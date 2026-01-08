@@ -1,0 +1,50 @@
+# Bridge Service Configuration
+# For local development with AggLayer
+
+[Log]
+Level = "debug"
+Outputs = ["stderr"]
+Environment = "development"
+
+[SyncDB]
+Database = "postgres"
+User = "agglayer"
+Password = "agglayer"
+Name = "bridge_db"
+Host = "agglayer-db"
+Port = "5432"
+MaxConns = 20
+
+[ClaimTxManager]
+Enabled = false
+FrequencyToMonitorTxs = "1s"
+PrivateKey = {Path = "/etc/bridge/keystore/claimtx.keystore", Password = ""}
+RetryInterval = "1s"
+RetryNumber = 10
+
+[Etherman]
+L1URL = "http://l1:8545"
+L2URLs = ["http://l2-reth:8545"]
+
+[Synchronizer]
+SyncInterval = "2s"
+SyncChunkSize = 100
+
+[BridgeController]
+Store = "postgres"
+Height = 32
+
+[BridgeServer]
+GRPCPort = "9090"
+HTTPPort = "8080"
+CacheSize = 100000
+DefaultPageLimit = 25
+MaxPageLimit = 100
+BridgeVersion = "v1"
+
+[NetworkConfig]
+GenBlockNumber = 1
+# Contract addresses - update after deployment
+PolygonBridgeAddress = "0x0000000000000000000000000000000000000000"
+PolygonZkEVMGlobalExitRootAddress = "0x0000000000000000000000000000000000000000"
+L2PolygonBridgeAddresses = ["0x0000000000000000000000000000000000000000"]

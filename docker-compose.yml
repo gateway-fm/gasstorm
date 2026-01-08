@@ -1,0 +1,354 @@
+services:
+  # Layer 1 - Anvil (local Ethereum node)
+  l1:
+    image: ghcr.io/foundry-rs/foundry:latest
+    container_name: sequencer-poc-l1
+    entrypoint: ["anvil"]
+    command: [
+      "--host", "0.0.0.0",
+      "--port", "8545",
+      "--block-time", "12",
+      "--accounts", "20",
+      "--balance", "100000",
+      "--chain-id", "1",
+      "--gas-limit", "30000000"
+    ]
+    ports:
+      - "18545:8545"  # Changed from 8545 to avoid conflicts
+    healthcheck:
+      test: ["CMD", "cast", "chain-id", "--rpc-url", "http://localhost:8545"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Layer 2 - op-reth with Engine API
+  l2-reth:
+    image: ghcr.io/paradigmxyz/op-reth:v1.9.3
+    container_name: sequencer-poc-l2
+    depends_on:
+      l1:
+        condition: service_healthy
+    command: [
+      "node",
+      "--chain", "/config/genesis.json",
+      "--datadir", "/data",
+      # RPC
+      "--http",
+      "--http.addr", "0.0.0.0",
+      "--http.port", "8545",
+      "--http.api", "eth,net,web3,debug,txpool",
+      "--http.corsdomain", "*",
+      # WebSocket
+      "--ws",
+      "--ws.addr", "0.0.0.0",
+      "--ws.port", "8546",
+      # Engine API (authenticated)
+      "--authrpc.addr", "0.0.0.0",
+      "--authrpc.port", "8551",
+      "--authrpc.jwtsecret", "/config/jwt.hex",
+      # Sequencer mode
+      "--rollup.disable-tx-pool-gossip",
+      # Performance tuning for high TPS
+      "--rpc.max-connections", "500",
+      "--rpc.max-request-size", "50",
+      "--rpc.max-response-size", "100",
+      # Logging - verbose debug mode
+      "--log.stdout.format", "terminal",
+      "-vvvv"
+    ]
+    volumes:
+      - ./genesis:/config:ro
+      - l2-data:/data
+    ports:
+      - "18546:8545"   # L2 RPC (changed from 8546)
+      - "18547:8546"   # L2 WebSocket (changed from 8547)
+      - "18551:8551"   # Engine API (changed from 8551)
+    # Note: healthcheck disabled as curl/wget not available in op-reth image
+    restart: unless-stopped
+
+  # Dashboard with RPC proxy (Next.js static build)
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: sequencer-poc-dashboard
+    depends_on:
+      - l1
+      - l2-reth
+      - block-builder
+    ports:
+      - "18000:80"  # Changed from 8000 to avoid conflicts
+    restart: unless-stopped
+
+  # Block Builder Service (Go)
+  block-builder:
+    build:
+      context: ./block-builder
+      dockerfile: Dockerfile
+    container_name: sequencer-poc-builder
+    depends_on:
+      - l2-reth
+    environment:
+      - ENGINE_RPC_URL=http://l2-reth:8551  # Internal port (unchanged)
+      - L2_RPC_URL=http://l2-reth:8545      # Internal port (unchanged)
+      - JWT_SECRET_PATH=/config/jwt.hex
+      - SEQUENCER_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+      - LISTEN_ADDR=:3000
+      # Block production settings
+      - BLOCK_TIME_MS=${BLOCK_TIME_MS:-150}
+      - SKIP_EMPTY_BLOCKS=${SKIP_EMPTY_BLOCKS:-true}
+      - GAS_LIMIT=${GAS_LIMIT:-1000000000}            # 1 gigagas default
+      - MAX_TXS_PER_BLOCK=${MAX_TXS_PER_BLOCK:-50000} # Scale with gas limit
+      # Transaction ordering
+      - TX_ORDERING=${TX_ORDERING:-tip_desc}          # fifo, tip_desc, tip_asc
+      # Experimental features
+      - ENABLE_PIPELINING=${ENABLE_PIPELINING:-false}
+      - PIPELINE_OVERLAP_MS=${PIPELINE_OVERLAP_MS:-50}
+      - ENABLE_PRECONFIRMATIONS=${ENABLE_PRECONFIRMATIONS:-true}
+      - PRECONF_LISTEN_ADDR=${PRECONF_LISTEN_ADDR:-:3001}
+      - PRECONF_BUFFER_SIZE=${PRECONF_BUFFER_SIZE:-1000}
+      # Transaction pool settings
+      - MAX_REQUEUE_COUNT=${MAX_REQUEUE_COUNT:-50}
+      # RPC timeouts
+      - NONCE_TIMEOUT_MS=${NONCE_TIMEOUT_MS:-500}
+    volumes:
+      - ./genesis/jwt.hex:/config/jwt.hex:ro
+    ports:
+      - "13000:3000"   # RPC for tx submission
+      - "13002:3001"   # Preconfirmation WebSocket (when enabled)
+    restart: unless-stopped
+
+  # Load Generator Service (Go) - High-performance tx generator with REST API
+  load-generator:
+    build:
+      context: ./load-generator
+      dockerfile: Dockerfile
+    container_name: sequencer-poc-loadgen
+    depends_on:
+      - block-builder
+      - l2-reth
+    environment:
+      - BUILDER_RPC_URL=http://block-builder:3000  # Internal connection to builder
+      - L2_RPC_URL=http://l2-reth:8545             # Internal connection to L2
+      - PRECONF_WS_URL=ws://block-builder:3001/ws/preconfirmations  # Preconfirmation WebSocket
+      - LISTEN_ADDR=:3001
+      - DATABASE_PATH=/data/loadgen.db             # SQLite database for test history
+    volumes:
+      - loadgen-data:/data
+    ports:
+      - "13001:3001"   # REST API for load test control
+    restart: unless-stopped
+
+  # Hyperlane Relayer (Phase 3)
+  hyperlane-relayer:
+    image: gcr.io/abacus-labs-dev/hyperlane-agent:main
+    container_name: sequencer-poc-relayer
+    profiles: ["bridge"]
+    depends_on:
+      l1:
+        condition: service_healthy
+      l2-reth:
+        condition: service_healthy
+    environment:
+      - HYP_BASE_CHAINS_L1_CONNECTION_URL=http://l1:8545
+      - HYP_BASE_CHAINS_L2_CONNECTION_URL=http://l2-reth:8545
+      - HYP_BASE_RELAYCHAINS=l1,l2
+    volumes:
+      - ./contracts/hyperlane/config:/config:ro
+    restart: unless-stopped
+
+  # =============================================================================
+  # AggLayer FEP Stack (profile: agglayer)
+  # Images sourced from kurtosis-cdk constants.star (2025-01)
+  # =============================================================================
+
+  # PostgreSQL for AggLayer services
+  agglayer-db:
+    image: postgres:17.6
+    container_name: sequencer-poc-postgres
+    profiles: ["agglayer"]
+    environment:
+      - POSTGRES_USER=agglayer
+      - POSTGRES_PASSWORD=agglayer
+      - POSTGRES_DB=agglayer
+    volumes:
+      - agglayer-db-data:/var/lib/postgresql/data
+      - ./config/init-agglayer-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agglayer -d agglayer"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # AggLayer Contracts Deployer - deploys bridge & rollup contracts to L1
+  # Run with: docker compose --profile agglayer-deploy up agglayer-contracts
+  agglayer-contracts:
+    image: europe-west2-docker.pkg.dev/prj-polygonlabs-devtools-dev/public/agglayer-contracts:v12.2.1
+    container_name: sequencer-poc-contracts
+    profiles: ["agglayer-deploy"]
+    depends_on:
+      l1:
+        condition: service_healthy
+    environment:
+      - L1_RPC_URL=http://l1:8545
+      - L1_CHAIN_ID=1
+      - L2_CHAIN_ID=42069
+      - DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+      - SEQUENCER_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+      - ADMIN_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+    volumes:
+      - ./output/contracts:/output
+    working_dir: /app
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Deploying AggLayer contracts to L1..."
+        # The contract deployer will output addresses to /output
+        # These need to be used in agglayer.toml and aggkit.toml
+        /app/deploy.sh 2>&1 | tee /output/deploy.log || true
+        echo "Contract deployment complete. Check /output for addresses."
+
+  # OP Succinct Proposer - SP1 prover for OP Stack validity proofs
+  # Uses mock prover mode for local development
+  op-succinct:
+    image: ghcr.io/agglayer/op-succinct/op-succinct-agglayer:v3.4.0-rc.1-agglayer
+    container_name: sequencer-poc-op-succinct
+    profiles: ["agglayer"]
+    depends_on:
+      agglayer-db:
+        condition: service_healthy
+      l2-reth:
+        condition: service_started
+    environment:
+      # Mock prover for local development
+      - SP1_PROVER=mock
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+      # L1/L2 connections
+      - L1_RPC_URL=http://l1:8545
+      - L2_RPC_URL=http://l2-reth:8545
+      - L2_NODE_RPC_URL=http://l2-reth:8545
+      # Database
+      - DATABASE_URL=postgres://agglayer:agglayer@agglayer-db:5432/op_succinct
+    ports:
+      - "13337:3000"
+    volumes:
+      - op-succinct-data:/data
+    restart: unless-stopped
+
+  # AggLayer Node - Settlement and aggregation layer
+  # Version: 0.4.4 with mock prover support
+  agglayer:
+    image: europe-west2-docker.pkg.dev/prj-polygonlabs-devtools-dev/public/agglayer:0.4.4-remove-agglayer-prover
+    container_name: sequencer-poc-agglayer
+    profiles: ["agglayer"]
+    depends_on:
+      l1:
+        condition: service_healthy
+      agglayer-db:
+        condition: service_healthy
+    volumes:
+      - ./config/agglayer.toml:/etc/agglayer/agglayer-config.toml:ro
+      - agglayer-data:/etc/agglayer/storage
+    entrypoint: ["/usr/local/bin/agglayer"]
+    command: ["run", "--cfg", "/etc/agglayer/agglayer-config.toml"]
+    environment:
+      - RUST_LOG=info
+      - RUST_BACKTRACE=1
+    ports:
+      - "15577:5577"   # RPC
+      - "14443:4443"   # gRPC
+      - "15578:5578"   # Admin
+      - "19092:9092"   # Prometheus metrics
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5577/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    restart: unless-stopped
+
+  # AggKit Node - Connects OP Stack chain to AggLayer
+  # Version: 0.8.0-beta5
+  aggkit:
+    image: ghcr.io/agglayer/aggkit:0.8.0-beta5
+    container_name: sequencer-poc-aggkit
+    profiles: ["agglayer"]
+    depends_on:
+      agglayer:
+        condition: service_healthy
+      l2-reth:
+        condition: service_started
+    volumes:
+      - ./config/aggkit.toml:/etc/aggkit/config.toml:ro
+      - aggkit-data:/data
+    command: ["run", "--cfg", "/etc/aggkit/config.toml", "--components", "aggsender,bridgesync,l1infotreesync"]
+    environment:
+      - RUST_LOG=debug
+    ports:
+      - "15579:5579"
+    restart: unless-stopped
+
+  # Bridge Service - Backend API for bridge operations
+  bridge-service:
+    image: ghcr.io/0xpolygon/zkevm-bridge-service:v0.6.4-RC1
+    container_name: sequencer-poc-bridge-svc
+    profiles: ["agglayer"]
+    depends_on:
+      agglayer-db:
+        condition: service_healthy
+      agglayer:
+        condition: service_healthy
+    volumes:
+      - ./config/bridge-service.toml:/etc/bridge/config.toml:ro
+    command: ["run", "--cfg", "/etc/bridge/config.toml"]
+    environment:
+      - BRIDGE_LOG_LEVEL=debug
+    ports:
+      - "18080:8080"   # REST API
+      - "19090:9090"   # gRPC
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Bridge UI - Web interface for bridging assets
+  bridge-ui:
+    image: europe-west2-docker.pkg.dev/prj-polygonlabs-devtools-dev/public/zkevm-bridge-ui:0006445
+    container_name: sequencer-poc-bridge-ui
+    profiles: ["agglayer"]
+    depends_on:
+      bridge-service:
+        condition: service_healthy
+    environment:
+      - VITE_ETHEREUM_RPC_URL=http://localhost:18545
+      - VITE_POLYGON_ZK_EVM_RPC_URL=http://localhost:18546
+      - VITE_BRIDGE_API_URL=http://localhost:18080
+      - VITE_ETHEREUM_BRIDGE_CONTRACT_ADDRESS=${L1_BRIDGE_ADDRESS:-0x0000000000000000000000000000000000000000}
+      - VITE_POLYGON_ZK_EVM_BRIDGE_CONTRACT_ADDRESS=${L2_BRIDGE_ADDRESS:-0x0000000000000000000000000000000000000000}
+      - VITE_ETHEREUM_PROOF_OF_EFFICIENCY_CONTRACT_ADDRESS=${ROLLUP_ADDRESS:-0x0000000000000000000000000000000000000000}
+      - VITE_ETHEREUM_ROLLUP_MANAGER_ADDRESS=${ROLLUP_MANAGER_ADDRESS:-0x0000000000000000000000000000000000000000}
+      - VITE_ETHEREUM_NETWORK_ID=1
+      - VITE_POLYGON_ZK_EVM_NETWORK_ID=42069
+      - VITE_SHOW_OUTDATED_NETWORK_MODAL=false
+    ports:
+      - "18088:80"
+    restart: unless-stopped
+
+volumes:
+  l2-data:
+  loadgen-data:
+  agglayer-db-data:
+  op-succinct-data:
+  agglayer-data:
+  aggkit-data:
+
+networks:
+  default:
+    name: sequencer-poc

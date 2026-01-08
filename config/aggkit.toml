@@ -1,0 +1,62 @@
+# AggKit Configuration
+# Connects OP Stack chain (op-reth) to AggLayer
+# Based on kurtosis-cdk patterns
+
+[Log]
+Level = "debug"
+Outputs = ["stderr"]
+Environment = "development"
+
+[L1]
+ChainID = 1
+RPCURL = "http://l1:8545"
+WsURL = "ws://l1:8545"
+RPCTimeout = "45s"
+# Contract addresses - update after deployment
+GlobalExitRootAddress = "0x0000000000000000000000000000000000000000"
+RollupManagerAddress = "0x0000000000000000000000000000000000000000"
+
+[L2]
+ChainID = 42069
+RPCURL = "http://l2-reth:8545"
+WsURL = "ws://l2-reth:8546"
+RPCTimeout = "45s"
+# Bridge address on L2 - update after deployment
+BridgeAddress = "0x0000000000000000000000000000000000000000"
+
+[AggSender]
+Enabled = true
+AgglayerURL = "http://agglayer:5577"
+SequencerPrivateKeyPath = "/etc/aggkit/keystore/sequencer.key"
+MaxRetriesStoreCertificate = 3
+DelayBetweenRetries = "5s"
+KeepCertificatesHistory = true
+SaveCertificatesToFilesPath = "/data/certificates"
+
+[BridgeSync]
+Enabled = true
+DBPath = "/data/bridgesync.db"
+SyncBlockChunkSize = 100
+BlockFinality = "latestBlock"
+InitialBlockNumber = 0
+RetryAfterErrorPeriod = "1s"
+MaxRetryAttemptsAfterError = 3
+WaitForNewBlocksPeriod = "2s"
+
+[L1InfoTreeSync]
+Enabled = true
+DBPath = "/data/l1infotreesync.db"
+SyncBlockChunkSize = 100
+InitialBlockNumber = 0
+RetryAfterErrorPeriod = "1s"
+MaxRetryAttemptsAfterError = 3
+WaitForNewBlocksPeriod = "2s"
+
+[ClaimTxManager]
+Enabled = false
+DBPath = "/data/claimtx.db"
+RetryInterval = "5s"
+RetryNumber = 10
+
+[AggOracle]
+Enabled = false

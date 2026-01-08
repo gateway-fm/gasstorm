@@ -1,0 +1,9 @@
+[profile.default]
+src = "."
+out = "out"
+libs = ["lib"]
+solc = "0.8.20"
+
+[rpc_endpoints]
+l1 = "http://localhost:8545"
+l2 = "http://localhost:8546"

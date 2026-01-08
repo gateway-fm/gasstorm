@@ -1,0 +1,29 @@
+# Hyperlane Warp Route Configuration
+# Enables ETH bridging between L1 and L2
+#
+# Usage: npx @hyperlane-xyz/cli deploy warp --config warp-config.yaml
+
+tokens:
+  - chainName: l1
+    standard: native      # Native ETH on L1
+    type: collateral      # Lock ETH on L1
+    name: "Ether"
+    symbol: "ETH"
+    decimals: 18
+
+  - chainName: l2
+    standard: native      # Native ETH on L2
+    type: synthetic       # Mint wrapped ETH on L2
+    name: "Wrapped Ether"
+    symbol: "WETH"
+    decimals: 18
+
+# Connection defines the bridge route
+connections:
+  - from: l1
+    to: l2
+
+# ISM for warp route messages
+warpRouteIsm:
+  l1: trustedRelayerIsm
+  l2: trustedRelayerIsm

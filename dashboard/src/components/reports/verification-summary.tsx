@@ -1,0 +1,115 @@
+"use client";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CheckCircle, XCircle, AlertTriangle, Clock } from "lucide-react";
+import { useGoLoadTestStore } from "@/stores/go-load-test-store";
+
+export function VerificationSummary() {
+  const { status, txSentCount, txConfirmedCount, txFailedCount, averageTps } = useGoLoadTestStore();
+
+  // Don't show if test hasn't run
+  if (status === "idle") {
+    return null;
+  }
+
+  const pendingCount = Math.max(0, txSentCount - txConfirmedCount - txFailedCount);
+  const allConfirmed = txSentCount > 0 && pendingCount === 0 && txFailedCount === 0;
+  const hasFailures = txFailedCount > 0;
+  const hasPending = pendingCount > 0;
+
+  const confirmRate = txSentCount > 0 ? (txConfirmedCount / txSentCount) * 100 : 0;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          Transaction Verification
+          {status === "running" && (
+            <Clock className="h-4 w-4 animate-pulse text-blue-400" />
+          )}
+          {status === "completed" && allConfirmed && (
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          )}
+          {status === "completed" && hasFailures && (
+            <XCircle className="h-4 w-4 text-red-500" />
+          )}
+          {status === "completed" && !hasFailures && hasPending && (
+            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {/* Summary Grid */}
+          <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="bg-muted/50 rounded p-2">
+              <div className="text-lg font-mono font-bold">{txSentCount.toLocaleString()}</div>
+              <div className="text-xs text-muted-foreground">Sent</div>
+            </div>
+            <div className="bg-green-500/10 rounded p-2">
+              <div className="text-lg font-mono font-bold text-green-400">
+                {txConfirmedCount.toLocaleString()}
+              </div>
+              <div className="text-xs text-muted-foreground">Confirmed</div>
+            </div>
+            <div className="bg-red-500/10 rounded p-2">
+              <div className="text-lg font-mono font-bold text-red-400">
+                {txFailedCount.toLocaleString()}
+              </div>
+              <div className="text-xs text-muted-foreground">Failed</div>
+            </div>
+            <div className="bg-yellow-500/10 rounded p-2">
+              <div className="text-lg font-mono font-bold text-yellow-400">
+                {pendingCount.toLocaleString()}
+              </div>
+              <div className="text-xs text-muted-foreground">Pending</div>
+            </div>
+          </div>
+
+          {/* Confirmation Rate */}
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Confirmation Rate</span>
+            <span className="font-mono font-semibold">{confirmRate.toFixed(1)}%</span>
+          </div>
+
+          {/* Average TPS */}
+          {averageTps > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Average TPS</span>
+              <span className="font-mono font-semibold">{averageTps.toFixed(0)} tx/s</span>
+            </div>
+          )}
+
+          {/* Status Message */}
+          {status === "running" && (
+            <div className="flex items-center gap-2 text-sm text-blue-400 bg-blue-400/10 rounded p-2">
+              <Clock className="h-4 w-4" />
+              Test in progress...
+            </div>
+          )}
+
+          {status === "completed" && allConfirmed && (
+            <div className="flex items-center gap-2 text-sm text-green-400 bg-green-400/10 rounded p-2">
+              <CheckCircle className="h-4 w-4" />
+              All {txSentCount.toLocaleString()} transactions confirmed on-chain
+            </div>
+          )}
+
+          {status === "completed" && hasFailures && (
+            <div className="flex items-center gap-2 text-sm text-red-400 bg-red-400/10 rounded p-2">
+              <XCircle className="h-4 w-4" />
+              {txFailedCount.toLocaleString()} transactions failed
+            </div>
+          )}
+
+          {status === "completed" && !hasFailures && hasPending && (
+            <div className="flex items-center gap-2 text-sm text-yellow-400 bg-yellow-400/10 rounded p-2">
+              <AlertTriangle className="h-4 w-4" />
+              {pendingCount.toLocaleString()} transactions still pending
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

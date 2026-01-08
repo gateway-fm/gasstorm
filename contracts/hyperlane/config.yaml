@@ -1,0 +1,47 @@
+# Hyperlane CLI Configuration
+# Usage: npx @hyperlane-xyz/cli deploy core --config config.yaml
+
+chains:
+  l1:
+    name: "Local L1"
+    chainId: 1
+    domainId: 1
+    protocol: ethereum
+    rpcUrls:
+      - http://localhost:8545
+    nativeToken:
+      name: Ether
+      symbol: ETH
+      decimals: 18
+
+  l2:
+    name: "Sequencer PoC L2"
+    chainId: 42069
+    domainId: 42069
+    protocol: ethereum
+    rpcUrls:
+      - http://localhost:8546
+    nativeToken:
+      name: Ether
+      symbol: ETH
+      decimals: 18
+
+# ISM Configuration
+# For PoC, use trusted relayer ISM
+ism:
+  l1:
+    type: trustedRelayerIsm
+    relayer: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+
+  l2:
+    type: trustedRelayerIsm
+    relayer: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+
+# Validator Configuration (for multisig ISM - production)
+# validators:
+#   l1:
+#     - address: "0x..."
+#       name: "Validator 1"
+#   l2:
+#     - address: "0x..."
+#       name: "Validator 1"

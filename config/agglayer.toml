@@ -1,0 +1,82 @@
+# AggLayer Configuration
+# Based on kurtosis-cdk templates/bridge-infra/agglayer-config.toml
+# For local development with mock prover
+
+# Debug mode for development
+debug-mode = true
+
+# Use mock verifier (no real ZK proofs)
+mock-verifier = true
+
+[Log]
+Level = "debug"
+Outputs = ["stderr"]
+Environment = "development"
+
+[RPC]
+Host = "0.0.0.0"
+Port = 5577
+ReadTimeout = "60s"
+WriteTimeout = "60s"
+MaxRequestBodySizeMB = 100
+
+[GRPC]
+Host = "0.0.0.0"
+Port = 4443
+MaxRecvMsgSizeMB = 100
+
+[Admin]
+Host = "0.0.0.0"
+Port = 5578
+
+[Telemetry]
+PrometheusAddr = "0.0.0.0:9092"
+
+[L1]
+ChainID = 1
+RPCURL = "http://l1:8545"
+WsURL = "ws://l1:8545"
+RPCTimeout = "45s"
+# Contract addresses - update after deployment
+RollupManagerAddress = "0x0000000000000000000000000000000000000000"
+GlobalExitRootAddress = "0x0000000000000000000000000000000000000000"
+
+[Prover]
+# Mock prover for local development - no real proofs generated
+Mock = true
+ProofGenerationTimeout = "5m"
+RequestTimeout = "300s"
+# For network prover (production), uncomment:
+# Mock = false
+# SP1ClusterEndpoint = "..."
+# SP1PrivateKey = "..."
+
+[EpochPacing]
+Enabled = false
+EpochDuration = 15
+
+[Settlement]
+MaxRetries = 3
+RetryInterval = "7s"
+Confirmations = 1
+SettlementTimeout = "1200s"
+GasMultiplierFactor = 1.75
+
+[Storage]
+DBPath = "/etc/agglayer/storage/agglayer.db"
+MaxBackups = 100
+
+[RateLimiting]
+SendTxRateLimit = 0
+
+[Runtime]
+ShutdownTimeout = "5s"
+
+# Full node RPC endpoints for connected chains
+[FullNodeRPCs]
+# Chain ID 42069 -> op-reth L2
+42069 = "http://l2-reth:8545"
+
+# Proof signers - sequencer address
+[ProofSigners]
+42069 = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
