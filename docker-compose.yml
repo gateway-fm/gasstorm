@@ -178,6 +178,9 @@ services:
       - MAX_REQUEUE_COUNT=${MAX_REQUEUE_COUNT:-50}
       # RPC timeouts (reduced for faster block building)
       - NONCE_TIMEOUT_MS=${NONCE_TIMEOUT_MS:-200}
+      # Speculative block building
+      - BUILDER_FULL_DECOUPLING=${BUILDER_FULL_DECOUPLING:-false}
+      - BUILDER_MAX_SPECULATIVE_DEPTH=${BUILDER_MAX_SPECULATIVE_DEPTH:-100}
     volumes:
       - ./genesis/jwt.hex:/config/jwt.hex:ro
     ports:
