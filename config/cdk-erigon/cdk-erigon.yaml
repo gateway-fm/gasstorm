@@ -1,0 +1,52 @@
+# CDK-Erigon Sequencer Configuration for Devnet
+# This config runs cdk-erigon as a standalone sequencer without L1 dependency
+
+datadir: /data
+chain: dynamic-devnet
+
+# HTTP RPC
+http: true
+http.addr: "0.0.0.0"
+http.port: 8545
+http.api: ["eth", "net", "web3", "txpool", "zkevm"]
+http.corsdomain: "*"
+http.vhosts: "*"
+
+# WebSocket
+ws: true
+ws.addr: "0.0.0.0"
+ws.port: 8546
+
+# Private API (internal gRPC)
+private.api.addr: "0.0.0.0:9091"
+
+# zkEVM Configuration
+zkevm:
+  l2-chain-id: 42069
+
+  # Disable strict executor mode - allows running without prover/executor
+  executor-strict: false
+  executor-urls: ""
+
+  # No L1 sync for standalone devnet mode
+  l1-rpc-url: ""
+  l1-chain-id: 0
+
+  # Sequencer address (Anvil default account 0)
+  address-sequencer: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+
+  # Disable features not needed for devnet
+  data-stream-port: 0
+  data-stream-host: ""
+
+# Logging
+log.console.verbosity: 3
+
+# Disable metrics for simplicity
+metrics: false
+
+# TxPool settings
+txpool.accountslots: 16
+txpool.globalslots: 10000
+txpool.accountqueue: 64
+txpool.globalqueue: 10000

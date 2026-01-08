@@ -39,6 +39,57 @@ import {
 
 const LOAD_GEN_API = "/api/loadgen";
 
+// Transform Go API PascalCase to TypeScript camelCase for TestRun
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function transformTestRun(run: any): TestRun {
+  return {
+    id: run?.ID || run?.id || "",
+    startedAt: run?.StartedAt || run?.startedAt || "",
+    completedAt: run?.CompletedAt || run?.completedAt,
+    pattern: run?.Pattern || run?.pattern || "constant",
+    transactionType: run?.TransactionType || run?.transactionType || "eth-transfer",
+    durationMs: run?.DurationMs || run?.durationMs || 0,
+    txSent: run?.TxSent || run?.txSent || 0,
+    txConfirmed: run?.TxConfirmed || run?.txConfirmed || 0,
+    txFailed: run?.TxFailed || run?.txFailed || 0,
+    averageTps: run?.AverageTPS || run?.averageTps || 0,
+    peakTps: run?.PeakTPS || run?.peakTps || 0,
+    latencyStats: run?.LatencyStats || run?.latencyStats,
+    preconfLatency: run?.PreconfLatency || run?.preconfLatency,
+    config: run?.Config || run?.config,
+    status: run?.Status || run?.status || "completed",
+    errorMessage: run?.ErrorMessage || run?.errorMessage,
+    txLoggingEnabled: run?.TxLoggingEnabled ?? run?.txLoggingEnabled ?? false,
+    executionLayer: run?.ExecutionLayer || run?.executionLayer || "reth",
+    // Block metrics (aggregated)
+    blockCount: run?.BlockCount || run?.blockCount,
+    totalGasUsed: run?.TotalGasUsed || run?.totalGasUsed,
+    avgFillRate: run?.AvgFillRate || run?.avgFillRate,
+    peakMgasPerSec: run?.PeakMgasPerSec || run?.peakMgasPerSec,
+    avgMgasPerSec: run?.AvgMgasPerSec || run?.avgMgasPerSec,
+  };
+}
+
+// Transform Go API PascalCase to TypeScript camelCase for TimeSeriesPoint
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function transformTimeSeriesPoint(p: any): TimeSeriesPoint {
+  return {
+    timestampMs: p?.TimestampMs || p?.timestampMs || 0,
+    txSent: p?.TxSent || p?.txSent || 0,
+    txConfirmed: p?.TxConfirmed || p?.txConfirmed || 0,
+    txFailed: p?.TxFailed || p?.txFailed || 0,
+    currentTps: p?.CurrentTPS || p?.currentTps || 0,
+    targetTps: p?.TargetTPS || p?.targetTps || 0,
+    pendingCount: p?.PendingCount || p?.pendingCount || 0,
+    // Block metrics per sample period
+    gasUsed: p?.GasUsed || p?.gasUsed,
+    gasLimit: p?.GasLimit || p?.gasLimit,
+    blockCount: p?.BlockCount || p?.blockCount,
+    mgasPerSec: p?.MgasPerSec || p?.mgasPerSec,
+    fillRate: p?.FillRate || p?.fillRate,
+  };
+}
+
 interface HistoryItem extends TestResult {
   txLoggingEnabled?: boolean;
 }
@@ -65,31 +116,35 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
       const response = await fetch(`${LOAD_GEN_API}/history?limit=50&offset=0`);
       if (response.ok) {
         const data = await response.json();
-        // Check if it's paginated response
-        if (data.runs) {
-          const paginatedData = data as PaginatedTestRuns;
-          // Map TestRun to HistoryItem
+        // Check if it's paginated response (supports both PascalCase and camelCase)
+        const runs = data.Runs || data.runs;
+        if (runs) {
+          // Transform each run from PascalCase to camelCase and map to HistoryItem
           setHistory(
-            paginatedData.runs.map((run: TestRun) => ({
-              id: run.id,
-              startedAt: run.startedAt,
-              completedAt: run.completedAt || "",
-              pattern: run.pattern,
-              transactionType: run.transactionType,
-              durationMs: run.durationMs,
-              txSent: run.txSent,
-              txConfirmed: run.txConfirmed,
-              txFailed: run.txFailed,
-              averageTps: run.averageTps,
-              peakTps: run.peakTps,
-              latency: run.latencyStats,
-              preconfLatency: run.preconfLatency,
-              config: run.config || {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            runs.map((rawRun: any) => {
+              const run = transformTestRun(rawRun);
+              return {
+                id: run.id,
+                startedAt: run.startedAt,
+                completedAt: run.completedAt || "",
                 pattern: run.pattern,
-                durationSec: Math.round(run.durationMs / 1000),
-              },
-              txLoggingEnabled: run.txLoggingEnabled,
-            }))
+                transactionType: run.transactionType,
+                durationMs: run.durationMs,
+                txSent: run.txSent,
+                txConfirmed: run.txConfirmed,
+                txFailed: run.txFailed,
+                averageTps: run.averageTps,
+                peakTps: run.peakTps,
+                latency: run.latencyStats,
+                preconfLatency: run.preconfLatency,
+                config: run.config || {
+                  pattern: run.pattern,
+                  durationSec: Math.round(run.durationMs / 1000),
+                },
+                txLoggingEnabled: run.txLoggingEnabled,
+              };
+            })
           );
         } else {
           // Old format - array of TestResult
@@ -110,12 +165,19 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
     try {
       const response = await fetch(`${LOAD_GEN_API}/history/${testId}`);
       if (response.ok) {
-        const data: TestRunDetail = await response.json();
-        if (data.timeSeries) {
-          setTimeSeries((prev) => ({ ...prev, [testId]: data.timeSeries }));
+        const rawData = await response.json();
+        // Transform from PascalCase to camelCase
+        const rawRun = rawData.Run || rawData.run;
+        const rawTimeSeries = rawData.TimeSeries || rawData.timeSeries || [];
+
+        const transformedTimeSeries = rawTimeSeries.map(transformTimeSeriesPoint);
+
+        if (transformedTimeSeries.length > 0) {
+          setTimeSeries((prev) => ({ ...prev, [testId]: transformedTimeSeries }));
         }
-        if (data.run) {
-          setTxLoggingEnabled(data.run.txLoggingEnabled);
+        if (rawRun) {
+          const run = transformTestRun(rawRun);
+          setTxLoggingEnabled(run.txLoggingEnabled);
         }
       }
     } catch {
@@ -228,7 +290,17 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
                   >
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="font-mono text-xs">
-                        {result.pattern}
+                        {result.pattern || "unknown"}
+                      </Badge>
+                      <Badge
+                        variant="secondary"
+                        className={`font-mono text-xs ${
+                          (result as TestRun).executionLayer === "cdk-erigon"
+                            ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                            : "bg-orange-500/10 text-orange-400 border-orange-500/20"
+                        }`}
+                      >
+                        {(result as TestRun).executionLayer || "reth"}
                       </Badge>
                       <span className="text-sm text-muted-foreground">
                         {formatDate(result.startedAt)}
@@ -420,6 +492,16 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="font-mono text-xs">
                           {result.pattern}
+                        </Badge>
+                        <Badge
+                          variant="secondary"
+                          className={`font-mono text-xs ${
+                            (result as TestRun).executionLayer === "cdk-erigon"
+                              ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                              : "bg-orange-500/10 text-orange-400 border-orange-500/20"
+                          }`}
+                        >
+                          {(result as TestRun).executionLayer || "reth"}
                         </Badge>
                         <span className="text-sm text-muted-foreground">
                           {formatDate(result.startedAt)}

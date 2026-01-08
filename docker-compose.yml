@@ -22,10 +22,11 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # Layer 2 - op-reth with Engine API
+  # Layer 2 - op-reth with Engine API (profile: reth)
   l2-reth:
     image: ghcr.io/paradigmxyz/op-reth:v1.9.3
     container_name: sequencer-poc-l2
+    profiles: ["reth"]
     depends_on:
       l1:
         condition: service_healthy
@@ -50,12 +51,13 @@ services:
       # Sequencer mode
       "--rollup.disable-tx-pool-gossip",
       # Performance tuning for high TPS
-      "--rpc.max-connections", "500",
-      "--rpc.max-request-size", "50",
-      "--rpc.max-response-size", "100",
-      # Logging - verbose debug mode
+      "--rpc.max-connections", "1000",
+      "--rpc.max-request-size", "100",
+      "--rpc.max-response-size", "200",
+      "--rpc.max-tracing-requests", "50",
+      # Reduce logging for performance (change to -vvvv for debug)
       "--log.stdout.format", "terminal",
-      "-vvvv"
+      "-v"
     ]
     volumes:
       - ./genesis:/config:ro
@@ -64,15 +66,64 @@ services:
       - "18546:8545"   # L2 RPC (changed from 8546)
       - "18547:8546"   # L2 WebSocket (changed from 8547)
       - "18551:8551"   # Engine API (changed from 8551)
+    # Resource limits for performance
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
     # Note: healthcheck disabled as curl/wget not available in op-reth image
     restart: unless-stopped
 
-  # Dashboard with RPC proxy (Next.js static build)
+  # Layer 2 - CDK-Erigon (alternative execution layer - sequencer mode)
+  # When using cdk-erigon, the block-builder is NOT used - cdk-erigon is its own sequencer
+  l2-cdk-erigon:
+    image: hermeznetwork/cdk-erigon:20251127001542-3aa1157
+    container_name: sequencer-poc-cdk-erigon
+    profiles: ["cdk-erigon"]
+    depends_on:
+      l1:
+        condition: service_healthy
+    environment:
+      - CDK_ERIGON_SEQUENCER=1
+    command: [
+      "--config=/config/cdk-erigon.yaml",
+      "--datadir=/data",
+      "--http",
+      "--http.addr=0.0.0.0",
+      "--http.port=8545",
+      "--http.api=eth,net,web3,txpool,zkevm",
+      "--http.corsdomain=*",
+      "--ws",
+      "--ws.addr=0.0.0.0",
+      "--ws.port=8546"
+    ]
+    volumes:
+      - ./config/cdk-erigon:/config:ro
+      - cdk-erigon-data:/data
+    ports:
+      - "18546:8545"   # L2 RPC (same external port as op-reth for consistency)
+      - "18547:8546"   # L2 WebSocket
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+    restart: unless-stopped
+
+  # Dashboard with RPC proxy (Next.js static build) - for op-reth mode
   dashboard:
     build:
       context: ./dashboard
       dockerfile: Dockerfile
     container_name: sequencer-poc-dashboard
+    profiles: ["reth"]
     depends_on:
       - l1
       - l2-reth
@@ -81,12 +132,27 @@ services:
       - "18000:80"  # Changed from 8000 to avoid conflicts
     restart: unless-stopped
 
-  # Block Builder Service (Go)
+  # Dashboard for cdk-erigon mode
+  dashboard-cdk:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: sequencer-poc-dashboard
+    profiles: ["cdk-erigon"]
+    depends_on:
+      - l1
+      - l2-cdk-erigon
+    ports:
+      - "18000:80"
+    restart: unless-stopped
+
+  # Block Builder Service (Go) - only used with op-reth (profile: reth)
   block-builder:
     build:
       context: ./block-builder
       dockerfile: Dockerfile
     container_name: sequencer-poc-builder
+    profiles: ["reth"]
     depends_on:
       - l2-reth
     environment:
@@ -110,8 +176,8 @@ services:
       - PRECONF_BUFFER_SIZE=${PRECONF_BUFFER_SIZE:-1000}
       # Transaction pool settings
       - MAX_REQUEUE_COUNT=${MAX_REQUEUE_COUNT:-50}
-      # RPC timeouts
-      - NONCE_TIMEOUT_MS=${NONCE_TIMEOUT_MS:-500}
+      # RPC timeouts (reduced for faster block building)
+      - NONCE_TIMEOUT_MS=${NONCE_TIMEOUT_MS:-200}
     volumes:
       - ./genesis/jwt.hex:/config/jwt.hex:ro
     ports:
@@ -119,21 +185,48 @@ services:
       - "13002:3001"   # Preconfirmation WebSocket (when enabled)
     restart: unless-stopped
 
-  # Load Generator Service (Go) - High-performance tx generator with REST API
+  # Load Generator Service (Go) - for op-reth mode (profile: reth)
   load-generator:
     build:
       context: ./load-generator
       dockerfile: Dockerfile
     container_name: sequencer-poc-loadgen
+    profiles: ["reth"]
     depends_on:
       - block-builder
       - l2-reth
     environment:
+      - EXECUTION_LAYER=reth
       - BUILDER_RPC_URL=http://block-builder:3000  # Internal connection to builder
       - L2_RPC_URL=http://l2-reth:8545             # Internal connection to L2
+      - L2_WS_URL=ws://l2-reth:8546                # L2 WebSocket for block metrics (newHeads)
       - PRECONF_WS_URL=ws://block-builder:3001/ws/preconfirmations  # Preconfirmation WebSocket
       - LISTEN_ADDR=:3001
       - DATABASE_PATH=/data/loadgen.db             # SQLite database for test history
+    volumes:
+      - loadgen-data:/data
+    ports:
+      - "13001:3001"   # REST API for load test control
+    restart: unless-stopped
+
+  # Load Generator Service (Go) - for cdk-erigon mode (profile: cdk-erigon)
+  # Sends transactions directly to cdk-erigon RPC (no block-builder)
+  load-generator-cdk:
+    build:
+      context: ./load-generator
+      dockerfile: Dockerfile
+    container_name: sequencer-poc-loadgen
+    profiles: ["cdk-erigon"]
+    depends_on:
+      - l2-cdk-erigon
+    environment:
+      - EXECUTION_LAYER=cdk-erigon
+      - BUILDER_RPC_URL=http://l2-cdk-erigon:8545  # Direct to cdk-erigon RPC
+      - L2_RPC_URL=http://l2-cdk-erigon:8545       # Same as builder in this mode
+      - L2_WS_URL=ws://l2-cdk-erigon:8546          # L2 WebSocket for block metrics
+      - PRECONF_WS_URL=                            # No preconfirmations in cdk-erigon mode
+      - LISTEN_ADDR=:3001
+      - DATABASE_PATH=/data/loadgen.db
     volumes:
       - loadgen-data:/data
     ports:
@@ -343,6 +436,7 @@ services:
 
 volumes:
   l2-data:
+  cdk-erigon-data:
   loadgen-data:
   agglayer-db-data:
   op-succinct-data:

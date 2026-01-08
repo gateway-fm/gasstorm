@@ -271,6 +271,12 @@ export interface TimeSeriesPoint {
   currentTps: number;
   targetTps: number;
   pendingCount: number;
+  // Block metrics (from L2 newHeads subscription)
+  gasUsed?: number;
+  gasLimit?: number;
+  blockCount?: number;
+  mgasPerSec?: number;
+  fillRate?: number;
 }
 
 // Transaction log entry from persistent storage
@@ -287,6 +293,9 @@ export interface TransactionLogEntry {
   nonce: number;
   gasTipGwei?: number;
 }
+
+// Execution layer type
+export type ExecutionLayer = "reth" | "cdk-erigon";
 
 // Test run from persistent storage (enhanced version of TestResult)
 export interface TestRun {
@@ -307,6 +316,13 @@ export interface TestRun {
   status: "running" | "completed" | "error";
   errorMessage?: string;
   txLoggingEnabled: boolean;
+  executionLayer: ExecutionLayer; // "reth" or "cdk-erigon"
+  // Block metrics (aggregated from time series)
+  blockCount?: number;
+  totalGasUsed?: number;
+  avgFillRate?: number;
+  peakMgasPerSec?: number;
+  avgMgasPerSec?: number;
 }
 
 // Test run with time-series detail

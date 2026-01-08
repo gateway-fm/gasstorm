@@ -20,6 +20,24 @@ import { Button } from "@/components/ui/button";
 import { Loader2, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import type { TransactionLogEntry, PaginatedTxLogs } from "@/types/load-test";
 
+// Transform Go API PascalCase to TypeScript camelCase for TransactionLogEntry
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function transformTxLog(log: any): TransactionLogEntry {
+  return {
+    txHash: log?.TxHash || log?.txHash || "",
+    sentAtMs: log?.SentAtMs || log?.sentAtMs || 0,
+    confirmedAtMs: log?.ConfirmedAtMs || log?.confirmedAtMs,
+    preconfAtMs: log?.PreconfAtMs || log?.preconfAtMs,
+    confirmLatencyMs: log?.ConfirmLatencyMs || log?.confirmLatencyMs,
+    preconfLatencyMs: log?.PreconfLatencyMs || log?.preconfLatencyMs,
+    status: log?.Status || log?.status || "pending",
+    errorReason: log?.ErrorReason || log?.errorReason,
+    fromAccount: log?.FromAccount ?? log?.fromAccount ?? 0,
+    nonce: log?.Nonce ?? log?.nonce ?? 0,
+    gasTipGwei: log?.GasTipGwei || log?.gasTipGwei,
+  };
+}
+
 interface TxLogViewerProps {
   testId: string;
   open: boolean;
@@ -45,9 +63,18 @@ export function TxLogViewer({ testId, open, onClose, txLoggingEnabled }: TxLogVi
       if (!res.ok) {
         throw new Error(`Failed to fetch: ${res.statusText}`);
       }
-      const data: PaginatedTxLogs = await res.json();
-      setLogs(data.transactions || []);
-      setTotal(data.total);
+      const data = await res.json();
+      // Handle both PascalCase (Go) and camelCase responses
+      const rawTransactions = data?.Transactions || data?.transactions || [];
+      const rawTotal = data?.Total ?? data?.total ?? 0;
+
+      // Transform each transaction from PascalCase to camelCase
+      const transformedLogs = Array.isArray(rawTransactions)
+        ? rawTransactions.map(transformTxLog)
+        : [];
+
+      setLogs(transformedLogs);
+      setTotal(typeof rawTotal === "number" ? rawTotal : 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch transactions");
     } finally {
@@ -61,7 +88,8 @@ export function TxLogViewer({ testId, open, onClose, txLoggingEnabled }: TxLogVi
     }
   }, [open, fetchLogs, txLoggingEnabled]);
 
-  const formatTxHash = (hash: string) => {
+  const formatTxHash = (hash: string | undefined | null) => {
+    if (!hash) return "N/A";
     if (hash.length <= 18) return hash;
     return `${hash.slice(0, 10)}...${hash.slice(-6)}`;
   };

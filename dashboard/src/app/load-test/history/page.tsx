@@ -17,11 +17,69 @@ import { useMetricsStore } from "@/stores/metrics-store";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, RefreshCw, AlertCircle } from "lucide-react";
-import type { TestRun, TestRunDetail } from "@/types/load-test";
+import type { TestRun, TestRunDetail, TimeSeriesPoint } from "@/types/load-test";
 import type { Statistics } from "@/types/metrics";
 import { calculateStatistics } from "@/lib/statistics";
 
 const LOAD_GEN_API = "/api/loadgen";
+
+// Transform Go API PascalCase response to TypeScript camelCase
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function transformApiResponse(data: any): TestRunDetail {
+  const run = data.Run || data.run;
+  const timeSeries = data.TimeSeries || data.timeSeries || [];
+
+  // Transform TestRun from PascalCase to camelCase
+  const transformedRun: TestRun = {
+    id: run?.ID || run?.id || "",
+    startedAt: run?.StartedAt || run?.startedAt || "",
+    completedAt: run?.CompletedAt || run?.completedAt,
+    pattern: run?.Pattern || run?.pattern || "constant",
+    transactionType: run?.TransactionType || run?.transactionType || "eth-transfer",
+    durationMs: run?.DurationMs || run?.durationMs || 0,
+    txSent: run?.TxSent || run?.txSent || 0,
+    txConfirmed: run?.TxConfirmed || run?.txConfirmed || 0,
+    txFailed: run?.TxFailed || run?.txFailed || 0,
+    averageTps: run?.AverageTPS || run?.averageTps || 0,
+    peakTps: run?.PeakTPS || run?.peakTps || 0,
+    latencyStats: run?.LatencyStats || run?.latencyStats,
+    preconfLatency: run?.PreconfLatency || run?.preconfLatency,
+    config: run?.Config || run?.config,
+    status: run?.Status || run?.status || "completed",
+    errorMessage: run?.ErrorMessage || run?.errorMessage,
+    txLoggingEnabled: run?.TxLoggingEnabled ?? run?.txLoggingEnabled ?? false,
+    executionLayer: run?.ExecutionLayer || run?.executionLayer || "reth",
+    // Block metrics (aggregated)
+    blockCount: run?.BlockCount || run?.blockCount,
+    totalGasUsed: run?.TotalGasUsed || run?.totalGasUsed,
+    avgFillRate: run?.AvgFillRate || run?.avgFillRate,
+    peakMgasPerSec: run?.PeakMgasPerSec || run?.peakMgasPerSec,
+    avgMgasPerSec: run?.AvgMgasPerSec || run?.avgMgasPerSec,
+  };
+
+  // Transform TimeSeriesPoint[] from PascalCase to camelCase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const transformedTimeSeries: TimeSeriesPoint[] = timeSeries.map((p: any) => ({
+    timestampMs: p?.TimestampMs || p?.timestampMs || 0,
+    txSent: p?.TxSent || p?.txSent || 0,
+    txConfirmed: p?.TxConfirmed || p?.txConfirmed || 0,
+    txFailed: p?.TxFailed || p?.txFailed || 0,
+    currentTps: p?.CurrentTPS || p?.currentTps || 0,
+    targetTps: p?.TargetTPS || p?.targetTps || 0,
+    pendingCount: p?.PendingCount || p?.pendingCount || 0,
+    // Block metrics per sample period
+    gasUsed: p?.GasUsed || p?.gasUsed,
+    gasLimit: p?.GasLimit || p?.gasLimit,
+    blockCount: p?.BlockCount || p?.blockCount,
+    mgasPerSec: p?.MgasPerSec || p?.mgasPerSec,
+    fillRate: p?.FillRate || p?.fillRate,
+  }));
+
+  return {
+    run: transformedRun,
+    timeSeries: transformedTimeSeries,
+  };
+}
 
 // Detail view component
 function HistoryDetailView({ testId }: { testId: string }) {
@@ -91,7 +149,8 @@ function HistoryDetailView({ testId }: { testId: string }) {
           throw new Error(`Failed to load test: ${response.statusText}`);
         }
 
-        const data: TestRunDetail = await response.json();
+        const rawData = await response.json();
+        const data = transformApiResponse(rawData);
         setTestRun(data.run);
 
         hydrateGoStore(data.run, data.timeSeries || []);
@@ -163,7 +222,7 @@ function HistoryDetailView({ testId }: { testId: string }) {
         <LatencyHistogram />
       </div>
 
-      {testRun.pattern === "stress" && (
+      {testRun?.pattern === "stress" && (
         <div className="grid gap-4 md:grid-cols-2 mb-6">
           <TipHistogram />
           <TxTypeBreakdown />

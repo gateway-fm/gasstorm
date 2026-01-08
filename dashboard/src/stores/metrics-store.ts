@@ -25,12 +25,24 @@ interface HistoricalTestRun {
   txConfirmed: number;
   averageTps: number;
   peakTps: number;
+  // Block metrics (aggregated)
+  blockCount?: number;
+  totalGasUsed?: number;
+  avgFillRate?: number;
+  peakMgasPerSec?: number;
+  avgMgasPerSec?: number;
 }
 
 interface HistoricalTimeSeriesPoint {
   timestampMs: number;
   currentTps: number;
   targetTps: number;
+  // Block metrics per sample period
+  gasUsed?: number;
+  gasLimit?: number;
+  blockCount?: number;
+  mgasPerSec?: number;
+  fillRate?: number;
 }
 
 interface MetricsActions {
@@ -171,29 +183,32 @@ export const useMetricsStore = create<MetricsStore>()(
   // Hydrate store with historical test data (for history detail view)
   hydrateFromHistory: (run: HistoricalTestRun, timeSeries: HistoricalTimeSeriesPoint[]) => {
     // Convert TimeSeriesPoint[] to MetricsTimeSeries format
-    // Note: Block metrics (Mgas/s, fillRate) are not available in historical data
     const timestamps = timeSeries.map(p => p.timestampMs / 1000);
     const txPerSec = timeSeries.map(p => p.currentTps);
 
+    // Extract block metrics from time series (now available in historical data)
+    const mgasPerSec = timeSeries.map(p => p.mgasPerSec ?? 0);
+    const blockFillRate = timeSeries.map(p => p.fillRate ?? 0);
+
     set({
-      blockMetrics: [], // Not available in history
+      blockMetrics: [], // Raw block data not available, but time series has aggregated values
       timeSeries: {
         timestamps,
-        mgasPerSec: [], // Not available in history
+        mgasPerSec,
         txPerSec,
-        blockFillRate: [], // Not available in history
+        blockFillRate,
         latencies: [],
       },
       snapshot: {
-        currentMgasPerSec: 0,
+        currentMgasPerSec: run.avgMgasPerSec ?? 0,
         currentTxPerSec: run.averageTps,
-        currentFillRate: 0,
-        peakMgasPerSec: 0,
+        currentFillRate: run.avgFillRate ?? 0,
+        peakMgasPerSec: run.peakMgasPerSec ?? 0,
         peakTxPerSec: run.peakTps,
-        averageFillRate: 0,
-        totalGasUsed: 0n,
+        averageFillRate: run.avgFillRate ?? 0,
+        totalGasUsed: BigInt(run.totalGasUsed ?? 0),
         totalTransactions: run.txConfirmed,
-        blocksProduced: 0,
+        blocksProduced: run.blockCount ?? 0,
       },
       transactions: [],
       latencies: [],

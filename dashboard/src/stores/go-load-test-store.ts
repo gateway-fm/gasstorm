@@ -369,7 +369,7 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
       const request: StartTestRequest = {
         pattern,
         durationSec,
-        numAccounts: 10, // Default - stress test overrides this from stressConfig
+        numAccounts: 100, // Default - stress test overrides this from stressConfig
         transactionType: cfg.transactionType ?? "eth-transfer",
       };
 

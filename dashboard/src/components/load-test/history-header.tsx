@@ -3,8 +3,10 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Clock, Calendar, Zap } from "lucide-react";
-import type { TestRun } from "@/types/load-test";
+import { ArrowLeft, Clock, Calendar, Zap, Download, FileJson, FileSpreadsheet } from "lucide-react";
+import type { TestRun, TimeSeriesPoint } from "@/types/load-test";
+import { useMetricsStore } from "@/stores/metrics-store";
+import { useGoLoadTestStore } from "@/stores/go-load-test-store";
 
 interface HistoryHeaderProps {
   testRun: TestRun;
@@ -53,27 +55,122 @@ function getTxTypeLabel(type: string): string {
   return labels[type] || type;
 }
 
+// Export helpers
+function downloadFile(content: string, filename: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function generateTestFilename(testRun: TestRun, extension: string): string {
+  const date = new Date(testRun.startedAt);
+  const dateStr = date.toISOString().split("T")[0];
+  const timeStr = date.toISOString().split("T")[1].slice(0, 5).replace(":", "");
+  return `load-test-${testRun.pattern}-${dateStr}-${timeStr}.${extension}`;
+}
+
+interface ExportData {
+  testRun: TestRun;
+  timeSeries: { timestamps: number[]; txPerSec: number[]; mgasPerSec: number[]; blockFillRate: number[] };
+  latencyStats?: { min: number; max: number; avg: number; p50: number; p95: number; p99: number; count: number };
+  preconfStats?: { min: number; max: number; avg: number; p50: number; p95: number; p99: number; count: number };
+  snapshot: { peakMgasPerSec: number; peakTxPerSec: number; averageFillRate: number; totalTransactions: number; blocksProduced: number };
+}
+
 export function HistoryHeader({ testRun, onBack }: HistoryHeaderProps) {
-  const config = testRun.config;
+  const config = testRun?.config;
+  const pattern = testRun?.pattern || "unknown";
+  const transactionType = testRun?.transactionType || "unknown";
+
+  const timeSeries = useMetricsStore((s) => s.timeSeries);
+  const snapshot = useMetricsStore((s) => s.snapshot);
+  const latencyStats = useGoLoadTestStore((s) => s.latencyStats);
+  const preconfStats = useGoLoadTestStore((s) => s.preconfLatencyStats);
+
+  const handleExportJSON = () => {
+    const exportData: ExportData = {
+      testRun,
+      timeSeries,
+      latencyStats: latencyStats ? {
+        min: latencyStats.min,
+        max: latencyStats.max,
+        avg: latencyStats.avg,
+        p50: latencyStats.p50,
+        p95: latencyStats.p95,
+        p99: latencyStats.p99,
+        count: latencyStats.count,
+      } : undefined,
+      preconfStats: preconfStats ? {
+        min: preconfStats.min,
+        max: preconfStats.max,
+        avg: preconfStats.avg,
+        p50: preconfStats.p50,
+        p95: preconfStats.p95,
+        p99: preconfStats.p99,
+        count: preconfStats.count,
+      } : undefined,
+      snapshot: {
+        peakMgasPerSec: snapshot.peakMgasPerSec,
+        peakTxPerSec: snapshot.peakTxPerSec,
+        averageFillRate: snapshot.averageFillRate,
+        totalTransactions: snapshot.totalTransactions,
+        blocksProduced: snapshot.blocksProduced,
+      },
+    };
+    const json = JSON.stringify(exportData, null, 2);
+    downloadFile(json, generateTestFilename(testRun, "json"), "application/json");
+  };
+
+  const handleExportCSV = () => {
+    // Build CSV with time series data
+    const headers = ["timestamp_sec", "tx_per_sec", "mgas_per_sec", "fill_rate_pct"];
+    const rows = timeSeries.timestamps.map((ts, i) => [
+      ts.toFixed(1),
+      (timeSeries.txPerSec[i] ?? 0).toFixed(2),
+      (timeSeries.mgasPerSec[i] ?? 0).toFixed(3),
+      (timeSeries.blockFillRate[i] ?? 0).toFixed(1),
+    ].join(","));
+
+    const csv = [headers.join(","), ...rows].join("\n");
+    downloadFile(csv, generateTestFilename(testRun, "csv"), "text/csv");
+  };
 
   return (
     <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-      {/* Left side: Back button + title */}
+      {/* Left side: Back button + title + export */}
       <div className="space-y-2">
-        <Button variant="ghost" size="sm" onClick={onBack} className="gap-2 -ml-2">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Load Test
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={onBack} className="gap-2 -ml-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Load Test
+          </Button>
+          <div className="flex items-center gap-1 ml-auto md:ml-4">
+            <Button variant="outline" size="sm" onClick={handleExportJSON} className="gap-1.5 h-8">
+              <FileJson className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">JSON</span>
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportCSV} className="gap-1.5 h-8">
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">CSV</span>
+            </Button>
+          </div>
+        </div>
         <div>
           <h1 className="text-2xl font-bold">Test Results</h1>
           <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
             <span className="flex items-center gap-1">
               <Calendar className="h-4 w-4" />
-              {formatDateTime(testRun.startedAt)}
+              {testRun?.startedAt ? formatDateTime(testRun.startedAt) : "Unknown"}
             </span>
             <span className="flex items-center gap-1">
               <Clock className="h-4 w-4" />
-              {formatDuration(testRun.durationMs)}
+              {testRun?.durationMs ? formatDuration(testRun.durationMs) : "Unknown"}
             </span>
           </div>
         </div>
@@ -88,27 +185,42 @@ export function HistoryHeader({ testRun, onBack }: HistoryHeaderProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
+          {/* Execution Layer */}
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">Execution Layer</span>
+            <Badge
+              variant="secondary"
+              className={`font-mono text-xs ${
+                testRun?.executionLayer === "cdk-erigon"
+                  ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                  : "bg-orange-500/10 text-orange-400 border-orange-500/20"
+              }`}
+            >
+              {testRun?.executionLayer || "reth"}
+            </Badge>
+          </div>
+
           {/* Pattern */}
           <div className="flex justify-between items-center">
             <span className="text-muted-foreground">Pattern</span>
-            <Badge variant="outline">{getPatternLabel(testRun.pattern)}</Badge>
+            <Badge variant="outline">{getPatternLabel(pattern)}</Badge>
           </div>
 
           {/* Transaction Type */}
           <div className="flex justify-between items-center">
             <span className="text-muted-foreground">Transaction Type</span>
-            <span className="font-mono text-xs">{getTxTypeLabel(testRun.transactionType)}</span>
+            <span className="font-mono text-xs">{getTxTypeLabel(transactionType)}</span>
           </div>
 
           {/* Pattern-specific config */}
-          {testRun.pattern === "constant" && config?.constantRate && (
+          {pattern === "constant" && config?.constantRate && (
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">Target Rate</span>
               <span className="font-mono">{config.constantRate} tx/s</span>
             </div>
           )}
 
-          {testRun.pattern === "ramp" && (
+          {pattern === "ramp" && (
             <>
               {config?.rampStart !== undefined && config?.rampEnd !== undefined && (
                 <div className="flex justify-between items-center">
@@ -127,7 +239,7 @@ export function HistoryHeader({ testRun, onBack }: HistoryHeaderProps) {
             </>
           )}
 
-          {testRun.pattern === "spike" && (
+          {pattern === "spike" && (
             <>
               {config?.baselineRate !== undefined && (
                 <div className="flex justify-between items-center">
@@ -144,7 +256,7 @@ export function HistoryHeader({ testRun, onBack }: HistoryHeaderProps) {
             </>
           )}
 
-          {testRun.pattern === "max" && (
+          {pattern === "max" && (
             <>
               {config?.maxInitialRate !== undefined && (
                 <div className="flex justify-between items-center">
@@ -161,7 +273,7 @@ export function HistoryHeader({ testRun, onBack }: HistoryHeaderProps) {
             </>
           )}
 
-          {testRun.pattern === "stress" && config?.stressConfig && (
+          {pattern === "stress" && config?.stressConfig && (
             <>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Accounts</span>
