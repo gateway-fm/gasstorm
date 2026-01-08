@@ -478,13 +478,35 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
       try {
         // Set isPolling to false BEFORE closing WebSocket to prevent reconnect race
         set({ isPolling: false });
-        await fetchLoadGenAPI("/stop", { method: "POST" });
+
+        // Use AbortController with timeout to prevent hanging forever
+        // The server-side stop now has a 5s timeout, but network issues could still hang
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+        try {
+          await fetchLoadGenAPI("/stop", {
+            method: "POST",
+            signal: controller.signal,
+          });
+        } catch (err) {
+          if (err instanceof Error && err.name === "AbortError") {
+            console.warn("[LoadTest] Stop request timed out after 10s");
+          } else {
+            throw err;
+          }
+        } finally {
+          clearTimeout(timeoutId);
+        }
+
         stopPolling();
         set({ status: "completed" });
       } catch (error) {
         console.error("Failed to stop test:", error);
-        // Restore isPolling if stop failed so reconnect can happen
-        set({ isPolling: true });
+        // Even if stop failed, still update UI state and close WebSocket
+        // The server may have stopped even if the response timed out
+        stopPolling();
+        set({ status: "completed" });
       }
     },
 
