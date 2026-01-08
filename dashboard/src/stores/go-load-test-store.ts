@@ -42,8 +42,16 @@ interface GoLoadTestMetrics {
   transactionType: TransactionType;
   peakTps?: number; // For max pattern
   error?: string;
-  latency?: LatencyStats; // Confirmation latency statistics
-  preconfLatency?: LatencyStats; // Preconfirmation latency statistics
+  // Preconfirmation stage counters (Flashblocks-compliant lifecycle)
+  txPending?: number; // TX received by sequencer (queued)
+  txPreconfirmed?: number; // TX selected for block (sequencer commitment)
+  txRevoked?: number; // Preconfirmation broken (execution rejected)
+  txDropped?: number; // TX permanently dropped
+  txRequeued?: number; // TX requeued for later block
+  // Latency statistics
+  latency?: LatencyStats; // Confirmation latency (send to confirmed)
+  preconfLatency?: LatencyStats; // Preconfirmation latency (send to preconfirmed)
+  pendingLatency?: LatencyStats; // Pending latency (send to pending)
   // Stress test specific metrics
   tipHistogram?: TipHistogramBucket[];
   txTypeMetrics?: TxTypeMetrics[];
@@ -155,8 +163,16 @@ interface GoLoadTestState {
   isPolling: boolean;
   isStarting: boolean; // True while start API call is in flight
   wsConnected: boolean; // WebSocket connection status
-  latencyStats: LatencyStats | null; // Confirmation latency statistics from Go load generator
-  preconfLatencyStats: LatencyStats | null; // Preconfirmation latency statistics
+  // Preconfirmation stage counters (Flashblocks-compliant lifecycle)
+  txPendingCount: number; // TX received by sequencer
+  txPreconfirmedCount: number; // TX selected for block (commitment)
+  txRevokedCount: number; // Preconfirmation broken
+  txDroppedCount: number; // TX permanently dropped
+  txRequeuedCount: number; // TX requeued for later
+  // Latency statistics
+  latencyStats: LatencyStats | null; // Confirmation latency (send to confirmed)
+  preconfLatencyStats: LatencyStats | null; // Preconfirmation latency (send to preconfirmed)
+  pendingLatencyStats: LatencyStats | null; // Pending latency (send to pending)
   // Stress test specific state
   tipHistogram: TipHistogramBucket[];
   txTypeMetrics: TxTypeMetrics[];
@@ -247,8 +263,16 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
             peakTps: metrics.peakTps ?? 0,
             durationSec: Math.floor(metrics.durationMs / 1000),
             error: metrics.error || null,
+            // Preconfirmation stage counters
+            txPendingCount: metrics.txPending ?? 0,
+            txPreconfirmedCount: metrics.txPreconfirmed ?? 0,
+            txRevokedCount: metrics.txRevoked ?? 0,
+            txDroppedCount: metrics.txDropped ?? 0,
+            txRequeuedCount: metrics.txRequeued ?? 0,
+            // Latency stats
             latencyStats: metrics.latency ?? null,
             preconfLatencyStats: metrics.preconfLatency ?? null,
+            pendingLatencyStats: metrics.pendingLatency ?? null,
             // Stress test specific
             tipHistogram: metrics.tipHistogram ?? [],
             txTypeMetrics: metrics.txTypeMetrics ?? [],
@@ -335,8 +359,16 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
     isPolling: false,
     isStarting: false,
     wsConnected: false,
+    // Preconfirmation stage counters
+    txPendingCount: 0,
+    txPreconfirmedCount: 0,
+    txRevokedCount: 0,
+    txDroppedCount: 0,
+    txRequeuedCount: 0,
+    // Latency stats
     latencyStats: null,
     preconfLatencyStats: null,
+    pendingLatencyStats: null,
     // Stress test specific
     tipHistogram: [],
     txTypeMetrics: [],
@@ -529,8 +561,17 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
           error: null,
           isPolling: false,
           isStarting: false,
+          // Preconfirmation stage counters
+          txPendingCount: 0,
+          txPreconfirmedCount: 0,
+          txRevokedCount: 0,
+          txDroppedCount: 0,
+          txRequeuedCount: 0,
+          // Latency stats
           latencyStats: null,
           preconfLatencyStats: null,
+          pendingLatencyStats: null,
+          // Stress test specific
           tipHistogram: [],
           txTypeMetrics: [],
           accountsActive: 0,
@@ -570,8 +611,16 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
           peakTps: metrics.peakTps ?? 0,
           durationSec: Math.floor(metrics.durationMs / 1000),
           error: metrics.error || null,
+          // Preconfirmation stage counters
+          txPendingCount: metrics.txPending ?? 0,
+          txPreconfirmedCount: metrics.txPreconfirmed ?? 0,
+          txRevokedCount: metrics.txRevoked ?? 0,
+          txDroppedCount: metrics.txDropped ?? 0,
+          txRequeuedCount: metrics.txRequeued ?? 0,
+          // Latency stats
           latencyStats: metrics.latency ?? null,
           preconfLatencyStats: metrics.preconfLatency ?? null,
+          pendingLatencyStats: metrics.pendingLatency ?? null,
           // Stress test specific
           tipHistogram: metrics.tipHistogram ?? [],
           txTypeMetrics: metrics.txTypeMetrics ?? [],
@@ -629,8 +678,17 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
         error: null,
         isPolling: false,
         wsConnected: false,
+        // Preconfirmation stage counters (not available in historical data yet)
+        txPendingCount: 0,
+        txPreconfirmedCount: 0,
+        txRevokedCount: 0,
+        txDroppedCount: 0,
+        txRequeuedCount: 0,
+        // Latency stats
         latencyStats: run.latencyStats ?? null,
         preconfLatencyStats: run.preconfLatency ?? null,
+        pendingLatencyStats: null,
+        // Stress test specific
         tipHistogram: run.tipHistogram ?? [],
         txTypeMetrics: run.txTypeMetrics ?? [],
         accountsActive: 0,
@@ -667,8 +725,16 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
             },
             error: metrics.error || null,
             isPolling: true,
+            // Preconfirmation stage counters
+            txPendingCount: metrics.txPending ?? 0,
+            txPreconfirmedCount: metrics.txPreconfirmed ?? 0,
+            txRevokedCount: metrics.txRevoked ?? 0,
+            txDroppedCount: metrics.txDropped ?? 0,
+            txRequeuedCount: metrics.txRequeued ?? 0,
+            // Latency stats
             latencyStats: metrics.latency ?? null,
             preconfLatencyStats: metrics.preconfLatency ?? null,
+            pendingLatencyStats: metrics.pendingLatency ?? null,
           });
           startPolling();
         } else if (metrics.status === "completed" || metrics.status === "error") {
@@ -686,8 +752,16 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
             durationSec: Math.floor(metrics.durationMs / 1000),
             error: metrics.error || null,
             isPolling: false,
+            // Preconfirmation stage counters
+            txPendingCount: metrics.txPending ?? 0,
+            txPreconfirmedCount: metrics.txPreconfirmed ?? 0,
+            txRevokedCount: metrics.txRevoked ?? 0,
+            txDroppedCount: metrics.txDropped ?? 0,
+            txRequeuedCount: metrics.txRequeued ?? 0,
+            // Latency stats
             latencyStats: metrics.latency ?? null,
             preconfLatencyStats: metrics.preconfLatency ?? null,
+            pendingLatencyStats: metrics.pendingLatency ?? null,
           });
         }
       } catch (error) {

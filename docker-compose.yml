@@ -61,9 +61,9 @@ services:
       "--rpc.max-request-size", "100",
       "--rpc.max-response-size", "200",
       "--rpc.max-tracing-requests", "50",
-      # Reduce logging for performance (change to -vvvv for debug)
+      # Log level: -v (info), -vv (debug), -vvv (trace), -vvvv (trace all)
       "--log.stdout.format", "terminal",
-      "-v"
+      "-vvv"
     ]
     volumes:
       - ./genesis:/config:ro
@@ -172,26 +172,24 @@ services:
       - SKIP_EMPTY_BLOCKS=${SKIP_EMPTY_BLOCKS:-true}
       - GAS_LIMIT=${GAS_LIMIT:-1000000000}            # 1 gigagas default
       - MAX_TXS_PER_BLOCK=${MAX_TXS_PER_BLOCK:-50000} # Scale with gas limit
+      # OP Stack settings
+      - INCLUDE_DEPOSIT_TX=${INCLUDE_DEPOSIT_TX:-false}  # Include L1 attributes deposit TX (off for PoC)
       # Transaction ordering
-      - TX_ORDERING=${TX_ORDERING:-tip_desc}          # fifo, tip_desc, tip_asc
-      # Experimental features
-      - ENABLE_PIPELINING=${ENABLE_PIPELINING:-false}
-      - PIPELINE_OVERLAP_MS=${PIPELINE_OVERLAP_MS:-50}
+      - TX_ORDERING=${TX_ORDERING:-fifo}              # fifo, tip_desc, tip_asc
+      # Preconfirmations
       - ENABLE_PRECONFIRMATIONS=${ENABLE_PRECONFIRMATIONS:-true}
       - PRECONF_LISTEN_ADDR=${PRECONF_LISTEN_ADDR:-:3001}
-      - PRECONF_BUFFER_SIZE=${PRECONF_BUFFER_SIZE:-1000}
+      - PRECONF_BUFFER_SIZE=${PRECONF_BUFFER_SIZE:-10000}
       # Transaction pool settings
       - MAX_REQUEUE_COUNT=${MAX_REQUEUE_COUNT:-50}
-      # RPC timeouts (reduced for faster block building)
-      - NONCE_TIMEOUT_MS=${NONCE_TIMEOUT_MS:-200}
-      # Speculative block building
-      - BUILDER_FULL_DECOUPLING=${BUILDER_FULL_DECOUPLING:-false}
-      - BUILDER_MAX_SPECULATIVE_DEPTH=${BUILDER_MAX_SPECULATIVE_DEPTH:-100}
+      # RPC timeouts
+      - NONCE_TIMEOUT_MS=${NONCE_TIMEOUT_MS:-500}
     volumes:
       - ./genesis/jwt.hex:/config/jwt.hex:ro
     ports:
       - "13000:3000"   # RPC for tx submission
       - "13002:3001"   # Preconfirmation WebSocket (when enabled)
+      - "16060:6060"   # pprof for profiling
     restart: unless-stopped
 
   # Load Generator Service (Go) - for op-reth mode (profile: reth)

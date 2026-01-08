@@ -30,6 +30,7 @@ export interface MetricsTimeSeries {
   txPerSec: number[];
   blockFillRate: number[];
   latencies: number[];
+  blockTimes: number[]; // block time in milliseconds
 }
 
 export interface MetricsSnapshot {
@@ -42,4 +43,9 @@ export interface MetricsSnapshot {
   totalGasUsed: bigint;
   totalTransactions: number;
   blocksProduced: number;
+  // Block time stats (milliseconds)
+  currentBlockTimeMs: number;
+  avgBlockTimeMs: number;
+  minBlockTimeMs: number;
+  maxBlockTimeMs: number;
 }

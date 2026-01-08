@@ -66,6 +66,11 @@ const initialSnapshot: MetricsSnapshot = {
   totalGasUsed: 0n,
   totalTransactions: 0,
   blocksProduced: 0,
+  // Block time stats (milliseconds)
+  currentBlockTimeMs: 0,
+  avgBlockTimeMs: 0,
+  minBlockTimeMs: 0,
+  maxBlockTimeMs: 0,
 };
 
 const initialTimeSeries: MetricsTimeSeries = {
@@ -74,6 +79,7 @@ const initialTimeSeries: MetricsTimeSeries = {
   txPerSec: [],
   blockFillRate: [],
   latencies: [],
+  blockTimes: [],
 };
 
 export const useMetricsStore = create<MetricsStore>()(
@@ -107,6 +113,9 @@ export const useMetricsStore = create<MetricsStore>()(
       const smoothedTxPerSec = windowTime > 0 ? windowTxCount / windowTime : metrics.txPerSec;
       const smoothedMgasPerSec = windowTime > 0 ? (windowGasUsed / 1_000_000) / windowTime : metrics.mgasPerSec;
 
+      // Convert block time to milliseconds for display
+      const blockTimeMs = metrics.blockTime * 1000;
+
       // Update time series with smoothed values
       const timeSeries = {
         timestamps: [...state.timeSeries.timestamps, metrics.timestamp],
@@ -114,6 +123,7 @@ export const useMetricsStore = create<MetricsStore>()(
         txPerSec: [...state.timeSeries.txPerSec, smoothedTxPerSec],
         blockFillRate: [...state.timeSeries.blockFillRate, metrics.fillRate],
         latencies: state.timeSeries.latencies,
+        blockTimes: [...state.timeSeries.blockTimes, blockTimeMs],
       };
 
       // Update snapshot (totalTransactions is updated separately when TXs confirm)
@@ -121,6 +131,20 @@ export const useMetricsStore = create<MetricsStore>()(
       const blocksProduced = blockMetrics.length;
 
       const avgFillRate = blockMetrics.reduce((sum, m) => sum + m.fillRate, 0) / blocksProduced;
+
+      // Calculate block time stats (in ms) - only from blocks with valid block time (> 0)
+      const validBlockTimes = blockMetrics
+        .map(m => m.blockTime * 1000)
+        .filter(t => t > 0);
+      const avgBlockTimeMs = validBlockTimes.length > 0
+        ? validBlockTimes.reduce((sum, t) => sum + t, 0) / validBlockTimes.length
+        : 0;
+      const minBlockTimeMs = validBlockTimes.length > 0
+        ? Math.min(...validBlockTimes)
+        : 0;
+      const maxBlockTimeMs = validBlockTimes.length > 0
+        ? Math.max(...validBlockTimes)
+        : 0;
 
       const snapshot: MetricsSnapshot = {
         currentMgasPerSec: smoothedMgasPerSec,
@@ -132,6 +156,11 @@ export const useMetricsStore = create<MetricsStore>()(
         totalGasUsed,
         totalTransactions: state.snapshot.totalTransactions, // Preserve current count
         blocksProduced,
+        // Block time stats
+        currentBlockTimeMs: blockTimeMs,
+        avgBlockTimeMs,
+        minBlockTimeMs,
+        maxBlockTimeMs,
       };
 
       return { blockMetrics, timeSeries, snapshot };
@@ -198,6 +227,7 @@ export const useMetricsStore = create<MetricsStore>()(
         txPerSec,
         blockFillRate,
         latencies: [],
+        blockTimes: [], // Not available in historical data
       },
       snapshot: {
         currentMgasPerSec: run.avgMgasPerSec ?? 0,
@@ -209,6 +239,11 @@ export const useMetricsStore = create<MetricsStore>()(
         totalGasUsed: BigInt(run.totalGasUsed ?? 0),
         totalTransactions: run.txConfirmed,
         blocksProduced: run.blockCount ?? 0,
+        // Block time stats not available in historical data
+        currentBlockTimeMs: 0,
+        avgBlockTimeMs: 0,
+        minBlockTimeMs: 0,
+        maxBlockTimeMs: 0,
       },
       transactions: [],
       latencies: [],

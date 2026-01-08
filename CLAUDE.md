@@ -84,8 +84,8 @@ make run-reth
 # Start with cdk-erigon sequencer
 make run-cdk-erigon
 
-# Start with performance features (reth mode only)
-ENABLE_PIPELINING=true ENABLE_PRECONFIRMATIONS=true BLOCK_TIME_MS=250 make run-reth
+# Start with fast blocks and preconfirmations (reth mode only)
+BLOCK_TIME_MS=250 ENABLE_PRECONFIRMATIONS=true make run-reth
 
 # View logs
 make logs
@@ -136,12 +136,12 @@ source ~/.gvm/scripts/gvm && gvm use go1.25 && go <command>
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `EXECUTION_LAYER` | reth | Execution layer: `reth` or `cdk-erigon` |
-| `BLOCK_TIME_MS` | 250 | Block interval in milliseconds (reth only) |
-| `GAS_LIMIT` | 100000000 | Block gas limit |
-| `MAX_TXS_PER_BLOCK` | 5000 | Maximum transactions per block (reth only) |
-| `ENABLE_PIPELINING` | false | Overlap block preparation with execution (reth only) |
+| `BLOCK_TIME_MS` | 1000 | Block interval in milliseconds (reth only) |
+| `GAS_LIMIT` | 1000000000 | Block gas limit (1 gigagas) |
+| `MAX_TXS_PER_BLOCK` | 25000 | Maximum transactions per block (reth only) |
+| `TX_ORDERING` | fifo | Transaction ordering: `fifo`, `tip_desc`, `tip_asc` |
 | `ENABLE_PRECONFIRMATIONS` | true | WebSocket preconf events (reth only) |
-| `SKIP_EMPTY_BLOCKS` | true | Don't produce blocks without transactions (reth only) |
+| `SKIP_EMPTY_BLOCKS` | false | Don't produce blocks without transactions (reth only) |
 
 ## Performance Characteristics
 

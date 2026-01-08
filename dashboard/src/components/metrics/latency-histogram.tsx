@@ -13,6 +13,15 @@ import {
 } from "recharts";
 import { useGoLoadTestStore } from "@/stores/go-load-test-store";
 
+// Pending latency uses very tight buckets (0-50ms range typically)
+const PENDING_BUCKET_COLORS = [
+  "#a855f7", // purple-500
+  "#c084fc", // purple-400
+  "#d8b4fe", // purple-300
+  "#f97316", // orange
+  "#ef4444", // red
+];
+
 // Preconf latency uses tighter buckets (0-200ms range typically)
 const PRECONF_BUCKET_COLORS = [
   "#22c55e", // green
@@ -129,7 +138,7 @@ function LatencyCard({ title, stats, colors, emptyMessage }: LatencyCardProps) {
 }
 
 export function LatencyHistogram() {
-  const { latencyStats, preconfLatencyStats, status } = useGoLoadTestStore();
+  const { latencyStats, preconfLatencyStats, pendingLatencyStats, status } = useGoLoadTestStore();
 
   // Don't show if test hasn't run
   if (status === "idle") {
@@ -137,7 +146,13 @@ export function LatencyHistogram() {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid gap-4 md:grid-cols-3">
+      <LatencyCard
+        title="Pending Latency"
+        stats={pendingLatencyStats}
+        colors={PENDING_BUCKET_COLORS}
+        emptyMessage="Waiting for pending events..."
+      />
       <LatencyCard
         title="Preconfirmation Latency"
         stats={preconfLatencyStats}

@@ -54,12 +54,11 @@ run-attached:
 # Performance Profiles (uses current EXECUTION_LAYER)
 # =============================================================================
 
-# High throughput: 1 gigagas, 100ms blocks, pipelining enabled
+# High throughput: 1 gigagas, 100ms blocks
 run-high-throughput:
 	GAS_LIMIT=1000000000 \
-	MAX_TXS_PER_BLOCK=50000 \
+	MAX_TXS_PER_BLOCK=25000 \
 	BLOCK_TIME_MS=100 \
-	ENABLE_PIPELINING=true \
 	docker compose --profile $(COMPOSE_PROFILE) up --build -d
 
 # Fast confirmations: 150M gas, 50ms blocks
@@ -69,12 +68,11 @@ run-fast-confirm:
 	BLOCK_TIME_MS=50 \
 	docker compose --profile $(COMPOSE_PROFILE) up --build -d
 
-# Experimental: All features enabled
-run-experimental:
+# Preconfirmations enabled: 1 gigagas, 100ms blocks
+run-with-preconf:
 	GAS_LIMIT=1000000000 \
-	MAX_TXS_PER_BLOCK=50000 \
+	MAX_TXS_PER_BLOCK=25000 \
 	BLOCK_TIME_MS=100 \
-	ENABLE_PIPELINING=true \
 	ENABLE_PRECONFIRMATIONS=true \
 	docker compose --profile $(COMPOSE_PROFILE) up --build -d
 
@@ -326,12 +324,11 @@ dev-builder:
 	SEQUENCER_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
 	LISTEN_ADDR=:13000 \
 	PRECONF_LISTEN_ADDR=:13002 \
-	BLOCK_TIME_MS=$${BLOCK_TIME_MS:-150} \
-	SKIP_EMPTY_BLOCKS=$${SKIP_EMPTY_BLOCKS:-true} \
+	BLOCK_TIME_MS=$${BLOCK_TIME_MS:-1000} \
+	SKIP_EMPTY_BLOCKS=$${SKIP_EMPTY_BLOCKS:-false} \
 	GAS_LIMIT=$${GAS_LIMIT:-1000000000} \
-	MAX_TXS_PER_BLOCK=$${MAX_TXS_PER_BLOCK:-50000} \
-	TX_ORDERING=$${TX_ORDERING:-tip_desc} \
-	ENABLE_PIPELINING=$${ENABLE_PIPELINING:-false} \
+	MAX_TXS_PER_BLOCK=$${MAX_TXS_PER_BLOCK:-25000} \
+	TX_ORDERING=$${TX_ORDERING:-fifo} \
 	ENABLE_PRECONFIRMATIONS=$${ENABLE_PRECONFIRMATIONS:-true} \
 	go run .
 
@@ -438,12 +435,11 @@ dev:
 		  SEQUENCER_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
 		  LISTEN_ADDR=:13000 \
 		  PRECONF_LISTEN_ADDR=:13002 \
-		  BLOCK_TIME_MS=$${BLOCK_TIME_MS:-150} \
-		  SKIP_EMPTY_BLOCKS=$${SKIP_EMPTY_BLOCKS:-true} \
+		  BLOCK_TIME_MS=$${BLOCK_TIME_MS:-1000} \
+		  SKIP_EMPTY_BLOCKS=$${SKIP_EMPTY_BLOCKS:-false} \
 		  GAS_LIMIT=$${GAS_LIMIT:-1000000000} \
-		  MAX_TXS_PER_BLOCK=$${MAX_TXS_PER_BLOCK:-50000} \
-		  TX_ORDERING=$${TX_ORDERING:-tip_desc} \
-		  ENABLE_PIPELINING=$${ENABLE_PIPELINING:-false} \
+		  MAX_TXS_PER_BLOCK=$${MAX_TXS_PER_BLOCK:-25000} \
+		  TX_ORDERING=$${TX_ORDERING:-fifo} \
 		  ENABLE_PRECONFIRMATIONS=$${ENABLE_PRECONFIRMATIONS:-true} \
 		  go run . 2>&1 | sed "s/^/[builder] /" ) & \
 		BUILDER_PID=$$!; \
@@ -540,9 +536,9 @@ help:
 	@echo "  Configuration (.env file - sourced automatically):"
 	@echo "    EXECUTION_LAYER       - reth (default) or cdk-erigon"
 	@echo "    GAS_LIMIT             - Block gas limit (default: 1000000000)"
-	@echo "    MAX_TXS_PER_BLOCK     - Max txs per block (default: 50000)"
+	@echo "    MAX_TXS_PER_BLOCK     - Max txs per block (default: 25000)"
 	@echo "    BLOCK_TIME_MS         - Block interval ms (default: 1000)"
-	@echo "    ENABLE_PIPELINING     - Overlap block production (default: true, reth only)"
+	@echo "    TX_ORDERING           - fifo (default), tip_desc, tip_asc"
 	@echo "    ENABLE_PRECONFIRMATIONS - WebSocket tx streaming (default: true, reth only)"
 	@echo ""
 	@echo "  Example: Override .env on command line:"

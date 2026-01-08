@@ -1,11 +1,22 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, XCircle, AlertTriangle, Clock } from "lucide-react";
+import { CheckCircle, XCircle, AlertTriangle, Clock, ArrowRight, ShieldAlert } from "lucide-react";
 import { useGoLoadTestStore } from "@/stores/go-load-test-store";
 
 export function VerificationSummary() {
-  const { status, txSentCount, txConfirmedCount, txFailedCount, averageTps } = useGoLoadTestStore();
+  const {
+    status,
+    txSentCount,
+    txConfirmedCount,
+    txFailedCount,
+    averageTps,
+    // Preconfirmation stage counters (Flashblocks-compliant)
+    txPendingCount,
+    txPreconfirmedCount,
+    txRevokedCount,
+    txDroppedCount,
+  } = useGoLoadTestStore();
 
   // Don't show if test hasn't run
   if (status === "idle") {
@@ -16,8 +27,10 @@ export function VerificationSummary() {
   const allConfirmed = txSentCount > 0 && pendingCount === 0 && txFailedCount === 0;
   const hasFailures = txFailedCount > 0;
   const hasPending = pendingCount > 0;
+  const hasRevoked = txRevokedCount > 0;
 
   const confirmRate = txSentCount > 0 ? (txConfirmedCount / txSentCount) * 100 : 0;
+  const preconfRate = txSentCount > 0 ? (txPreconfirmedCount / txSentCount) * 100 : 0;
 
   return (
     <Card>
@@ -66,11 +79,59 @@ export function VerificationSummary() {
             </div>
           </div>
 
+          {/* Preconfirmation Pipeline (Flashblocks-compliant) */}
+          {(txPendingCount > 0 || txPreconfirmedCount > 0) && (
+            <div className="mt-4 pt-3 border-t border-border/50">
+              <div className="text-xs text-muted-foreground mb-2">Preconfirmation Pipeline</div>
+              <div className="flex items-center justify-between text-xs gap-1">
+                <div className="flex flex-col items-center flex-1 bg-blue-500/10 rounded p-1.5">
+                  <div className="font-mono font-bold text-blue-400">{txPendingCount.toLocaleString()}</div>
+                  <div className="text-muted-foreground">Queued</div>
+                </div>
+                <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                <div className="flex flex-col items-center flex-1 bg-purple-500/10 rounded p-1.5">
+                  <div className="font-mono font-bold text-purple-400">{txPreconfirmedCount.toLocaleString()}</div>
+                  <div className="text-muted-foreground">Preconf&apos;d</div>
+                </div>
+                <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                <div className="flex flex-col items-center flex-1 bg-green-500/10 rounded p-1.5">
+                  <div className="font-mono font-bold text-green-400">{txConfirmedCount.toLocaleString()}</div>
+                  <div className="text-muted-foreground">Confirmed</div>
+                </div>
+                {(txRevokedCount > 0 || txDroppedCount > 0) && (
+                  <>
+                    <div className="text-muted-foreground mx-1">|</div>
+                    <div className="flex flex-col items-center bg-red-500/10 rounded p-1.5">
+                      <div className="font-mono font-bold text-red-400">{(txRevokedCount + txDroppedCount).toLocaleString()}</div>
+                      <div className="text-muted-foreground">Revoked</div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Revoked Warning */}
+          {hasRevoked && (
+            <div className="flex items-center gap-2 text-xs text-orange-400 bg-orange-400/10 rounded p-2 mt-2">
+              <ShieldAlert className="h-3 w-3" />
+              {txRevokedCount.toLocaleString()} preconfirmations were revoked (execution layer rejected)
+            </div>
+          )}
+
           {/* Confirmation Rate */}
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Confirmation Rate</span>
             <span className="font-mono font-semibold">{confirmRate.toFixed(1)}%</span>
           </div>
+
+          {/* Preconfirmation Rate */}
+          {txPreconfirmedCount > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Preconf Rate</span>
+              <span className="font-mono font-semibold">{preconfRate.toFixed(1)}%</span>
+            </div>
+          )}
 
           {/* Average TPS */}
           {averageTps > 0 && (
