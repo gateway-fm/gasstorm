@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Loader2 } from "lucide-react";
 import { useGoLoadTestStore } from "@/stores/go-load-test-store";
 import { formatDuration } from "@/lib/statistics";
 import { cn } from "@/lib/utils";
@@ -30,6 +31,7 @@ export function LoadTestRunner() {
     txConfirmedCount,
     txFailedCount,
     error,
+    isStarting,
     start,
     stop,
     reset,
@@ -125,8 +127,15 @@ export function LoadTestRunner() {
         {/* Controls */}
         <div className="flex gap-2 pt-2">
           {status === "idle" && (
-            <Button className="flex-1" onClick={start}>
-              Start Test
+            <Button className="flex-1" onClick={start} disabled={isStarting}>
+              {isStarting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Starting...
+                </>
+              ) : (
+                "Start Test"
+              )}
             </Button>
           )}
           {status === "running" && (

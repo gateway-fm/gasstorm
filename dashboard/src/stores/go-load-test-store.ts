@@ -153,6 +153,7 @@ interface GoLoadTestState {
   durationSec: number;
   error: string | null;
   isPolling: boolean;
+  isStarting: boolean; // True while start API call is in flight
   wsConnected: boolean; // WebSocket connection status
   latencyStats: LatencyStats | null; // Confirmation latency statistics from Go load generator
   preconfLatencyStats: LatencyStats | null; // Preconfirmation latency statistics
@@ -332,6 +333,7 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
     durationSec: 60,
     error: null,
     isPolling: false,
+    isStarting: false,
     wsConnected: false,
     latencyStats: null,
     preconfLatencyStats: null,
@@ -349,12 +351,15 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
 
     start: async () => {
       const state = get();
-      if (state.status === "running") {
-        console.log("[LoadTest] Already running, ignoring start");
+      if (state.status === "running" || state.isStarting) {
+        console.log("[LoadTest] Already running or starting, ignoring start");
         return;
       }
 
       console.log("[LoadTest] Starting test, current status:", state.status);
+
+      // Set isStarting immediately for instant UI feedback
+      set({ isStarting: true });
 
       // Reset metrics store
       useMetricsStore.getState().reset();
@@ -373,30 +378,30 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
         transactionType: cfg.transactionType ?? "eth-transfer",
       };
 
-      // Add pattern-specific parameters - use config values directly without fallbacks
-      // The config should already have proper defaults from DEFAULT_LOAD_TEST_CONFIG
+      // Add pattern-specific parameters - merge with defaults to handle persisted configs
+      // that might be missing newer fields
       switch (pattern) {
         case "constant":
-          request.constantRate = cfg.constantRate!;
+          request.constantRate = cfg.constantRate ?? DEFAULT_LOAD_TEST_CONFIG.constantRate;
           break;
 
         case "ramp":
-          request.rampStart = cfg.rampStart!;
-          request.rampEnd = cfg.rampEnd!;
-          request.rampSteps = cfg.rampSteps!;
+          request.rampStart = cfg.rampStart ?? DEFAULT_LOAD_TEST_CONFIG.rampStart;
+          request.rampEnd = cfg.rampEnd ?? DEFAULT_LOAD_TEST_CONFIG.rampEnd;
+          request.rampSteps = cfg.rampSteps ?? DEFAULT_LOAD_TEST_CONFIG.rampSteps;
           break;
 
         case "spike":
-          request.baselineRate = cfg.baselineRate!;
-          request.spikeRate = cfg.spikeRate!;
-          request.spikeDuration = cfg.spikeDuration!;
-          request.spikeInterval = cfg.spikeInterval!;
+          request.baselineRate = cfg.baselineRate ?? DEFAULT_LOAD_TEST_CONFIG.baselineRate;
+          request.spikeRate = cfg.spikeRate ?? DEFAULT_LOAD_TEST_CONFIG.spikeRate;
+          request.spikeDuration = cfg.spikeDuration ?? DEFAULT_LOAD_TEST_CONFIG.spikeDuration;
+          request.spikeInterval = cfg.spikeInterval ?? DEFAULT_LOAD_TEST_CONFIG.spikeInterval;
           break;
 
         case "max":
-          request.maxInitialRate = cfg.maxInitialRate!;
-          request.maxTargetPending = cfg.maxTargetPending!;
-          request.maxRateStep = cfg.maxRateStep!;
+          request.maxInitialRate = cfg.maxInitialRate ?? DEFAULT_LOAD_TEST_CONFIG.maxInitialRate;
+          request.maxTargetPending = cfg.maxTargetPending ?? DEFAULT_LOAD_TEST_CONFIG.maxTargetPending;
+          request.maxRateStep = cfg.maxRateStep ?? DEFAULT_LOAD_TEST_CONFIG.maxRateStep;
           break;
 
         case "stress":
@@ -454,6 +459,7 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
           durationSec,
           error: null,
           isPolling: true,
+          isStarting: false,
         });
         console.log("[LoadTest] Status set, starting polling. New status:", get().status);
 
@@ -463,17 +469,22 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
         set({
           status: "error",
           error: error instanceof Error ? error.message : String(error),
+          isStarting: false,
         });
       }
     },
 
     stop: async () => {
       try {
+        // Set isPolling to false BEFORE closing WebSocket to prevent reconnect race
+        set({ isPolling: false });
         await fetchLoadGenAPI("/stop", { method: "POST" });
         stopPolling();
-        set({ status: "completed", isPolling: false });
+        set({ status: "completed" });
       } catch (error) {
         console.error("Failed to stop test:", error);
+        // Restore isPolling if stop failed so reconnect can happen
+        set({ isPolling: true });
       }
     },
 
@@ -495,6 +506,7 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
           peakTps: 0,
           error: null,
           isPolling: false,
+          isStarting: false,
           latencyStats: null,
           preconfLatencyStats: null,
           tipHistogram: [],

@@ -48,8 +48,14 @@ services:
       "--authrpc.addr", "0.0.0.0",
       "--authrpc.port", "8551",
       "--authrpc.jwtsecret", "/config/jwt.hex",
-      # Sequencer mode
+      # Sequencer mode - external block builder handles all transactions
       "--rollup.disable-tx-pool-gossip",
+      # Disable internal txpool (we use external block builder exclusively)
+      # Setting counts to 1 effectively neuters the txpool while keeping reth happy
+      "--txpool.pending-max-count", "1",
+      "--txpool.basefee-max-count", "1",
+      "--txpool.queued-max-count", "1",
+      "--txpool.max-account-slots", "1",
       # Performance tuning for high TPS
       "--rpc.max-connections", "1000",
       "--rpc.max-request-size", "100",
@@ -206,6 +212,7 @@ services:
       - PRECONF_WS_URL=ws://block-builder:3001/ws/preconfirmations  # Preconfirmation WebSocket
       - LISTEN_ADDR=:3001
       - DATABASE_PATH=/data/loadgen.db             # SQLite database for test history
+      - BLOCK_TIME_MS=${BLOCK_TIME_MS:-150}        # Must match block-builder for account scaling
     volumes:
       - loadgen-data:/data
     ports:
