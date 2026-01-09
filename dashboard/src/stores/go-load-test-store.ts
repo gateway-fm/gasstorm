@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { LoadTestConfig, LoadTestStatus, LoadPattern, TransactionType, StressTestConfig, TipHistogramBucket, TxTypeMetrics } from "@/types/load-test";
-import { DEFAULT_LOAD_TEST_CONFIG, DEFAULT_STRESS_CONFIG } from "@/types/load-test";
+import type { LoadTestConfig, LoadTestStatus, LoadPattern, TransactionType, RealisticTestConfig, TipHistogramBucket, TxTypeMetrics } from "@/types/load-test";
+import { DEFAULT_LOAD_TEST_CONFIG, DEFAULT_REALISTIC_CONFIG } from "@/types/load-test";
 import { useMetricsStore } from "./metrics-store";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -40,7 +40,7 @@ interface GoLoadTestMetrics {
   targetTps: number;
   pattern: LoadPattern;
   transactionType: TransactionType;
-  peakTps?: number; // For max pattern
+  peakTps?: number; // For adaptive pattern
   error?: string;
   // Preconfirmation stage counters (Flashblocks-compliant lifecycle)
   txPending?: number; // TX received by sequencer (queued)
@@ -52,11 +52,15 @@ interface GoLoadTestMetrics {
   latency?: LatencyStats; // Confirmation latency (send to confirmed)
   preconfLatency?: LatencyStats; // Preconfirmation latency (send to preconfirmed)
   pendingLatency?: LatencyStats; // Pending latency (send to pending)
-  // Stress test specific metrics
+  // Realistic test specific metrics
   tipHistogram?: TipHistogramBucket[];
   txTypeMetrics?: TxTypeMetrics[];
   accountsActive?: number;
   accountsFunded?: number;
+  // Block gas metrics (from block builder status)
+  latestBaseFeeGwei?: number;
+  latestGasPriceGwei?: number;
+  latestGasUsed?: number;
 }
 
 // Request payload to Go load generator
@@ -81,13 +85,13 @@ interface StartTestRequest {
   spikeDuration?: number;
   spikeInterval?: number;
 
-  // Max pattern
-  maxInitialRate?: number;
-  maxTargetPending?: number;
-  maxRateStep?: number;
+  // Adaptive pattern
+  adaptiveInitialRate?: number;
+  adaptiveTargetPending?: number;
+  adaptiveRateStep?: number;
 
-  // Stress pattern
-  stressConfig?: StressTestConfig;
+  // Realistic pattern
+  realisticConfig?: RealisticTestConfig;
 }
 
 interface GoLoadTestActions {
@@ -98,6 +102,7 @@ interface GoLoadTestActions {
   pollStatus: () => Promise<void>;
   checkAndReconnect: () => Promise<void>;
   hydrateFromHistory: (run: HistoricalTestRun, timeSeries: HistoricalTimeSeriesPoint[]) => void;
+  setHistoricalMode: (isHistorical: boolean) => void;
 }
 
 // Types for historical data hydration
@@ -127,10 +132,10 @@ interface HistoricalTestRun {
     baselineRate?: number;
     spikeDuration?: number;
     spikeInterval?: number;
-    maxInitialRate?: number;
-    maxTargetPending?: number;
-    maxRateStep?: number;
-    stressConfig?: StressTestConfig;
+    adaptiveInitialRate?: number;
+    adaptiveTargetPending?: number;
+    adaptiveRateStep?: number;
+    realisticConfig?: RealisticTestConfig;
   };
   tipHistogram?: TipHistogramBucket[];
   txTypeMetrics?: TxTypeMetrics[];
@@ -157,7 +162,7 @@ interface GoLoadTestState {
   txFailedCount: number;
   averageTps: number;
   targetTps: number;
-  peakTps: number; // For max pattern
+  peakTps: number; // For adaptive pattern
   durationSec: number;
   error: string | null;
   isPolling: boolean;
@@ -173,11 +178,17 @@ interface GoLoadTestState {
   latencyStats: LatencyStats | null; // Confirmation latency (send to confirmed)
   preconfLatencyStats: LatencyStats | null; // Preconfirmation latency (send to preconfirmed)
   pendingLatencyStats: LatencyStats | null; // Pending latency (send to pending)
-  // Stress test specific state
+  // Realistic test specific state
   tipHistogram: TipHistogramBucket[];
   txTypeMetrics: TxTypeMetrics[];
   accountsActive: number;
   accountsFunded: number;
+  // Block gas metrics (from block builder status)
+  latestBaseFeeGwei: number;
+  latestGasPriceGwei: number;
+  latestGasUsed: number;
+  // Historical mode - when true, ignores live updates
+  isHistoricalMode: boolean;
 }
 
 type GoLoadTestStore = GoLoadTestState & GoLoadTestActions;
@@ -243,6 +254,9 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
 
       ws.onmessage = (event) => {
         try {
+          // Ignore live updates when in historical mode
+          if (get().isHistoricalMode) return;
+
           const metrics: GoLoadTestMetrics = JSON.parse(event.data);
 
           // Map Go status to our status type
@@ -273,11 +287,15 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
             latencyStats: metrics.latency ?? null,
             preconfLatencyStats: metrics.preconfLatency ?? null,
             pendingLatencyStats: metrics.pendingLatency ?? null,
-            // Stress test specific
+            // Realistic test specific
             tipHistogram: metrics.tipHistogram ?? [],
             txTypeMetrics: metrics.txTypeMetrics ?? [],
             accountsActive: metrics.accountsActive ?? 0,
             accountsFunded: metrics.accountsFunded ?? 0,
+            // Block gas metrics
+            latestBaseFeeGwei: metrics.latestBaseFeeGwei ?? 0,
+            latestGasPriceGwei: metrics.latestGasPriceGwei ?? 0,
+            latestGasUsed: metrics.latestGasUsed ?? 0,
           };
 
           set(newState);
@@ -369,11 +387,17 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
     latencyStats: null,
     preconfLatencyStats: null,
     pendingLatencyStats: null,
-    // Stress test specific
+    // Realistic test specific
     tipHistogram: [],
     txTypeMetrics: [],
     accountsActive: 0,
     accountsFunded: 0,
+    // Block gas metrics
+    latestBaseFeeGwei: 0,
+    latestGasPriceGwei: 0,
+    latestGasUsed: 0,
+    // Historical mode
+    isHistoricalMode: false,
 
     // Actions
     setConfig: (config) =>
@@ -406,7 +430,7 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
       const request: StartTestRequest = {
         pattern,
         durationSec,
-        numAccounts: 100, // Default - stress test overrides this from stressConfig
+        numAccounts: 100, // Default - realistic test overrides this from realisticConfig
         transactionType: cfg.transactionType ?? "eth-transfer",
       };
 
@@ -430,15 +454,15 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
           request.spikeInterval = cfg.spikeInterval ?? DEFAULT_LOAD_TEST_CONFIG.spikeInterval;
           break;
 
-        case "max":
-          request.maxInitialRate = cfg.maxInitialRate ?? DEFAULT_LOAD_TEST_CONFIG.maxInitialRate;
-          request.maxTargetPending = cfg.maxTargetPending ?? DEFAULT_LOAD_TEST_CONFIG.maxTargetPending;
-          request.maxRateStep = cfg.maxRateStep ?? DEFAULT_LOAD_TEST_CONFIG.maxRateStep;
+        case "adaptive":
+          request.adaptiveInitialRate = cfg.adaptiveInitialRate ?? DEFAULT_LOAD_TEST_CONFIG.adaptiveInitialRate;
+          request.adaptiveTargetPending = cfg.adaptiveTargetPending ?? DEFAULT_LOAD_TEST_CONFIG.adaptiveTargetPending;
+          request.adaptiveRateStep = cfg.adaptiveRateStep ?? DEFAULT_LOAD_TEST_CONFIG.adaptiveRateStep;
           break;
 
-        case "stress":
-          request.stressConfig = cfg.stressConfig ?? DEFAULT_STRESS_CONFIG;
-          request.numAccounts = request.stressConfig.numAccounts;
+        case "realistic":
+          request.realisticConfig = cfg.realisticConfig ?? DEFAULT_REALISTIC_CONFIG;
+          request.numAccounts = request.realisticConfig.numAccounts;
           break;
       }
 
@@ -468,11 +492,11 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
           case "spike":
             initialTargetTps = request.baselineRate ?? 2;
             break;
-          case "max":
-            initialTargetTps = request.maxInitialRate ?? 10;
+          case "adaptive":
+            initialTargetTps = request.adaptiveInitialRate ?? 10;
             break;
-          case "stress":
-            initialTargetTps = request.stressConfig?.targetTps ?? 500;
+          case "realistic":
+            initialTargetTps = request.realisticConfig?.targetTps ?? 500;
             break;
         }
 
@@ -571,19 +595,30 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
           latencyStats: null,
           preconfLatencyStats: null,
           pendingLatencyStats: null,
-          // Stress test specific
+          // Realistic test specific
           tipHistogram: [],
           txTypeMetrics: [],
           accountsActive: 0,
           accountsFunded: 0,
+          // Block gas metrics
+          latestBaseFeeGwei: 0,
+          latestGasPriceGwei: 0,
+          latestGasUsed: 0,
+          // Historical mode
+          isHistoricalMode: false,
         });
       } catch (error) {
         console.error("Failed to reset:", error);
       }
     },
 
+    setHistoricalMode: (isHistorical: boolean) => set({ isHistoricalMode: isHistorical }),
+
     // Kept for initial status check (now WebSocket handles real-time updates)
     pollStatus: async () => {
+      // Ignore when in historical mode
+      if (get().isHistoricalMode) return;
+
       try {
         const response = await fetchLoadGenAPI("/status");
         if (!response.ok) {
@@ -621,11 +656,15 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
           latencyStats: metrics.latency ?? null,
           preconfLatencyStats: metrics.preconfLatency ?? null,
           pendingLatencyStats: metrics.pendingLatency ?? null,
-          // Stress test specific
+          // Realistic test specific
           tipHistogram: metrics.tipHistogram ?? [],
           txTypeMetrics: metrics.txTypeMetrics ?? [],
           accountsActive: metrics.accountsActive ?? 0,
           accountsFunded: metrics.accountsFunded ?? 0,
+          // Block gas metrics
+          latestBaseFeeGwei: metrics.latestBaseFeeGwei ?? 0,
+          latestGasPriceGwei: metrics.latestGasPriceGwei ?? 0,
+          latestGasUsed: metrics.latestGasUsed ?? 0,
         };
 
         set(newState);
@@ -651,10 +690,10 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
         spikeRate: run.config?.spikeRate,
         spikeDuration: run.config?.spikeDuration,
         spikeInterval: run.config?.spikeInterval,
-        maxInitialRate: run.config?.maxInitialRate,
-        maxTargetPending: run.config?.maxTargetPending,
-        maxRateStep: run.config?.maxRateStep,
-        stressConfig: run.config?.stressConfig,
+        adaptiveInitialRate: run.config?.adaptiveInitialRate,
+        adaptiveTargetPending: run.config?.adaptiveTargetPending,
+        adaptiveRateStep: run.config?.adaptiveRateStep,
+        realisticConfig: run.config?.realisticConfig,
       };
 
       // Get target TPS from time series or derive from config
@@ -688,16 +727,21 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
         latencyStats: run.latencyStats ?? null,
         preconfLatencyStats: run.preconfLatency ?? null,
         pendingLatencyStats: null,
-        // Stress test specific
+        // Realistic test specific
         tipHistogram: run.tipHistogram ?? [],
         txTypeMetrics: run.txTypeMetrics ?? [],
         accountsActive: 0,
         accountsFunded: 0,
+        // Historical mode - prevent live updates from interfering
+        isHistoricalMode: true,
       });
     },
 
     // Check if a test is already running and reconnect to it
     checkAndReconnect: async () => {
+      // Don't reconnect when in historical mode
+      if (get().isHistoricalMode) return;
+
       try {
         const response = await fetchLoadGenAPI("/status");
         if (!response.ok) return;

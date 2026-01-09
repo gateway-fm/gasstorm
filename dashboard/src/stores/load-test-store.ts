@@ -26,7 +26,7 @@ interface LoadTestActions {
 interface VerificationState {
   verificationStatus: VerificationStatus;
   correctnessResult: CorrectnessResult | null;
-  peakAdaptiveRate: number; // Track peak rate achieved in max mode
+  peakAdaptiveRate: number; // Track peak rate achieved in adaptive mode
 }
 
 interface ContractState {
@@ -166,8 +166,8 @@ export const useLoadTestStore = create<LoadTestStore>((set, get) => ({
     // Lock to prevent concurrent sends which can cause nonce gaps
     let isSending = false;
 
-    // Adaptive rate for max mode
-    let adaptiveRate = config.maxInitialRate ?? 10;
+    // Adaptive rate for adaptive mode
+    let adaptiveRate = config.adaptiveInitialRate ?? 10;
     let lastAdaptiveAdjust = 0;
     const adaptiveAdjustInterval = 500; // Adjust every 500ms
 
@@ -184,14 +184,14 @@ export const useLoadTestStore = create<LoadTestStore>((set, get) => ({
         return;
       }
 
-      // Get current rate - use adaptive logic for max mode
+      // Get current rate - use adaptive logic for adaptive mode
       let rate: number;
-      if (config.pattern === "max") {
+      if (config.pattern === "adaptive") {
         // Adaptive rate adjustment
         if (now - lastAdaptiveAdjust >= adaptiveAdjustInterval) {
           const pendingCount = currentState.transactions.filter(t => t.status === "pending").length;
-          const targetPending = config.maxTargetPending ?? 50;
-          const rateStep = config.maxRateStep ?? 5;
+          const targetPending = config.adaptiveTargetPending ?? 50;
+          const rateStep = config.adaptiveRateStep ?? 5;
 
           if (pendingCount > targetPending * 1.5) {
             // Way too many pending - back off aggressively

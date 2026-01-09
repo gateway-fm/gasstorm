@@ -16,7 +16,7 @@ import type { LoadPattern, TransactionType } from "@/types/load-test";
 import { TRANSACTION_TYPES } from "@/types/load-test";
 import { getPatternDescription, getDefaultConfigForPattern } from "@/lib/load-patterns";
 import { needsDeployment, loadDeployedContracts } from "@/lib/contract-deployer";
-import { StressTestConfigPanel } from "./stress-test-config";
+import { RealisticTestConfigPanel } from "./realistic-test-config";
 
 function formatDurationHuman(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
@@ -51,8 +51,8 @@ export function LoadTestConfig() {
         <CardTitle className="text-base font-semibold">Load Test Configuration</CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        {/* Transaction Type Selection - only show for non-stress modes */}
-        {config?.pattern !== "stress" && (
+        {/* Transaction Type Selection - only show for non-realistic modes */}
+        {config?.pattern !== "realistic" && (
           <div className="space-y-2">
             <Label>Transaction Type</Label>
             <Select
@@ -102,11 +102,11 @@ export function LoadTestConfig() {
             <TabsTrigger value="spike" disabled={isDisabled}>
               Spike
             </TabsTrigger>
-            <TabsTrigger value="max" disabled={isDisabled}>
-              Max
+            <TabsTrigger value="adaptive" disabled={isDisabled}>
+              Adaptive
             </TabsTrigger>
-            <TabsTrigger value="stress" disabled={isDisabled}>
-              Stress
+            <TabsTrigger value="realistic" disabled={isDisabled}>
+              Realistic
             </TabsTrigger>
           </TabsList>
 
@@ -204,15 +204,15 @@ export function LoadTestConfig() {
             </div>
           </TabsContent>
 
-          {/* Max Pattern Config */}
-          <TabsContent value="max" className="mt-4 space-y-4">
+          {/* Adaptive Pattern Config */}
+          <TabsContent value="adaptive" className="mt-4 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Initial Rate (tx/s)</Label>
                 <Input
                   type="text"
-                  value={config?.maxInitialRate ?? 100}
-                  onChange={(e) => setConfig({ maxInitialRate: parseInt(e.target.value) || 0 })}
+                  value={config?.adaptiveInitialRate ?? 100}
+                  onChange={(e) => setConfig({ adaptiveInitialRate: parseInt(e.target.value) || 0 })}
                   disabled={isDisabled}
                 />
               </div>
@@ -220,8 +220,8 @@ export function LoadTestConfig() {
                 <Label>Rate Step (tx/s)</Label>
                 <Input
                   type="text"
-                  value={config?.maxRateStep ?? 100}
-                  onChange={(e) => setConfig({ maxRateStep: parseInt(e.target.value) || 0 })}
+                  value={config?.adaptiveRateStep ?? 100}
+                  onChange={(e) => setConfig({ adaptiveRateStep: parseInt(e.target.value) || 0 })}
                   disabled={isDisabled}
                 />
               </div>
@@ -230,16 +230,16 @@ export function LoadTestConfig() {
               <Label>Target Pending TXs</Label>
               <Input
                 type="text"
-                value={config?.maxTargetPending ?? 1000}
-                onChange={(e) => setConfig({ maxTargetPending: parseInt(e.target.value) || 0 })}
+                value={config?.adaptiveTargetPending ?? 1000}
+                onChange={(e) => setConfig({ adaptiveTargetPending: parseInt(e.target.value) || 0 })}
                 disabled={isDisabled}
               />
             </div>
           </TabsContent>
 
-          {/* Stress Pattern Config */}
-          <TabsContent value="stress" className="mt-4">
-            <StressTestConfigPanel />
+          {/* Realistic Pattern Config */}
+          <TabsContent value="realistic" className="mt-4">
+            <RealisticTestConfigPanel />
           </TabsContent>
         </Tabs>
 

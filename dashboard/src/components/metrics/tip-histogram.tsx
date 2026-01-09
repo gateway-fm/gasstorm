@@ -27,8 +27,8 @@ const TIP_COLORS = [
 export function TipHistogram() {
   const { tipHistogram, config, status } = useGoLoadTestStore();
 
-  // Only show for stress mode
-  if (config?.pattern !== "stress") {
+  // Only show for realistic mode
+  if (config?.pattern !== "realistic") {
     return null;
   }
 
@@ -53,7 +53,7 @@ export function TipHistogram() {
         <div className="text-sm">
           <span className="text-muted-foreground">Distribution: </span>
           <span className="font-mono font-semibold">
-            {config?.stressConfig?.tipDistribution ?? "exponential"}
+            {config?.realisticConfig?.tipDistribution ?? "exponential"}
           </span>
         </div>
       </CardHeader>

@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useMetricsStore } from "@/stores/metrics-store";
-import { useChainStore } from "@/stores/chain-store";
+import { useGoLoadTestStore } from "@/stores/go-load-test-store";
 import { formatGas, formatPercent } from "@/lib/statistics";
 
 // Format block time in ms with appropriate precision
@@ -26,42 +26,57 @@ function getBlockTimeColor(ms: number, targetMs: number): string {
   return "text-red-400";                           // More than 50% off
 }
 
-export function MetricsSnapshot() {
-  const { snapshot, blockMetrics } = useMetricsStore();
-  const { builder } = useChainStore();
+// Format gas price - show more precision for very low values
+function formatGasPrice(gwei: number): string {
+  if (gwei === 0) return "—";
+  if (gwei < 0.001) return gwei.toExponential(1);
+  if (gwei < 0.1) return gwei.toFixed(4);
+  if (gwei < 1) return gwei.toFixed(3);
+  return gwei.toFixed(2);
+}
 
-  // Check if we have block metrics (not available in historical mode)
+export function MetricsSnapshot() {
+  const { snapshot, blockMetrics, timeSeries, isHistoricalMode } = useMetricsStore();
+  const { latestBaseFeeGwei, latestGasPriceGwei } = useGoLoadTestStore();
+
+  // Check if we have block metrics (live mode with raw block data)
   const hasBlockMetrics = blockMetrics.length > 0;
 
-  // Target block time from config (default 2000ms if not set)
-  const targetBlockTimeMs = builder.blockTimeMs || 2000;
+  // In historical mode, check if we have time series data with Mgas/s
+  const hasHistoricalMgasData = isHistoricalMode && timeSeries.mgasPerSec.some(v => v > 0);
+
+  // Use Mgas display if we have live block metrics OR historical Mgas data
+  const showMgasMetrics = hasBlockMetrics || hasHistoricalMgasData;
+
+  // Target block time - only relevant for live mode
+  const targetBlockTimeMs = 2000;
 
   const metrics = [
     {
-      label: hasBlockMetrics ? "Current Mgas/s" : "Avg tx/s",
-      value: hasBlockMetrics ? snapshot.currentMgasPerSec.toFixed(2) : snapshot.currentTxPerSec.toFixed(1),
-      unit: hasBlockMetrics ? "Mgas/s" : "tx/s",
-      color: hasBlockMetrics ? "text-blue-400" : "text-purple-400",
+      label: isHistoricalMode ? "Avg Mgas/s" : (showMgasMetrics ? "Current Mgas/s" : "Avg tx/s"),
+      value: showMgasMetrics ? snapshot.currentMgasPerSec.toFixed(2) : snapshot.currentTxPerSec.toFixed(1),
+      unit: showMgasMetrics ? "Mgas/s" : "tx/s",
+      color: showMgasMetrics ? "text-blue-400" : "text-purple-400",
     },
     {
-      label: hasBlockMetrics ? "Peak Mgas/s" : "Peak tx/s",
-      value: hasBlockMetrics ? snapshot.peakMgasPerSec.toFixed(2) : snapshot.peakTxPerSec.toFixed(1),
-      unit: hasBlockMetrics ? "Mgas/s" : "tx/s",
+      label: showMgasMetrics ? "Peak Mgas/s" : "Peak tx/s",
+      value: showMgasMetrics ? snapshot.peakMgasPerSec.toFixed(2) : snapshot.peakTxPerSec.toFixed(1),
+      unit: showMgasMetrics ? "Mgas/s" : "tx/s",
       color: "text-green-400",
     },
     {
-      label: hasBlockMetrics ? "Current tx/s" : "Confirmed",
-      value: hasBlockMetrics ? snapshot.currentTxPerSec.toFixed(1) : snapshot.totalTransactions.toLocaleString(),
-      unit: hasBlockMetrics ? "tx/s" : "txs",
+      label: isHistoricalMode ? "Avg tx/s" : (showMgasMetrics ? "Current tx/s" : "Confirmed"),
+      value: showMgasMetrics ? snapshot.currentTxPerSec.toFixed(1) : snapshot.totalTransactions.toLocaleString(),
+      unit: showMgasMetrics ? "tx/s" : "txs",
       color: "text-purple-400",
     },
     {
-      label: hasBlockMetrics ? "Peak tx/s" : "Success Rate",
-      value: hasBlockMetrics
+      label: showMgasMetrics ? "Peak tx/s" : "Success Rate",
+      value: showMgasMetrics
         ? snapshot.peakTxPerSec.toFixed(1)
         : snapshot.totalTransactions > 0 ? "100%" : "-",
-      unit: hasBlockMetrics ? "tx/s" : "",
-      color: hasBlockMetrics ? "text-purple-400" : "text-green-400",
+      unit: showMgasMetrics ? "tx/s" : "",
+      color: showMgasMetrics ? "text-purple-400" : "text-green-400",
     },
     {
       label: "Block Time",
@@ -77,15 +92,39 @@ export function MetricsSnapshot() {
     },
     {
       label: "Avg Fill Rate",
-      value: hasBlockMetrics ? formatPercent(snapshot.averageFillRate) : "N/A",
+      value: showMgasMetrics ? formatPercent(snapshot.averageFillRate) : "N/A",
       unit: "",
-      color: hasBlockMetrics ? "text-orange-400" : "text-muted-foreground",
+      color: showMgasMetrics ? "text-orange-400" : "text-muted-foreground",
     },
     {
       label: "Blocks",
-      value: hasBlockMetrics ? snapshot.blocksProduced.toString() : "N/A",
+      value: showMgasMetrics ? snapshot.blocksProduced.toString() : "N/A",
       unit: "",
       color: "text-muted-foreground",
+    },
+    {
+      label: "Base Fee",
+      value: !isHistoricalMode ? formatGasPrice(latestBaseFeeGwei) : "N/A",
+      unit: !isHistoricalMode && latestBaseFeeGwei > 0 ? "gwei" : "",
+      color: latestBaseFeeGwei > 1.5 ? "text-red-400" : (latestBaseFeeGwei > 1.0 ? "text-yellow-400" : "text-green-400"),
+    },
+    {
+      label: "Gas Price",
+      value: !isHistoricalMode ? formatGasPrice(latestGasPriceGwei) : "N/A",
+      unit: !isHistoricalMode && latestGasPriceGwei > 0 ? "gwei" : "",
+      color: latestGasPriceGwei > 2.0 ? "text-red-400" : (latestGasPriceGwei > 1.5 ? "text-yellow-400" : "text-green-400"),
+    },
+    {
+      label: "Total Gas",
+      value: showMgasMetrics ? formatGas(snapshot.totalGasUsed) : "N/A",
+      unit: "",
+      color: "text-cyan-400",
+    },
+    {
+      label: "Total Txs",
+      value: snapshot.totalTransactions.toLocaleString(),
+      unit: "",
+      color: "text-amber-400",
     },
   ];
 
@@ -93,11 +132,11 @@ export function MetricsSnapshot() {
     <Card>
       <CardHeader>
         <CardTitle className="text-base font-semibold">
-          {hasBlockMetrics ? "Live Metrics" : "Test Metrics"}
+          {isHistoricalMode ? "Historical Metrics" : (hasBlockMetrics ? "Live Metrics" : "Test Metrics")}
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
           {metrics.map((metric) => (
             <div key={metric.label} className="rounded-lg border p-3">
               <p className="text-xs text-muted-foreground">{metric.label}</p>
@@ -112,27 +151,17 @@ export function MetricsSnapshot() {
             </div>
           ))}
         </div>
-        <div className="mt-3 pt-3 border-t">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Total Gas Used</span>
-            <span className="font-mono">
-              {hasBlockMetrics ? formatGas(snapshot.totalGasUsed) : "N/A"}
-            </span>
-          </div>
-          <div className="flex justify-between text-sm mt-1">
-            <span className="text-muted-foreground">Total Transactions</span>
-            <span className="font-mono">{snapshot.totalTransactions.toLocaleString()}</span>
-          </div>
-          {hasBlockMetrics && snapshot.minBlockTimeMs > 0 && (
-            <div className="flex justify-between text-sm mt-1">
+        {hasBlockMetrics && snapshot.minBlockTimeMs > 0 && (
+          <div className="mt-3 pt-3 border-t">
+            <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Block Time (min/max)</span>
               <span className="font-mono">
                 {formatBlockTime(snapshot.minBlockTimeMs)} / {formatBlockTime(snapshot.maxBlockTimeMs)}
                 {snapshot.minBlockTimeMs < 1000 && <span className="text-xs text-muted-foreground ml-1">ms</span>}
               </span>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

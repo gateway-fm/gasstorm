@@ -1,4 +1,4 @@
-export type LoadPattern = "constant" | "ramp" | "spike" | "max" | "stress";
+export type LoadPattern = "constant" | "ramp" | "spike" | "adaptive" | "realistic";
 
 export type TipDistribution = "exponential" | "power-law" | "uniform";
 
@@ -11,7 +11,7 @@ export interface TxTypeRatios {
   heavyCompute: number;
 }
 
-export interface StressTestConfig {
+export interface RealisticTestConfig {
   numAccounts: number;
   targetTps: number;
   minTipGwei: number;
@@ -121,13 +121,13 @@ export interface LoadTestConfig {
   spikeDuration?: number; // seconds
   spikeInterval?: number; // seconds between spikes
 
-  // Max mode pattern
-  maxInitialRate?: number; // starting tx/s (default: 10)
-  maxTargetPending?: number; // target pending tx count (default: 50)
-  maxRateStep?: number; // rate adjustment step (default: 5)
+  // Adaptive mode pattern
+  adaptiveInitialRate?: number; // starting tx/s (default: 10)
+  adaptiveTargetPending?: number; // target pending tx count (default: 50)
+  adaptiveRateStep?: number; // rate adjustment step (default: 5)
 
-  // Stress mode pattern
-  stressConfig?: StressTestConfig;
+  // Realistic mode pattern
+  realisticConfig?: RealisticTestConfig;
 
   // Common
   txValue?: bigint; // wei per tx (default 1 ETH)
@@ -178,7 +178,7 @@ export interface CorrectnessResult {
   verifiedAt: number; // timestamp
 }
 
-export const DEFAULT_STRESS_CONFIG: StressTestConfig = {
+export const DEFAULT_REALISTIC_CONFIG: RealisticTestConfig = {
   numAccounts: 100,
   targetTps: 500,
   minTipGwei: 0,
@@ -235,10 +235,10 @@ export interface TestResult {
     baselineRate?: number;
     spikeDuration?: number;
     spikeInterval?: number;
-    maxInitialRate?: number;
-    maxTargetPending?: number;
-    maxRateStep?: number;
-    stressConfig?: StressTestConfig;
+    adaptiveInitialRate?: number;
+    adaptiveTargetPending?: number;
+    adaptiveRateStep?: number;
+    realisticConfig?: RealisticTestConfig;
   };
 }
 
@@ -254,10 +254,10 @@ export const DEFAULT_LOAD_TEST_CONFIG: LoadTestConfig = {
   spikeRate: 5000,
   spikeDuration: 5,
   spikeInterval: 15,
-  maxInitialRate: 100,
-  maxTargetPending: 1000,
-  maxRateStep: 100,
-  stressConfig: DEFAULT_STRESS_CONFIG,
+  adaptiveInitialRate: 100,
+  adaptiveTargetPending: 1000,
+  adaptiveRateStep: 100,
+  realisticConfig: DEFAULT_REALISTIC_CONFIG,
   txValue: 1000000000000000000n, // 1 ETH
   gasLimit: 21000,
 };

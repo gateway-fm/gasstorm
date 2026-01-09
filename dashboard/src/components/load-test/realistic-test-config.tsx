@@ -11,8 +11,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useGoLoadTestStore } from "@/stores/go-load-test-store";
-import type { TipDistribution, TxTypeRatios, StressTestConfig } from "@/types/load-test";
-import { DEFAULT_STRESS_CONFIG } from "@/types/load-test";
+import type { TipDistribution, TxTypeRatios, RealisticTestConfig } from "@/types/load-test";
+import { DEFAULT_REALISTIC_CONFIG } from "@/types/load-test";
 
 interface TxTypeRatioConfigProps {
   ratios: TxTypeRatios;
@@ -64,15 +64,15 @@ function TxTypeRatioConfig({ ratios, onChange, disabled }: TxTypeRatioConfigProp
   );
 }
 
-export function StressTestConfigPanel() {
+export function RealisticTestConfigPanel() {
   const { config, setConfig, status } = useGoLoadTestStore();
   const isDisabled = status === "running";
 
-  const stressConfig = config?.stressConfig ?? DEFAULT_STRESS_CONFIG;
+  const realisticConfig = config?.realisticConfig ?? DEFAULT_REALISTIC_CONFIG;
 
-  const updateStressConfig = (updates: Partial<StressTestConfig>) => {
+  const updateRealisticConfig = (updates: Partial<RealisticTestConfig>) => {
     setConfig({
-      stressConfig: { ...stressConfig, ...updates },
+      realisticConfig: { ...realisticConfig, ...updates },
     });
   };
 
@@ -82,11 +82,11 @@ export function StressTestConfigPanel() {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label>Number of Accounts</Label>
-          <span className="text-xs text-muted-foreground">{stressConfig.numAccounts.toLocaleString()}</span>
+          <span className="text-xs text-muted-foreground">{realisticConfig.numAccounts.toLocaleString()}</span>
         </div>
         <Slider
-          value={[stressConfig.numAccounts]}
-          onValueChange={([v]) => updateStressConfig({ numAccounts: v })}
+          value={[realisticConfig.numAccounts]}
+          onValueChange={([v]) => updateRealisticConfig({ numAccounts: v })}
           min={10}
           max={10000}
           step={10}
@@ -102,8 +102,8 @@ export function StressTestConfigPanel() {
         <Label>Target TPS</Label>
         <Input
           type="text"
-          value={stressConfig.targetTps}
-          onChange={(e) => updateStressConfig({ targetTps: parseInt(e.target.value) || 0 })}
+          value={realisticConfig.targetTps}
+          onChange={(e) => updateRealisticConfig({ targetTps: parseInt(e.target.value) || 0 })}
           disabled={isDisabled}
         />
       </div>
@@ -114,8 +114,8 @@ export function StressTestConfigPanel() {
           <Label>Min Tip (gwei)</Label>
           <Input
             type="text"
-            value={stressConfig.minTipGwei}
-            onChange={(e) => updateStressConfig({ minTipGwei: parseFloat(e.target.value) || 0 })}
+            value={realisticConfig.minTipGwei}
+            onChange={(e) => updateRealisticConfig({ minTipGwei: parseFloat(e.target.value) || 0 })}
             disabled={isDisabled}
           />
         </div>
@@ -123,8 +123,8 @@ export function StressTestConfigPanel() {
           <Label>Max Tip (gwei)</Label>
           <Input
             type="text"
-            value={stressConfig.maxTipGwei}
-            onChange={(e) => updateStressConfig({ maxTipGwei: parseFloat(e.target.value) || 0 })}
+            value={realisticConfig.maxTipGwei}
+            onChange={(e) => updateRealisticConfig({ maxTipGwei: parseFloat(e.target.value) || 0 })}
             disabled={isDisabled}
           />
         </div>
@@ -134,8 +134,8 @@ export function StressTestConfigPanel() {
       <div className="space-y-2">
         <Label>Tip Distribution</Label>
         <Select
-          value={stressConfig.tipDistribution}
-          onValueChange={(v) => updateStressConfig({ tipDistribution: v as TipDistribution })}
+          value={realisticConfig.tipDistribution}
+          onValueChange={(v) => updateRealisticConfig({ tipDistribution: v as TipDistribution })}
           disabled={isDisabled}
         >
           <SelectTrigger>
@@ -158,8 +158,8 @@ export function StressTestConfigPanel() {
       {/* TX Type Ratios */}
       <div className="border-t pt-4">
         <TxTypeRatioConfig
-          ratios={stressConfig.txTypeRatios}
-          onChange={(txTypeRatios) => updateStressConfig({ txTypeRatios })}
+          ratios={realisticConfig.txTypeRatios}
+          onChange={(txTypeRatios) => updateRealisticConfig({ txTypeRatios })}
           disabled={isDisabled}
         />
       </div>

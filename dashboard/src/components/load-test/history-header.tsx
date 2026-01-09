@@ -37,8 +37,8 @@ function getPatternLabel(pattern: string): string {
     constant: "Constant Rate",
     ramp: "Ramp Up",
     spike: "Spike",
-    max: "Max Throughput",
-    stress: "Stress Test",
+    adaptive: "Adaptive",
+    realistic: "Realistic",
   };
   return labels[pattern] || pattern;
 }
@@ -256,37 +256,37 @@ export function HistoryHeader({ testRun, onBack }: HistoryHeaderProps) {
             </>
           )}
 
-          {pattern === "max" && (
+          {pattern === "adaptive" && (
             <>
-              {config?.maxInitialRate !== undefined && (
+              {config?.adaptiveInitialRate !== undefined && (
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Initial Rate</span>
-                  <span className="font-mono">{config.maxInitialRate} tx/s</span>
+                  <span className="font-mono">{config.adaptiveInitialRate} tx/s</span>
                 </div>
               )}
-              {config?.maxTargetPending !== undefined && (
+              {config?.adaptiveTargetPending !== undefined && (
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Target Pending</span>
-                  <span className="font-mono">{config.maxTargetPending}</span>
+                  <span className="font-mono">{config.adaptiveTargetPending}</span>
                 </div>
               )}
             </>
           )}
 
-          {pattern === "stress" && config?.stressConfig && (
+          {pattern === "realistic" && config?.realisticConfig && (
             <>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Accounts</span>
-                <span className="font-mono">{config.stressConfig.numAccounts}</span>
+                <span className="font-mono">{config.realisticConfig.numAccounts}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Target TPS</span>
-                <span className="font-mono">{config.stressConfig.targetTps} tx/s</span>
+                <span className="font-mono">{config.realisticConfig.targetTps} tx/s</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground">Tip Range</span>
                 <span className="font-mono">
-                  {config.stressConfig.minTipGwei} - {config.stressConfig.maxTipGwei} gwei
+                  {config.realisticConfig.minTipGwei} - {config.realisticConfig.maxTipGwei} gwei
                 </span>
               </div>
             </>

@@ -24,8 +24,8 @@ const TX_TYPE_LABELS: Record<TransactionType, string> = {
 export function TxTypeBreakdown() {
   const { txTypeMetrics, accountsActive, accountsFunded, config, status } = useGoLoadTestStore();
 
-  // Only show for stress mode
-  if (config?.pattern !== "stress") {
+  // Only show for realistic mode
+  if (config?.pattern !== "realistic") {
     return null;
   }
 

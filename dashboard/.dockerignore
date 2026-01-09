@@ -1,0 +1,28 @@
+# Dependencies (will be installed in container)
+node_modules/
+
+# Build outputs (will be rebuilt in container)
+.next/
+out/
+
+# Cache files
+*.tsbuildinfo
+.eslintcache
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Development files
+*.md
+legacy/
+
+# Test files
+test-*.mjs

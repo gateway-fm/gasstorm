@@ -21,7 +21,7 @@
     "terminalTotalDifficultyPassed": true,
     "optimism": {
       "eip1559Elasticity": 6,
-      "eip1559Denominator": 50,
+      "eip1559Denominator": 250,
       "eip1559DenominatorCanyon": 250
     },
     "bedrockBlock": 0,
@@ -90,5 +90,5 @@
   "number": "0x0",
   "gasUsed": "0x0",
   "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
-  "baseFeePerGas": "0x3b9aca00"
+  "baseFeePerGas": "0x3e8"
 }

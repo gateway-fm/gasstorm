@@ -89,6 +89,12 @@ export default function LoadTestPage() {
   // Handle new L2 block - collect metrics and check for TX confirmations
   const handleL2NewHead = useCallback(
     async (head: { number: string; hash: string; timestamp: string; gasUsed: string; gasLimit: string }) => {
+      // Only collect block metrics while a test is running
+      // This prevents the chart from updating after test completion
+      if (status !== "running") {
+        return;
+      }
+
       const blockNum = parseInt(head.number, 16);
 
       // Get full block data
@@ -138,7 +144,7 @@ export default function LoadTestPage() {
         console.error("Failed to fetch block:", error);
       }
     },
-    [addBlockMetrics, builder.blockTimeMs]
+    [status, addBlockMetrics, builder.blockTimeMs]
   );
 
   const { isConnected: l1WsConnected } = useL1WebSocket();
@@ -178,7 +184,7 @@ export default function LoadTestPage() {
           <LatencyHistogram />
         </div>
 
-        {/* Stress Test Metrics - only shown for stress mode */}
+        {/* Realistic Test Metrics - only shown for realistic mode */}
         <div className="grid gap-4 md:grid-cols-2 mb-6">
           <TipHistogram />
           <TxTypeBreakdown />

@@ -38,7 +38,7 @@ services:
       "--http",
       "--http.addr", "0.0.0.0",
       "--http.port", "8545",
-      "--http.api", "eth,net,web3,debug,txpool",
+      "--http.api", "eth,net,web3",
       "--http.corsdomain", "*",
       # WebSocket
       "--ws",
@@ -56,6 +56,13 @@ services:
       "--txpool.basefee-max-count", "1",
       "--txpool.queued-max-count", "1",
       "--txpool.max-account-slots", "1",
+      # MDBX database performance tuning
+      "--db.sync-mode", "safe-no-sync",   # ~10x faster writes, async flushes, crash-safe
+      "--db.growth-step", "4GB",
+      "--db.max-readers", "512",
+      # State root / PMT performance tuning
+      "--engine.multiproof-chunking",
+      "--engine.multiproof-chunk-size", "100",
       # Performance tuning for high TPS
       "--rpc.max-connections", "1000",
       "--rpc.max-request-size", "100",
@@ -63,7 +70,7 @@ services:
       "--rpc.max-tracing-requests", "50",
       # Log level: -v (info), -vv (debug), -vvv (trace), -vvvv (trace all)
       "--log.stdout.format", "terminal",
-      "-vvv"
+      "-v"
     ]
     volumes:
       - ./genesis:/config:ro
@@ -76,11 +83,11 @@ services:
     deploy:
       resources:
         limits:
+          cpus: '8'
+          memory: 16G
+        reservations:
           cpus: '4'
           memory: 8G
-        reservations:
-          cpus: '2'
-          memory: 4G
     # Note: healthcheck disabled as curl/wget not available in op-reth image
     restart: unless-stopped
 

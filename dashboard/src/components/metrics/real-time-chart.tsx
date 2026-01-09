@@ -12,27 +12,27 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useMetricsStore } from "@/stores/metrics-store";
-import { useChainStore } from "@/stores/chain-store";
 import { useMemo } from "react";
 
 export function RealTimeChart() {
-  const { timeSeries, snapshot } = useMetricsStore();
-  const { builder } = useChainStore();
+  const { timeSeries, snapshot, isHistoricalMode } = useMetricsStore();
 
-  // Check if we have Mgas/s data (not available in historical mode)
-  const hasMgasData = timeSeries.mgasPerSec.length > 0;
+  // Check if we have Mgas/s data with actual values
+  const hasMgasData = timeSeries.mgasPerSec.some(v => v > 0);
 
   const chartData = useMemo(() => {
-    // Downsample to ~1 point per second for smoother chart
-    // Calculate sample interval based on configured block time
-    const blockTimeMs = builder.blockTimeMs || 2000;
-    const blocksPerSecond = 1000 / blockTimeMs;
-    const sampleInterval = Math.max(1, Math.round(blocksPerSecond)); // At least 1
-    const maxPoints = 120; // Show last 120 sampled points
+    // For historical mode, show all data points (they're already aggregated)
+    // For live mode, downsample to ~1 point per second for smoother chart
+    const maxPoints = isHistoricalMode ? 300 : 120; // Show more points for historical data
+    const totalPoints = timeSeries.timestamps.length;
+
+    // For historical data, use simpler sampling
+    const sampleInterval = isHistoricalMode
+      ? Math.max(1, Math.floor(totalPoints / maxPoints))
+      : Math.max(1, Math.round(1000 / 2000)); // Default ~2s block time for live
 
     // Sample every Nth point from recent data
     const sampledData: { time: string; mgasPerSec: number; txPerSec: number }[] = [];
-    const totalPoints = timeSeries.timestamps.length;
 
     for (let i = totalPoints - 1; i >= 0 && sampledData.length < maxPoints; i -= sampleInterval) {
       sampledData.unshift({
@@ -43,19 +43,21 @@ export function RealTimeChart() {
     }
 
     return sampledData;
-  }, [timeSeries, builder.blockTimeMs]);
+  }, [timeSeries, isHistoricalMode]);
 
   return (
     <Card className="col-span-2">
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base font-semibold">
-          {hasMgasData ? "Throughput Over Time" : "TPS Over Time"}
+          {isHistoricalMode
+            ? (hasMgasData ? "Historical Throughput" : "Historical TPS")
+            : (hasMgasData ? "Throughput Over Time" : "TPS Over Time")}
         </CardTitle>
         <div className="flex gap-4 text-sm">
           {hasMgasData ? (
             <>
               <div>
-                <span className="text-muted-foreground">Current: </span>
+                <span className="text-muted-foreground">{isHistoricalMode ? "Avg: " : "Current: "}</span>
                 <span className="font-mono font-semibold text-blue-400">
                   {snapshot.currentMgasPerSec.toFixed(2)} Mgas/s
                 </span>

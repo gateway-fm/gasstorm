@@ -18,6 +18,9 @@ interface MetricsState {
 
   // Latencies (confirmed tx only)
   latencies: number[];
+
+  // Historical mode - when true, ignores live updates
+  isHistoricalMode: boolean;
 }
 
 // Types for historical data hydration
@@ -52,6 +55,7 @@ interface MetricsActions {
   recordLatency: (latencyMs: number) => void;
   reset: () => void;
   hydrateFromHistory: (run: HistoricalTestRun, timeSeries: HistoricalTimeSeriesPoint[]) => void;
+  setHistoricalMode: (isHistorical: boolean) => void;
 }
 
 type MetricsStore = MetricsState & MetricsActions;
@@ -91,10 +95,13 @@ export const useMetricsStore = create<MetricsStore>()(
   timeSeries: { ...initialTimeSeries },
   transactions: [],
   latencies: [],
+  isHistoricalMode: false,
 
   // Actions
   addBlockMetrics: (metrics) =>
     set((state) => {
+      // Ignore live updates when in historical mode
+      if (state.isHistoricalMode) return state;
       const blockMetrics = [...state.blockMetrics, metrics];
 
       // Calculate smoothed values using rolling average targeting ~3 seconds of data
@@ -167,12 +174,16 @@ export const useMetricsStore = create<MetricsStore>()(
     }),
 
   addTransaction: (tx) =>
-    set((state) => ({
-      transactions: [...state.transactions, tx],
-    })),
+    set((state) => {
+      // Ignore live updates when in historical mode
+      if (state.isHistoricalMode) return state;
+      return { transactions: [...state.transactions, tx] };
+    }),
 
   updateTransaction: (txHash, update) =>
     set((state) => {
+      // Ignore live updates when in historical mode
+      if (state.isHistoricalMode) return state;
       const transactions = state.transactions.map((tx) =>
         tx.txHash === txHash ? { ...tx, ...update } : tx
       );
@@ -192,13 +203,17 @@ export const useMetricsStore = create<MetricsStore>()(
     }),
 
   recordLatency: (latencyMs) =>
-    set((state) => ({
-      latencies: [...state.latencies, latencyMs],
-      timeSeries: {
-        ...state.timeSeries,
-        latencies: [...state.timeSeries.latencies, latencyMs],
-      },
-    })),
+    set((state) => {
+      // Ignore live updates when in historical mode
+      if (state.isHistoricalMode) return state;
+      return {
+        latencies: [...state.latencies, latencyMs],
+        timeSeries: {
+          ...state.timeSeries,
+          latencies: [...state.timeSeries.latencies, latencyMs],
+        },
+      };
+    }),
 
   reset: () =>
     set(() => ({
@@ -207,7 +222,11 @@ export const useMetricsStore = create<MetricsStore>()(
       timeSeries: { ...initialTimeSeries },
       transactions: [],
       latencies: [],
+      isHistoricalMode: false,
     })),
+
+  setHistoricalMode: (isHistorical: boolean) =>
+    set(() => ({ isHistoricalMode: isHistorical })),
 
   // Hydrate store with historical test data (for history detail view)
   hydrateFromHistory: (run: HistoricalTestRun, timeSeries: HistoricalTimeSeriesPoint[]) => {
@@ -247,6 +266,7 @@ export const useMetricsStore = create<MetricsStore>()(
       },
       transactions: [],
       latencies: [],
+      isHistoricalMode: true, // Prevent live updates from interfering
     });
   },
     }),

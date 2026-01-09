@@ -37,7 +37,7 @@ export function LoadTestRunner() {
     reset,
   } = useGoLoadTestStore();
 
-  const isMaxMode = config?.pattern === "max";
+  const isAdaptiveMode = config?.pattern === "adaptive";
 
   // Use durationSec from Go load generator when running, fallback to config
   const duration = durationSec > 0 ? durationSec : (config?.duration ?? 60);
@@ -82,7 +82,7 @@ export function LoadTestRunner() {
                 Target: <span className="text-blue-400 font-mono">{targetTps.toLocaleString()}</span> tx/s
               </p>
             )}
-            {isMaxMode && peakTps > 0 && (
+            {isAdaptiveMode && peakTps > 0 && (
               <p className="text-xs text-muted-foreground mt-1">
                 Peak: <span className="text-purple-400 font-mono">{peakTps.toLocaleString()}</span> tx/s
               </p>

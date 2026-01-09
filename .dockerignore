@@ -1,0 +1,41 @@
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files (use .env.example)
+.env
+
+# Development data
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Compiled binaries
+block-builder/block-builder
+block-builder/block-builder.test
+load-generator/load-generator
+
+# Test files
+*_test.go
+*_bench_test.go
+
+# Node.js
+dashboard/node_modules/
+dashboard/.next/
+dashboard/out/
+dashboard/*.tsbuildinfo
+
+# Config backups
+config/*.bak

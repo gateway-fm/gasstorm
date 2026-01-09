@@ -1,5 +1,5 @@
 import type { LoadTestConfig, LoadPattern } from "@/types/load-test";
-import { DEFAULT_STRESS_CONFIG } from "@/types/load-test";
+import { DEFAULT_REALISTIC_CONFIG } from "@/types/load-test";
 
 export interface LoadScheduleEntry {
   timestamp: number; // ms from start
@@ -53,16 +53,16 @@ export function generateLoadSchedule(config: LoadTestConfig): LoadScheduleEntry[
       }
       break;
 
-    case "max":
-      // Max mode: start at initial rate, actual rate managed dynamically by store
-      const initialRate = config.maxInitialRate ?? 10;
+    case "adaptive":
+      // Adaptive mode: start at initial rate, actual rate managed dynamically by store
+      const initialRate = config.adaptiveInitialRate ?? 10;
       schedule.push({ timestamp: 0, rate: initialRate });
       schedule.push({ timestamp: durationMs, rate: initialRate });
       break;
 
-    case "stress":
-      // Stress mode: constant target TPS with dynamic tx types and tips
-      const targetTps = config.stressConfig?.targetTps ?? DEFAULT_STRESS_CONFIG.targetTps;
+    case "realistic":
+      // Realistic mode: constant target TPS with dynamic tx types and tips
+      const targetTps = config.realisticConfig?.targetTps ?? DEFAULT_REALISTIC_CONFIG.targetTps;
       schedule.push({ timestamp: 0, rate: targetTps });
       schedule.push({ timestamp: durationMs, rate: targetTps });
       break;
@@ -99,9 +99,9 @@ export function getPatternDescription(pattern: LoadPattern): string {
       return "Gradually increasing rate to find breaking point";
     case "spike":
       return "Periodic bursts to test resilience";
-    case "max":
+    case "adaptive":
       return "Adaptive rate that finds maximum throughput";
-    case "stress":
+    case "realistic":
       return "Realistic mempool: many senders, variable tips, mixed tx types";
   }
 }
@@ -115,9 +115,9 @@ export function getDefaultConfigForPattern(pattern: LoadPattern): Partial<LoadTe
       return { rampStart: 100, rampEnd: 5000, rampSteps: 10, duration: 120 };
     case "spike":
       return { baselineRate: 100, spikeRate: 5000, spikeDuration: 5, spikeInterval: 15, duration: 90 };
-    case "max":
-      return { maxInitialRate: 100, maxTargetPending: 1000, maxRateStep: 100, duration: 60 };
-    case "stress":
-      return { duration: 120 }; // Stress config handled separately via stressConfig
+    case "adaptive":
+      return { adaptiveInitialRate: 100, adaptiveTargetPending: 1000, adaptiveRateStep: 100, duration: 60 };
+    case "realistic":
+      return { duration: 120 }; // Realistic config handled separately via realisticConfig
   }
 }
