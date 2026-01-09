@@ -70,7 +70,7 @@ services:
       "--rpc.max-tracing-requests", "50",
       # Log level: -v (info), -vv (debug), -vvv (trace), -vvvv (trace all)
       "--log.stdout.format", "terminal",
-      "-v"
+      "-vvv"
     ]
     volumes:
       - ./genesis:/config:ro
@@ -177,7 +177,7 @@ services:
       # Block production settings
       - BLOCK_TIME_MS=${BLOCK_TIME_MS:-150}
       - SKIP_EMPTY_BLOCKS=${SKIP_EMPTY_BLOCKS:-true}
-      - GAS_LIMIT=${GAS_LIMIT:-1000000000}            # 1 gigagas default
+      - GAS_LIMIT=${GAS_LIMIT:-1500000000}            # 1.5 gigagas default
       - MAX_TXS_PER_BLOCK=${MAX_TXS_PER_BLOCK:-50000} # Scale with gas limit
       # OP Stack settings
       - INCLUDE_DEPOSIT_TX=${INCLUDE_DEPOSIT_TX:-false}  # Include L1 attributes deposit TX (off for PoC)

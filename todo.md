@@ -1,2 +1,0 @@
-- a tx with same nonce but higher tip should replace
-- a tx with same nonce and same tip should reject 'already seen' or whatever the real error is
