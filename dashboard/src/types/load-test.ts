@@ -323,6 +323,15 @@ export interface TestRun {
   avgFillRate?: number;
   peakMgasPerSec?: number;
   avgMgasPerSec?: number;
+  // User-defined metadata
+  customName?: string;
+  isFavorite: boolean;
+}
+
+// Update request for test run metadata
+export interface TestRunMetadataUpdate {
+  customName?: string;
+  isFavorite?: boolean;
 }
 
 // Test run with time-series detail

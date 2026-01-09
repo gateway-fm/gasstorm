@@ -55,6 +55,9 @@ function transformApiResponse(data: any): TestRunDetail {
     avgFillRate: run?.AvgFillRate || run?.avgFillRate,
     peakMgasPerSec: run?.PeakMgasPerSec || run?.peakMgasPerSec,
     avgMgasPerSec: run?.AvgMgasPerSec || run?.avgMgasPerSec,
+    // User metadata
+    customName: run?.CustomName || run?.customName,
+    isFavorite: run?.IsFavorite ?? run?.isFavorite ?? false,
   };
 
   // Transform TimeSeriesPoint[] from PascalCase to camelCase

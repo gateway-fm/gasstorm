@@ -128,8 +128,56 @@ export function HistoryHeader({ testRun, onBack }: HistoryHeaderProps) {
   };
 
   const handleExportCSV = () => {
-    // Build CSV with time series data
+    const lines: string[] = [];
+
+    // Summary section
+    lines.push("# Load Test Results");
+    lines.push(`# Test ID: ${testRun.id}`);
+    lines.push(`# Started: ${testRun.startedAt}`);
+    lines.push(`# Pattern: ${testRun.pattern}`);
+    lines.push(`# Transaction Type: ${testRun.transactionType}`);
+    lines.push(`# Duration: ${testRun.durationMs}ms`);
+    lines.push(`# Execution Layer: ${testRun.executionLayer || "reth"}`);
+    lines.push("#");
+
+    // Transaction summary
+    lines.push("# Transaction Summary");
+    lines.push(`# TX Sent: ${testRun.txSent}`);
+    lines.push(`# TX Confirmed: ${testRun.txConfirmed}`);
+    lines.push(`# TX Failed: ${testRun.txFailed}`);
+    lines.push(`# Success Rate: ${testRun.txSent > 0 ? ((testRun.txConfirmed / testRun.txSent) * 100).toFixed(1) : 0}%`);
+    lines.push("#");
+
+    // Performance summary
+    lines.push("# Performance Summary");
+    lines.push(`# Average TPS: ${testRun.averageTps?.toFixed(1) || "N/A"}`);
+    lines.push(`# Peak TPS: ${testRun.peakTps || "N/A"}`);
+    lines.push(`# Peak MGas/s: ${snapshot.peakMgasPerSec?.toFixed(2) || "N/A"}`);
+    lines.push(`# Avg Fill Rate: ${snapshot.averageFillRate?.toFixed(1) || "N/A"}%`);
+    lines.push(`# Blocks Produced: ${snapshot.blocksProduced || "N/A"}`);
+    lines.push("#");
+
+    // Latency stats
+    if (latencyStats && latencyStats.count > 0) {
+      lines.push("# Confirmation Latency (ms)");
+      lines.push(`# Min: ${latencyStats.min}, Max: ${latencyStats.max}, Avg: ${latencyStats.avg?.toFixed(0)}`);
+      lines.push(`# P50: ${latencyStats.p50}, P95: ${latencyStats.p95}, P99: ${latencyStats.p99}`);
+      lines.push("#");
+    }
+
+    if (preconfStats && preconfStats.count > 0) {
+      lines.push("# Preconfirmation Latency (ms)");
+      lines.push(`# Min: ${preconfStats.min}, Max: ${preconfStats.max}, Avg: ${preconfStats.avg?.toFixed(0)}`);
+      lines.push(`# P50: ${preconfStats.p50}, P95: ${preconfStats.p95}, P99: ${preconfStats.p99}`);
+      lines.push("#");
+    }
+
+    // Time series data header
+    lines.push("");
     const headers = ["timestamp_sec", "tx_per_sec", "mgas_per_sec", "fill_rate_pct"];
+    lines.push(headers.join(","));
+
+    // Time series data rows
     const rows = timeSeries.timestamps.map((ts, i) => [
       ts.toFixed(1),
       (timeSeries.txPerSec[i] ?? 0).toFixed(2),
@@ -137,7 +185,9 @@ export function HistoryHeader({ testRun, onBack }: HistoryHeaderProps) {
       (timeSeries.blockFillRate[i] ?? 0).toFixed(1),
     ].join(","));
 
-    const csv = [headers.join(","), ...rows].join("\n");
+    lines.push(...rows);
+
+    const csv = lines.join("\n");
     downloadFile(csv, generateTestFilename(testRun, "csv"), "text/csv");
   };
 

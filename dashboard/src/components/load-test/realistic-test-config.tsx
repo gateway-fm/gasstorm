@@ -88,7 +88,7 @@ export function RealisticTestConfigPanel() {
           value={[realisticConfig.numAccounts]}
           onValueChange={([v]) => updateRealisticConfig({ numAccounts: v })}
           min={10}
-          max={10000}
+          max={5000}
           step={10}
           disabled={isDisabled}
         />

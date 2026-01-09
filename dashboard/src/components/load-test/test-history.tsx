@@ -18,13 +18,16 @@ import {
   Trash2,
   LineChart,
   ExternalLink,
+  Star,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import type {
   TestResult,
   TestRunDetail,
   TimeSeriesPoint,
   PaginatedTestRuns,
   TestRun,
+  TestRunMetadataUpdate,
 } from "@/types/load-test";
 import { TxLogViewer } from "./tx-log-viewer";
 import {
@@ -67,6 +70,9 @@ function transformTestRun(run: any): TestRun {
     avgFillRate: run?.AvgFillRate || run?.avgFillRate,
     peakMgasPerSec: run?.PeakMgasPerSec || run?.peakMgasPerSec,
     avgMgasPerSec: run?.AvgMgasPerSec || run?.avgMgasPerSec,
+    // User metadata
+    customName: run?.CustomName || run?.customName,
+    isFavorite: run?.IsFavorite ?? run?.isFavorite ?? false,
   };
 }
 
@@ -92,6 +98,8 @@ function transformTimeSeriesPoint(p: any): TimeSeriesPoint {
 
 interface HistoryItem extends TestResult {
   txLoggingEnabled?: boolean;
+  customName?: string;
+  isFavorite?: boolean;
 }
 
 interface TestHistoryProps {
@@ -108,6 +116,9 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
   const [loadingDetail, setLoadingDetail] = useState<string | null>(null);
   const [txLogViewerId, setTxLogViewerId] = useState<string | null>(null);
   const [txLoggingEnabled, setTxLoggingEnabled] = useState<boolean>(true);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [editingNameValue, setEditingNameValue] = useState("");
 
   const fetchHistory = useCallback(async () => {
     setLoading(true);
@@ -143,6 +154,8 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
                   durationSec: Math.round(run.durationMs / 1000),
                 },
                 txLoggingEnabled: run.txLoggingEnabled,
+                customName: run.customName,
+                isFavorite: run.isFavorite,
               };
             })
           );
@@ -203,6 +216,42 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
     }
   }, [expanded]);
 
+  const updateMetadata = useCallback(async (testId: string, update: TestRunMetadataUpdate) => {
+    try {
+      const response = await fetch(`${LOAD_GEN_API}/history/${testId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(update),
+      });
+      if (response.ok) {
+        const updatedRun = transformTestRun(await response.json());
+        setHistory((prev) =>
+          prev.map((h) =>
+            h.id === testId
+              ? { ...h, customName: updatedRun.customName, isFavorite: updatedRun.isFavorite }
+              : h
+          )
+        );
+      }
+    } catch {
+      // Silently fail
+    }
+  }, []);
+
+  const toggleFavorite = useCallback(async (testId: string, currentFavorite: boolean) => {
+    await updateMetadata(testId, { isFavorite: !currentFavorite });
+  }, [updateMetadata]);
+
+  const saveName = useCallback(async (testId: string, name: string) => {
+    await updateMetadata(testId, { customName: name || undefined });
+    setEditingNameId(null);
+  }, [updateMetadata]);
+
+  const startEditingName = useCallback((testId: string, currentName: string | undefined) => {
+    setEditingNameId(testId);
+    setEditingNameValue(currentName || "");
+  }, []);
+
   useEffect(() => {
     fetchHistory();
   }, [fetchHistory]);
@@ -235,6 +284,13 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
     return ((confirmed / sent) * 100).toFixed(1);
   };
 
+  // Filter and sort: favorites first (already sorted by API), then filter if needed
+  const filteredHistory = showFavoritesOnly
+    ? history.filter((h) => h.isFavorite)
+    : history;
+
+  const favoriteCount = history.filter((h) => h.isFavorite).length;
+
   if (history.length === 0) {
     return (
       <Card>
@@ -264,31 +320,98 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-base font-semibold">
-            Test History ({history.length})
+            Test History ({filteredHistory.length}{showFavoritesOnly ? ` of ${history.length}` : ""})
           </CardTitle>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={fetchHistory}
-            disabled={loading}
-            className="h-8 w-8"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant={showFavoritesOnly ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+              className="h-8 gap-1"
+            >
+              <Star className={`h-3.5 w-3.5 ${showFavoritesOnly ? "fill-current" : ""}`} />
+              <span className="hidden sm:inline">Favorites</span>
+              {favoriteCount > 0 && (
+                <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                  {favoriteCount}
+                </Badge>
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={fetchHistory}
+              disabled={loading}
+              className="h-8 w-8"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {fullPage ? (
             <div className="space-y-2">
-              {history.map((result, index) => (
+              {filteredHistory.map((result, index) => (
                 <div
                   key={result.id || `history-${index}`}
                   className="border rounded-lg p-3 hover:bg-accent/50 transition-colors"
                 >
-                  <div
-                    className="flex items-center justify-between cursor-pointer"
-                    onClick={() => handleExpand(result.id)}
-                  >
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between">
+                    {/* Star button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(result.id, result.isFavorite ?? false);
+                      }}
+                      className="p-1 hover:bg-accent rounded -ml-1 mr-1"
+                    >
+                      <Star
+                        className={`h-4 w-4 ${
+                          result.isFavorite
+                            ? "fill-yellow-400 text-yellow-400"
+                            : "text-muted-foreground hover:text-yellow-400"
+                        }`}
+                      />
+                    </button>
+
+                    {/* Name (editable) or placeholder */}
+                    <div className="flex-1 min-w-0 mr-2">
+                      {editingNameId === result.id ? (
+                        <Input
+                          value={editingNameValue}
+                          onChange={(e) => setEditingNameValue(e.target.value)}
+                          onBlur={() => saveName(result.id, editingNameValue)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveName(result.id, editingNameValue);
+                            if (e.key === "Escape") setEditingNameId(null);
+                          }}
+                          className="h-6 text-sm"
+                          placeholder="Enter test name..."
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <span
+                          className={`text-sm cursor-pointer truncate block ${
+                            result.customName
+                              ? "font-medium"
+                              : "text-muted-foreground italic"
+                          }`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEditingName(result.id, result.customName);
+                          }}
+                        >
+                          {result.customName || "Click to add name"}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Row toggle and badges */}
+                    <div
+                      className="flex items-center gap-2 cursor-pointer"
+                      onClick={() => handleExpand(result.id)}
+                    >
                       <Badge variant="outline" className="font-mono text-xs">
                         {result.pattern || "unknown"}
                       </Badge>
@@ -302,11 +425,14 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
                       >
                         {(result as TestRun).executionLayer || "reth"}
                       </Badge>
-                      <span className="text-sm text-muted-foreground">
+                      <span className="text-sm text-muted-foreground hidden md:block">
                         {formatDate(result.startedAt)}
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 text-xs">
+                    <div
+                      className="flex items-center gap-3 text-xs cursor-pointer"
+                      onClick={() => handleExpand(result.id)}
+                    >
                       <span className="flex items-center gap-1 text-muted-foreground">
                         <Clock className="h-3 w-3" />
                         {formatDuration(result.durationMs)}
@@ -480,16 +606,67 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
           ) : (
             <ScrollArea className="h-[400px] pr-4">
               <div className="space-y-2">
-                {history.map((result, index) => (
+                {filteredHistory.map((result, index) => (
                   <div
                     key={result.id || `history-${index}`}
                     className="border rounded-lg p-3 hover:bg-accent/50 transition-colors"
                   >
-                    <div
-                      className="flex items-center justify-between cursor-pointer"
-                      onClick={() => handleExpand(result.id)}
-                    >
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between">
+                      {/* Star button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleFavorite(result.id, result.isFavorite ?? false);
+                        }}
+                        className="p-1 hover:bg-accent rounded -ml-1 mr-1"
+                      >
+                        <Star
+                          className={`h-4 w-4 ${
+                            result.isFavorite
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "text-muted-foreground hover:text-yellow-400"
+                          }`}
+                        />
+                      </button>
+
+                      {/* Name (editable) or placeholder */}
+                      <div className="flex-1 min-w-0 mr-2">
+                        {editingNameId === result.id ? (
+                          <Input
+                            value={editingNameValue}
+                            onChange={(e) => setEditingNameValue(e.target.value)}
+                            onBlur={() => saveName(result.id, editingNameValue)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") saveName(result.id, editingNameValue);
+                              if (e.key === "Escape") setEditingNameId(null);
+                            }}
+                            className="h-6 text-sm"
+                            placeholder="Enter test name..."
+                            autoFocus
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : (
+                          <span
+                            className={`text-sm cursor-pointer truncate block ${
+                              result.customName
+                                ? "font-medium"
+                                : "text-muted-foreground italic"
+                            }`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startEditingName(result.id, result.customName);
+                            }}
+                          >
+                            {result.customName || "Click to add name"}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Row toggle and badges */}
+                      <div
+                        className="flex items-center gap-2 cursor-pointer"
+                        onClick={() => handleExpand(result.id)}
+                      >
                         <Badge variant="outline" className="font-mono text-xs">
                           {result.pattern}
                         </Badge>
@@ -503,11 +680,14 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
                         >
                           {(result as TestRun).executionLayer || "reth"}
                         </Badge>
-                        <span className="text-sm text-muted-foreground">
+                        <span className="text-sm text-muted-foreground hidden md:block">
                           {formatDate(result.startedAt)}
                         </span>
                       </div>
-                      <div className="flex items-center gap-3 text-xs">
+                      <div
+                        className="flex items-center gap-3 text-xs cursor-pointer"
+                        onClick={() => handleExpand(result.id)}
+                      >
                         <span className="flex items-center gap-1 text-muted-foreground">
                           <Clock className="h-3 w-3" />
                           {formatDuration(result.durationMs)}
