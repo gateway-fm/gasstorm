@@ -10,6 +10,7 @@ import { MetricsSnapshot } from "@/components/metrics/metrics-snapshot";
 import { LatencyHistogram } from "@/components/metrics/latency-histogram";
 import { TipHistogram } from "@/components/metrics/tip-histogram";
 import { TxTypeBreakdown } from "@/components/metrics/tx-type-breakdown";
+import { OnChainMetrics } from "@/components/metrics/on-chain-metrics";
 import { PercentileTable } from "@/components/reports/percentile-table";
 import { VerificationSummary } from "@/components/reports/verification-summary";
 import { useGoLoadTestStore } from "@/stores/go-load-test-store";
@@ -64,6 +65,14 @@ function transformApiResponse(data: any): TestRunDetail {
     pendingLatency: run?.PendingLatency || run?.pendingLatency,
     accountsActive: run?.AccountsActive || run?.accountsActive,
     accountsFunded: run?.AccountsFunded || run?.accountsFunded,
+    // On-chain verification metrics
+    onChainFirstBlock: run?.OnChainFirstBlock || run?.onChainFirstBlock,
+    onChainLastBlock: run?.OnChainLastBlock || run?.onChainLastBlock,
+    onChainTxCount: run?.OnChainTxCount || run?.onChainTxCount,
+    onChainGasUsed: run?.OnChainGasUsed || run?.onChainGasUsed,
+    onChainMgasPerSec: run?.OnChainMgasPerSec || run?.onChainMgasPerSec,
+    onChainTps: run?.OnChainTps || run?.onChainTps,
+    onChainDurationSecs: run?.OnChainDurationSecs || run?.onChainDurationSecs,
   };
 
   // Transform TimeSeriesPoint[] from PascalCase to camelCase
@@ -226,6 +235,12 @@ function HistoryDetailView({ testId }: { testId: string }) {
       <div className="mb-6">
         <VerificationSummary />
       </div>
+
+      {testRun && (
+        <div className="mb-6">
+          <OnChainMetrics testRun={testRun} />
+        </div>
+      )}
 
       <div className="mb-6">
         <LatencyHistogram />

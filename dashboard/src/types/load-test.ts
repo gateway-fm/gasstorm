@@ -344,6 +344,14 @@ export interface TestRun {
   pendingLatency?: LatencyStats;
   accountsActive?: number;
   accountsFunded?: number;
+  // On-chain verification metrics (actual chain state after test)
+  onChainFirstBlock?: number;
+  onChainLastBlock?: number;
+  onChainTxCount?: number;
+  onChainGasUsed?: number;
+  onChainMgasPerSec?: number;
+  onChainTps?: number;
+  onChainDurationSecs?: number;
 }
 
 // Update request for test run metadata

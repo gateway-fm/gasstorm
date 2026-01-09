@@ -232,9 +232,11 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
               : h
           )
         );
+      } else {
+        console.error(`Failed to update test metadata: ${response.status} ${response.statusText}`);
       }
-    } catch {
-      // Silently fail
+    } catch (err) {
+      console.error("Failed to update test metadata:", err);
     }
   }, []);
 
@@ -243,7 +245,8 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
   }, [updateMetadata]);
 
   const saveName = useCallback(async (testId: string, name: string) => {
-    await updateMetadata(testId, { customName: name || undefined });
+    // Send empty string to clear name (not undefined which is omitted from JSON)
+    await updateMetadata(testId, { customName: name.trim() || "" });
     setEditingNameId(null);
   }, [updateMetadata]);
 

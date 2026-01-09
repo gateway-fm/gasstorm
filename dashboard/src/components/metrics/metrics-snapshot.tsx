@@ -51,27 +51,31 @@ export function MetricsSnapshot() {
   // Target block time - only relevant for live mode
   const targetBlockTimeMs = 2000;
 
+  // For historical mode: use showMgasMetrics to determine what to display
+  // This ensures label and value/unit are always consistent
+  const showMgasLabel = showMgasMetrics;
+
   const metrics = [
     {
-      label: isHistoricalMode ? "Avg Mgas/s" : (showMgasMetrics ? "Current Mgas/s" : "Avg tx/s"),
+      label: showMgasLabel ? (isHistoricalMode ? "Avg Mgas/s" : "Current Mgas/s") : "Avg tx/s",
       value: showMgasMetrics ? snapshot.currentMgasPerSec.toFixed(2) : snapshot.currentTxPerSec.toFixed(1),
       unit: showMgasMetrics ? "Mgas/s" : "tx/s",
       color: showMgasMetrics ? "text-blue-400" : "text-purple-400",
     },
     {
-      label: showMgasMetrics ? "Peak Mgas/s" : "Peak tx/s",
+      label: showMgasLabel ? "Peak Mgas/s" : "Peak tx/s",
       value: showMgasMetrics ? snapshot.peakMgasPerSec.toFixed(2) : snapshot.peakTxPerSec.toFixed(1),
       unit: showMgasMetrics ? "Mgas/s" : "tx/s",
       color: "text-green-400",
     },
     {
-      label: isHistoricalMode ? "Avg tx/s" : (showMgasMetrics ? "Current tx/s" : "Confirmed"),
+      label: showMgasLabel ? (isHistoricalMode ? "Avg tx/s" : "Current tx/s") : "Confirmed",
       value: showMgasMetrics ? snapshot.currentTxPerSec.toFixed(1) : snapshot.totalTransactions.toLocaleString(),
       unit: showMgasMetrics ? "tx/s" : "txs",
       color: "text-purple-400",
     },
     {
-      label: showMgasMetrics ? "Peak tx/s" : "Success Rate",
+      label: showMgasLabel ? "Peak tx/s" : "Success Rate",
       value: showMgasMetrics
         ? snapshot.peakTxPerSec.toFixed(1)
         : snapshot.totalTransactions > 0 ? "100%" : "-",
