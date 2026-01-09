@@ -150,6 +150,11 @@ export function LoadTestRunner() {
                   <span className="font-mono">{fundingTxsSent} / {fundingTxsTotal}</span>
                 </div>
                 <Progress value={fundingTxsTotal > 0 ? (fundingTxsSent / fundingTxsTotal) * 100 : 0} className="h-1" />
+                {accountsTotal > fundingTxsTotal && (
+                  <p className="text-xs text-muted-foreground/70">
+                    ({accountsTotal - fundingTxsTotal} built-in accounts already funded)
+                  </p>
+                )}
               </div>
             )}
             {initPhase === "waiting_for_funding" && fundingTxsSent > 0 && (
