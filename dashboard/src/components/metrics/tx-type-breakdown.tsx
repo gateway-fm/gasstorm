@@ -21,6 +21,16 @@ const TX_TYPE_LABELS: Record<TransactionType, string> = {
   "heavy-compute": "Heavy Compute",
 };
 
+// Order by typical gas cost (smallest to largest)
+const TX_TYPE_GAS_ORDER: Record<TransactionType, number> = {
+  "eth-transfer": 1,     // ~21,000 gas
+  "erc20-approve": 2,    // ~46,000 gas
+  "storage-write": 3,    // ~50,000 gas
+  "erc20-transfer": 4,   // ~65,000 gas
+  "heavy-compute": 5,    // ~100,000 gas
+  "uniswap-swap": 6,     // ~150,000 gas
+};
+
 export function TxTypeBreakdown() {
   const { txTypeMetrics, accountsActive, accountsFunded, config, status } = useGoLoadTestStore();
 
@@ -65,7 +75,9 @@ export function TxTypeBreakdown() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {txTypeMetrics.map((metric) => (
+                {[...txTypeMetrics]
+                  .sort((a, b) => (TX_TYPE_GAS_ORDER[a.type] ?? 99) - (TX_TYPE_GAS_ORDER[b.type] ?? 99))
+                  .map((metric) => (
                   <TableRow key={metric.type}>
                     <TableCell className="font-medium">
                       {TX_TYPE_LABELS[metric.type] ?? metric.type}

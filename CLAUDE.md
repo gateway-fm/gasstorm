@@ -101,25 +101,14 @@ make dev              # for reth
 make dev-cdk-erigon   # for cdk-erigon
 ```
 
-## Go Setup (gvm)
+## Go Setup
 
-This project uses gvm (Go Version Manager). **Do not run `go` directly** - it won't work.
+Go 1.25 is installed locally at `~/go-local/go/bin`. Just run `go` directly:
 
 ```bash
-# ALWAYS source gvm first, then use gvm's go
-source ~/.gvm/scripts/gvm && gvm use go1.25
-
-# Run tests
-source ~/.gvm/scripts/gvm && gvm use go1.25 && go test ./...
-
-# Build
-source ~/.gvm/scripts/gvm && gvm use go1.25 && go build ./...
-
-# One-liner pattern for any go command
-source ~/.gvm/scripts/gvm && gvm use go1.25 && go <command>
+go test ./...
+go build ./...
 ```
-
-**Why this matters**: The system `go` binary either doesn't exist or is the wrong version. gvm manages Go versions but requires sourcing its script first.
 
 ## Services
 
@@ -163,7 +152,7 @@ source ~/.gvm/scripts/gvm && gvm use go1.25 && go <command>
 | `builder.go` | Main BlockBuilder struct and StartBlockProduction |
 | `pipeline.go` | Pipelined block production (overlap mode) |
 | `internal/builder/builder.go` | Core block building logic |
-| `internal/txpool/nonce.go` | Nonce caching with LRU |
+| `internal/txpool/nonce_cache.go` | Unified nonce cache (LRU, RPC, freshness) |
 | `internal/txpool/filter.go` | TX filtering and ordering |
 | `internal/preconf/hub.go` | WebSocket preconf event broadcasting |
 | `internal/engine/client.go` | Engine API client (FCU, GetPayload) |
@@ -172,6 +161,9 @@ source ~/.gvm/scripts/gvm && gvm use go1.25 && go <command>
 | File | Purpose |
 |------|---------|
 | `cmd/loadgen/main.go` | Main entry, worker management |
+| `internal/account/account.go` | Nonce reservation pattern (ReserveNonce/Commit/Rollback) |
+| `internal/account/manager.go` | Account initialization and funding |
+| `internal/rpc/client.go` | RPC client with nonce fetching |
 | `internal/metrics/collector.go` | Latency and throughput tracking |
 | `internal/storage/models.go` | Database models (MUST have json tags!) |
 | `internal/storage/sqlite.go` | SQLite persistence |
@@ -190,41 +182,95 @@ source ~/.gvm/scripts/gvm && gvm use go1.25 && go <command>
 
 ## Internal Architecture
 
-### Nonce Tracking (Two Separate Systems)
+### Ethereum Nonce Fundamentals
 
-The block builder has **two distinct nonce tracking systems** - don't confuse them:
+**What is a nonce?** A sequential counter per account starting at 0. Each outbound transaction increments it by 1. It uniquely identifies transactions from an address.
 
-#### 1. NonceMap (builder.go) - Simple Key-Value Store
-- **Purpose**: Track expected nonces during block building
-- **Implementations**: `SimpleNonceMap`, `ShardedNonceMap` (256 shards)
-- **Config**: `USE_SHARDED_NONCE_MAP` (default: true)
-- **Location**: `internal/txpool/sharded_nonce_map.go`
-- **Interface**: `NonceMapInterface`
+**Nonce Rules:**
+1. **Sequential**: Nonce N can't be mined until nonces 0 through N-1 are mined
+2. **No gaps**: If you send nonce 5 before 4, nonce 5 waits in mempool
+3. **No reuse**: Same nonce = replacement (RBF), requires higher gas price (10% bump)
+4. **Immutable after mining**: Once mined, nonce is consumed forever
 
-```go
-// Used directly in builder.go
-nonceMap txpool.NonceMapInterface
-```
+**Common Pitfalls:**
+- **Stuck transactions**: Low-fee TX blocks all subsequent TXs from that account
+- **Nonce gaps**: Dropped TX leaves gap, all higher nonces stuck until gap filled
+- **Race conditions**: Two systems querying nonce can get different values
+- **Cache staleness**: Using old nonce values causes rejection or gaps
 
-#### 2. NonceTracker (producer.go / filter.go) - Full-Featured
-- **Purpose**: Chain lookups, LRU eviction, cache freshness for Filter
-- **Implementation**: `NonceTracker` only (no sharded version)
-- **Features**: L2 client integration, singleflight coalescing, `GetFresh()` for timeout fallback
-- **Location**: `internal/txpool/nonce.go`
+### Nonce Management (Unified NonceCache)
+
+The block builder uses a **single unified NonceCache** (`internal/txpool/nonce_cache.go`) for all nonce tracking:
 
 ```go
-// Used by SimpleProducer and Filter
-type Filter struct {
-    nonceTracker *NonceTracker  // Concrete type, not interface
+// Used by builder.go, producer.go, and filter.go
+type NonceCache struct {
+    entries     map[common.Address]*nonceCacheEntry
+    l2Client    *l2client.Client    // For RPC lookups
+    lruList     *list.List          // LRU eviction for memory bounds
+    maxAccounts int                 // Memory limit
+    maxCacheAge time.Duration       // Freshness tracking
+    nonceGroup  singleflight.Group  // Coalesces concurrent RPC calls
 }
 ```
+
+**Key Features:**
+- **LRU eviction**: Bounds memory by evicting least-recently-used entries
+- **Freshness tracking**: `GetFresh()` forces RPC lookup if cache is stale
+- **Singleflight**: Concurrent lookups for same address share one RPC call
+- **SetIfHigher semantics**: Prevents stale writes from overwriting newer data
+
+**Nonce Lifecycle:**
+1. TX arrives: nonce extracted from RLP during light parse
+2. Filtering: compare TX nonce to expected (cache or RPC lookup)
+3. Classification: executable (match) | future (gap) | dropped (too low)
+4. Block inclusion: Engine API accepts/rejects
+5. Commit: Update cache ONLY for confirmed-included TXs
+6. Recovery: On stuck state, refresh cache from chain
+
+### Load Generator Nonce Management
+
+The load generator uses a **reservation pattern** for high-throughput nonce management:
+
+```go
+// Reserve nonce atomically
+n := account.ReserveNonce()  // Increments immediately
+
+// Send transaction asynchronously
+queued := sender.SendAsync(ctx, txData, func(err error) {
+    if err != nil {
+        n.Rollback()  // Return nonce to pool on failure
+    } else {
+        n.Commit()    // Mark nonce as successfully used
+    }
+})
+```
+
+**Key Design Decisions:**
+- **Local tracking**: Nonces are tracked locally (not fetched per-TX) for speed
+- **Reservation pattern**: ReserveNonce increments immediately, preventing gaps
+- **Commit in callback**: Never commit before async send completes
+- **Reactive sync**: Resync only on circuit breaker open (not periodic)
+
+**Nonce Fetch Strategy** (`internal/rpc/client.go`):
+1. First tries `eth_getPendingNonce` (block builder's view)
+2. Falls back to `eth_getTransactionCount("pending")` to include mempool
+
+**Circuit Breaker Recovery:**
+- Opens when failure rate > 5% or revocation rate > 20%
+- Triggers `resyncAllNonces()` to fetch fresh nonces from builder
+- Rate is reduced to 10 TPS until recovery
+
+**Rollback Limitation:**
+- Rollback only works for the most recent nonce (prevents out-of-order rollback chaos)
+- Middle nonce failures create gaps that are recovered via circuit breaker resync
 
 ### When to Modify What
 
 | Task | File(s) to Change |
 |------|-------------------|
-| Change nonce storage behavior | `sharded_nonce_map.go` (NonceMapInterface) |
-| Change nonce filtering logic | `filter.go` + `nonce.go` (NonceTracker) |
+| Change nonce caching/lookup | `internal/txpool/nonce_cache.go` |
+| Change nonce filtering logic | `internal/txpool/filter.go` |
 | Add new block production mode | `builder.go` or new file in root |
 | Change preconfirmation events | `internal/preconf/hub.go` |
 | Modify Engine API calls | `internal/engine/client.go` |

@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 
 const statusColors: Record<string, string> = {
   idle: "bg-muted",
+  initializing: "bg-yellow-600",
   running: "bg-green-600",
   paused: "bg-yellow-600",
   completed: "bg-blue-600",
@@ -35,6 +36,15 @@ export function LoadTestRunner() {
     start,
     stop,
     reset,
+    // Initialization progress
+    initPhase,
+    initProgress,
+    accountsTotal,
+    accountsGenerated,
+    fundingTxsSent,
+    fundingTxsTotal,
+    contractsDeployed,
+    contractsTotal,
   } = useGoLoadTestStore();
 
   const isAdaptiveMode = config?.pattern === "adaptive";
@@ -117,6 +127,46 @@ export function LoadTestRunner() {
           </div>
         </div>
 
+        {/* Initialization Progress */}
+        {status === "initializing" && (
+          <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/20 p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-yellow-500" />
+              <p className="text-sm font-medium text-yellow-500">Initializing Test</p>
+            </div>
+            <p className="text-sm text-muted-foreground">{initProgress || "Starting..."}</p>
+
+            {/* Progress details based on phase */}
+            {initPhase === "generating_accounts" && accountsTotal > 0 && (
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Generating accounts...</span>
+                <span className="font-mono">{accountsGenerated} / {accountsTotal}</span>
+              </div>
+            )}
+            {initPhase === "funding_accounts" && fundingTxsTotal > 0 && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Funding transactions sent</span>
+                  <span className="font-mono">{fundingTxsSent} / {fundingTxsTotal}</span>
+                </div>
+                <Progress value={fundingTxsTotal > 0 ? (fundingTxsSent / fundingTxsTotal) * 100 : 0} className="h-1" />
+              </div>
+            )}
+            {initPhase === "waiting_for_funding" && fundingTxsSent > 0 && (
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Waiting for confirmations...</span>
+                <span className="font-mono">{fundingTxsSent} TXs</span>
+              </div>
+            )}
+            {initPhase === "deploying_contracts" && contractsTotal > 0 && (
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Deploying contracts...</span>
+                <span className="font-mono">{contractsDeployed} / {contractsTotal}</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Error Display */}
         {error && (
           <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3">
@@ -136,6 +186,11 @@ export function LoadTestRunner() {
               ) : (
                 "Start Test"
               )}
+            </Button>
+          )}
+          {status === "initializing" && (
+            <Button variant="destructive" className="flex-1" onClick={stop}>
+              Cancel
             </Button>
           )}
           {status === "running" && (

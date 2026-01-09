@@ -80,16 +80,11 @@ export function RealisticTestConfigPanel() {
     <div className="space-y-4">
       {/* Account Count */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <Label>Number of Accounts</Label>
-          <span className="text-xs text-muted-foreground">{realisticConfig.numAccounts.toLocaleString()}</span>
-        </div>
-        <Slider
-          value={[realisticConfig.numAccounts]}
-          onValueChange={([v]) => updateRealisticConfig({ numAccounts: v })}
-          min={10}
-          max={5000}
-          step={10}
+        <Label>Number of Accounts</Label>
+        <Input
+          type="text"
+          value={realisticConfig.numAccounts}
+          onChange={(e) => updateRealisticConfig({ numAccounts: parseInt(e.target.value) || 100 })}
           disabled={isDisabled}
         />
         <p className="text-xs text-muted-foreground">

@@ -150,7 +150,17 @@ export interface TransactionRecord {
   status: TransactionStatus;
 }
 
-export type LoadTestStatus = "idle" | "running" | "paused" | "completed" | "error";
+export type LoadTestStatus = "idle" | "initializing" | "running" | "paused" | "completed" | "error";
+
+// Initialization phases during test startup
+export type InitPhase =
+  | ""
+  | "generating_accounts"
+  | "funding_accounts"
+  | "waiting_for_funding"
+  | "initializing_nonces"
+  | "deploying_contracts"
+  | "starting_workers";
 
 export interface LoadTestState {
   status: LoadTestStatus;
@@ -328,6 +338,12 @@ export interface TestRun {
   // User-defined metadata
   customName?: string;
   isFavorite: boolean;
+  // Realistic test specific metrics
+  tipHistogram?: TipHistogramBucket[];
+  txTypeMetrics?: TxTypeMetrics[];
+  pendingLatency?: LatencyStats;
+  accountsActive?: number;
+  accountsFunded?: number;
 }
 
 // Update request for test run metadata

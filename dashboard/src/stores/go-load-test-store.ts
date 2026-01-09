@@ -27,9 +27,19 @@ interface LatencyStats {
   buckets: LatencyBucket[];
 }
 
+// Initialization phases during test startup
+type InitPhase =
+  | ""
+  | "generating_accounts"
+  | "funding_accounts"
+  | "waiting_for_funding"
+  | "initializing_nonces"
+  | "deploying_contracts"
+  | "starting_workers";
+
 // Go load generator API response types
 interface GoLoadTestMetrics {
-  status: "idle" | "running" | "completed" | "error";
+  status: "idle" | "initializing" | "running" | "completed" | "error";
   txSent: number;
   txConfirmed: number;
   txFailed: number;
@@ -42,6 +52,15 @@ interface GoLoadTestMetrics {
   transactionType: TransactionType;
   peakTps?: number; // For adaptive pattern
   error?: string;
+  // Initialization progress (only during "initializing" status)
+  initPhase?: InitPhase;
+  initProgress?: string; // Human-readable progress message
+  accountsTotal?: number;
+  accountsGenerated?: number;
+  fundingTxsSent?: number;
+  fundingTxsTotal?: number;
+  contractsDeployed?: number;
+  contractsTotal?: number;
   // Preconfirmation stage counters (Flashblocks-compliant lifecycle)
   txPending?: number; // TX received by sequencer (queued)
   txPreconfirmed?: number; // TX selected for block (sequencer commitment)
@@ -120,6 +139,7 @@ interface HistoricalTestRun {
   peakTps: number;
   latencyStats?: LatencyStats;
   preconfLatency?: LatencyStats;
+  pendingLatency?: LatencyStats;
   config?: {
     pattern: LoadPattern;
     durationSec: number;
@@ -139,6 +159,8 @@ interface HistoricalTestRun {
   };
   tipHistogram?: TipHistogramBucket[];
   txTypeMetrics?: TxTypeMetrics[];
+  accountsActive?: number;
+  accountsFunded?: number;
 }
 
 interface HistoricalTimeSeriesPoint {
@@ -168,6 +190,15 @@ interface GoLoadTestState {
   isPolling: boolean;
   isStarting: boolean; // True while start API call is in flight
   wsConnected: boolean; // WebSocket connection status
+  // Initialization progress (during "initializing" status)
+  initPhase: InitPhase;
+  initProgress: string;
+  accountsTotal: number;
+  accountsGenerated: number;
+  fundingTxsSent: number;
+  fundingTxsTotal: number;
+  contractsDeployed: number;
+  contractsTotal: number;
   // Preconfirmation stage counters (Flashblocks-compliant lifecycle)
   txPendingCount: number; // TX received by sequencer
   txPreconfirmedCount: number; // TX selected for block (commitment)
@@ -261,7 +292,8 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
 
           // Map Go status to our status type
           let status: LoadTestStatus = "idle";
-          if (metrics.status === "running") status = "running";
+          if (metrics.status === "initializing") status = "initializing";
+          else if (metrics.status === "running") status = "running";
           else if (metrics.status === "completed") status = "completed";
           else if (metrics.status === "error") status = "error";
 
@@ -277,6 +309,15 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
             peakTps: metrics.peakTps ?? 0,
             durationSec: Math.floor(metrics.durationMs / 1000),
             error: metrics.error || null,
+            // Initialization progress
+            initPhase: metrics.initPhase ?? "",
+            initProgress: metrics.initProgress ?? "",
+            accountsTotal: metrics.accountsTotal ?? 0,
+            accountsGenerated: metrics.accountsGenerated ?? 0,
+            fundingTxsSent: metrics.fundingTxsSent ?? 0,
+            fundingTxsTotal: metrics.fundingTxsTotal ?? 0,
+            contractsDeployed: metrics.contractsDeployed ?? 0,
+            contractsTotal: metrics.contractsTotal ?? 0,
             // Preconfirmation stage counters
             txPendingCount: metrics.txPending ?? 0,
             txPreconfirmedCount: metrics.txPreconfirmed ?? 0,
@@ -377,6 +418,15 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
     isPolling: false,
     isStarting: false,
     wsConnected: false,
+    // Initialization progress
+    initPhase: "",
+    initProgress: "",
+    accountsTotal: 0,
+    accountsGenerated: 0,
+    fundingTxsSent: 0,
+    fundingTxsTotal: 0,
+    contractsDeployed: 0,
+    contractsTotal: 0,
     // Preconfirmation stage counters
     txPendingCount: 0,
     txPreconfirmedCount: 0,
@@ -500,9 +550,9 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
             break;
         }
 
-        console.log("[LoadTest] API call successful, setting status to running");
+        console.log("[LoadTest] API call successful, setting status to initializing");
         set({
-          status: "running",
+          status: "initializing",
           startTime: Date.now(),
           elapsedTime: 0,
           txSentCount: 0,
@@ -516,6 +566,15 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
           error: null,
           isPolling: true,
           isStarting: false,
+          // Reset init progress
+          initPhase: "",
+          initProgress: "Starting initialization...",
+          accountsTotal: 0,
+          accountsGenerated: 0,
+          fundingTxsSent: 0,
+          fundingTxsTotal: 0,
+          contractsDeployed: 0,
+          contractsTotal: 0,
         });
         console.log("[LoadTest] Status set, starting polling. New status:", get().status);
 
@@ -585,6 +644,15 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
           error: null,
           isPolling: false,
           isStarting: false,
+          // Initialization progress
+          initPhase: "",
+          initProgress: "",
+          accountsTotal: 0,
+          accountsGenerated: 0,
+          fundingTxsSent: 0,
+          fundingTxsTotal: 0,
+          contractsDeployed: 0,
+          contractsTotal: 0,
           // Preconfirmation stage counters
           txPendingCount: 0,
           txPreconfirmedCount: 0,
@@ -630,7 +698,8 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
 
         // Map Go status to our status type
         let status: LoadTestStatus = "idle";
-        if (metrics.status === "running") status = "running";
+        if (metrics.status === "initializing") status = "initializing";
+        else if (metrics.status === "running") status = "running";
         else if (metrics.status === "completed") status = "completed";
         else if (metrics.status === "error") status = "error";
 
@@ -646,6 +715,15 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
           peakTps: metrics.peakTps ?? 0,
           durationSec: Math.floor(metrics.durationMs / 1000),
           error: metrics.error || null,
+          // Initialization progress
+          initPhase: metrics.initPhase ?? "",
+          initProgress: metrics.initProgress ?? "",
+          accountsTotal: metrics.accountsTotal ?? 0,
+          accountsGenerated: metrics.accountsGenerated ?? 0,
+          fundingTxsSent: metrics.fundingTxsSent ?? 0,
+          fundingTxsTotal: metrics.fundingTxsTotal ?? 0,
+          contractsDeployed: metrics.contractsDeployed ?? 0,
+          contractsTotal: metrics.contractsTotal ?? 0,
           // Preconfirmation stage counters
           txPendingCount: metrics.txPending ?? 0,
           txPreconfirmedCount: metrics.txPreconfirmed ?? 0,
@@ -726,12 +804,12 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
         // Latency stats
         latencyStats: run.latencyStats ?? null,
         preconfLatencyStats: run.preconfLatency ?? null,
-        pendingLatencyStats: null,
+        pendingLatencyStats: run.pendingLatency ?? null,
         // Realistic test specific
         tipHistogram: run.tipHistogram ?? [],
         txTypeMetrics: run.txTypeMetrics ?? [],
-        accountsActive: 0,
-        accountsFunded: 0,
+        accountsActive: run.accountsActive ?? 0,
+        accountsFunded: run.accountsFunded ?? 0,
         // Historical mode - prevent live updates from interfering
         isHistoricalMode: true,
       });
@@ -748,11 +826,11 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
 
         const metrics: GoLoadTestMetrics = await response.json();
 
-        // If a test is running, start polling and sync state
-        if (metrics.status === "running") {
-          console.log("Reconnecting to running load test...");
+        // If a test is running or initializing, start polling and sync state
+        if (metrics.status === "running" || metrics.status === "initializing") {
+          console.log("Reconnecting to", metrics.status, "load test...");
           set({
-            status: "running",
+            status: metrics.status === "initializing" ? "initializing" : "running",
             txSentCount: metrics.txSent,
             txConfirmedCount: metrics.txConfirmed,
             txFailedCount: metrics.txFailed,
@@ -769,6 +847,15 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
             },
             error: metrics.error || null,
             isPolling: true,
+            // Initialization progress
+            initPhase: metrics.initPhase ?? "",
+            initProgress: metrics.initProgress ?? "",
+            accountsTotal: metrics.accountsTotal ?? 0,
+            accountsGenerated: metrics.accountsGenerated ?? 0,
+            fundingTxsSent: metrics.fundingTxsSent ?? 0,
+            fundingTxsTotal: metrics.fundingTxsTotal ?? 0,
+            contractsDeployed: metrics.contractsDeployed ?? 0,
+            contractsTotal: metrics.contractsTotal ?? 0,
             // Preconfirmation stage counters
             txPendingCount: metrics.txPending ?? 0,
             txPreconfirmedCount: metrics.txPreconfirmed ?? 0,

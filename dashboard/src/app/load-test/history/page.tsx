@@ -58,6 +58,12 @@ function transformApiResponse(data: any): TestRunDetail {
     // User metadata
     customName: run?.CustomName || run?.customName,
     isFavorite: run?.IsFavorite ?? run?.isFavorite ?? false,
+    // Realistic test specific metrics
+    tipHistogram: run?.TipHistogram || run?.tipHistogram,
+    txTypeMetrics: run?.TxTypeMetrics || run?.txTypeMetrics,
+    pendingLatency: run?.PendingLatency || run?.pendingLatency,
+    accountsActive: run?.AccountsActive || run?.accountsActive,
+    accountsFunded: run?.AccountsFunded || run?.accountsFunded,
   };
 
   // Transform TimeSeriesPoint[] from PascalCase to camelCase
