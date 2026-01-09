@@ -219,6 +219,7 @@ export interface TestResult {
   txSent: number;
   txConfirmed: number;
   txFailed: number;
+  txDiscarded?: number; // Transactions still pending at test end (discarded)
   averageTps: number;
   peakTps?: number;
   latency?: LatencyStats;
@@ -287,7 +288,7 @@ export interface TransactionLogEntry {
   preconfAtMs?: number;
   confirmLatencyMs?: number;
   preconfLatencyMs?: number;
-  status: "pending" | "confirmed" | "failed";
+  status: "pending" | "confirmed" | "failed" | "discarded";
   errorReason?: string;
   fromAccount: number;
   nonce: number;
@@ -308,6 +309,7 @@ export interface TestRun {
   txSent: number;
   txConfirmed: number;
   txFailed: number;
+  txDiscarded?: number; // Transactions still pending at test end (discarded)
   averageTps: number;
   peakTps: number;
   latencyStats?: LatencyStats;
