@@ -232,16 +232,46 @@ export const useMetricsStore = create<MetricsStore>()(
   hydrateFromHistory: (run: HistoricalTestRun, timeSeries: HistoricalTimeSeriesPoint[]) => {
     // Convert TimeSeriesPoint[] to MetricsTimeSeries format
     const timestamps = timeSeries.map(p => p.timestampMs / 1000);
-    const txPerSec = timeSeries.map(p => p.currentTps);
+    const rawTxPerSec = timeSeries.map(p => p.currentTps);
+    const rawMgasPerSec = timeSeries.map(p => p.mgasPerSec ?? 0);
+    const rawFillRate = timeSeries.map(p => p.fillRate ?? 0);
 
-    // Extract block metrics from time series (now available in historical data)
-    const mgasPerSec = timeSeries.map(p => p.mgasPerSec ?? 0);
-    const blockFillRate = timeSeries.map(p => p.fillRate ?? 0);
+    // Apply rolling average smoothing (same as live view in addBlockMetrics)
+    // Target ~3 seconds of smoothing, assuming ~200ms sample interval
+    const smoothingWindow = 15; // ~3 seconds at 200ms intervals
+
+    function applySmoothing(values: number[]): number[] {
+      return values.map((_, i) => {
+        const start = Math.max(0, i - smoothingWindow + 1);
+        const window = values.slice(start, i + 1);
+        const sum = window.reduce((a, b) => a + b, 0);
+        return sum / window.length;
+      });
+    }
+
+    // Filter out initial zero values before smoothing (ramp-up period)
+    let startIndex = 0;
+    for (let i = 0; i < timeSeries.length; i++) {
+      if ((rawMgasPerSec[i] > 0 || rawTxPerSec[i] > 0)) {
+        startIndex = i;
+        break;
+      }
+    }
+
+    // Apply smoothing to the filtered data
+    const filteredTimestamps = timestamps.slice(startIndex);
+    const filteredMgas = rawMgasPerSec.slice(startIndex);
+    const filteredTps = rawTxPerSec.slice(startIndex);
+    const filteredFillRate = rawFillRate.slice(startIndex);
+
+    const mgasPerSec = applySmoothing(filteredMgas);
+    const txPerSec = applySmoothing(filteredTps);
+    const blockFillRate = applySmoothing(filteredFillRate);
 
     set({
       blockMetrics: [], // Raw block data not available, but time series has aggregated values
       timeSeries: {
-        timestamps,
+        timestamps: filteredTimestamps,
         mgasPerSec,
         txPerSec,
         blockFillRate,

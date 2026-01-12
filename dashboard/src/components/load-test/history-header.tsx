@@ -212,7 +212,9 @@ export function HistoryHeader({ testRun, onBack }: HistoryHeaderProps) {
           </div>
         </div>
         <div>
-          <h1 className="text-2xl font-bold">Test Results</h1>
+          <h1 className="text-2xl font-bold">
+            {testRun?.customName || "Test Results"}
+          </h1>
           <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
             <span className="flex items-center gap-1">
               <Calendar className="h-4 w-4" />

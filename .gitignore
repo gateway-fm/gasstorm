@@ -77,3 +77,7 @@ coverage/
 tmp/
 temp/
 *.tmp
+
+# Foundry cache
+cache/
+out/

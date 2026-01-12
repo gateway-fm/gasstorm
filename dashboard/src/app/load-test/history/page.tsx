@@ -11,6 +11,8 @@ import { LatencyHistogram } from "@/components/metrics/latency-histogram";
 import { TipHistogram } from "@/components/metrics/tip-histogram";
 import { TxTypeBreakdown } from "@/components/metrics/tx-type-breakdown";
 import { OnChainMetrics } from "@/components/metrics/on-chain-metrics";
+import { VerificationDetails } from "@/components/metrics/verification-details";
+import { ContractsAccounts } from "@/components/metrics/contracts-accounts";
 import { PercentileTable } from "@/components/reports/percentile-table";
 import { VerificationSummary } from "@/components/reports/verification-summary";
 import { useGoLoadTestStore } from "@/stores/go-load-test-store";
@@ -41,6 +43,7 @@ function transformApiResponse(data: any): TestRunDetail {
     txSent: run?.TxSent || run?.txSent || 0,
     txConfirmed: run?.TxConfirmed || run?.txConfirmed || 0,
     txFailed: run?.TxFailed || run?.txFailed || 0,
+    txDiscarded: run?.TxDiscarded || run?.txDiscarded || 0,
     averageTps: run?.AverageTPS || run?.averageTps || 0,
     peakTps: run?.PeakTPS || run?.peakTps || 0,
     latencyStats: run?.LatencyStats || run?.latencyStats,
@@ -57,7 +60,7 @@ function transformApiResponse(data: any): TestRunDetail {
     peakMgasPerSec: run?.PeakMgasPerSec || run?.peakMgasPerSec,
     avgMgasPerSec: run?.AvgMgasPerSec || run?.avgMgasPerSec,
     // User metadata
-    customName: run?.CustomName || run?.customName,
+    customName: run?.CustomName ?? run?.customName,
     isFavorite: run?.IsFavorite ?? run?.isFavorite ?? false,
     // Realistic test specific metrics
     tipHistogram: run?.TipHistogram || run?.tipHistogram,
@@ -73,6 +76,12 @@ function transformApiResponse(data: any): TestRunDetail {
     onChainMgasPerSec: run?.OnChainMgasPerSec || run?.onChainMgasPerSec,
     onChainTps: run?.OnChainTps || run?.onChainTps,
     onChainDurationSecs: run?.OnChainDurationSecs || run?.onChainDurationSecs,
+    // Environment snapshot and verification results
+    environment: run?.Environment || run?.environment,
+    verification: run?.Verification || run?.verification,
+    // Deployed contracts and accounts
+    deployedContracts: run?.DeployedContracts || run?.deployedContracts,
+    testAccounts: run?.TestAccounts || run?.testAccounts,
   };
 
   // Transform TimeSeriesPoint[] from PascalCase to camelCase
@@ -242,6 +251,18 @@ function HistoryDetailView({ testId }: { testId: string }) {
         </div>
       )}
 
+      {testRun && (testRun.environment || testRun.verification) && (
+        <div className="mb-6">
+          <VerificationDetails testRun={testRun} />
+        </div>
+      )}
+
+      {testRun && (testRun.deployedContracts?.length || testRun.testAccounts) && (
+        <div className="mb-6">
+          <ContractsAccounts testRun={testRun} />
+        </div>
+      )}
+
       <div className="mb-6">
         <LatencyHistogram />
       </div>
@@ -268,15 +289,9 @@ function HistoryDetailView({ testId }: { testId: string }) {
 
 // List view component
 function HistoryListView() {
-  const router = useRouter();
-
   return (
     <>
       <div className="flex items-center gap-4 mb-6">
-        <Button variant="ghost" size="sm" onClick={() => router.push("/load-test")} className="gap-2 -ml-2">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Load Test
-        </Button>
         <h1 className="text-2xl font-bold">Test History</h1>
       </div>
 

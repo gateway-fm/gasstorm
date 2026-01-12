@@ -46,12 +46,23 @@ export function Header({ l1WsConnected, l2WsConnected, loadGenWsConnected }: Hea
                 href="/load-test"
                 className={cn(
                   "px-2 sm:px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap",
-                  pathname.startsWith("/load-test")
+                  pathname === "/load-test" || pathname === "/load-test/"
                     ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
                     : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 )}
               >
                 Load Test
+              </Link>
+              <Link
+                href="/load-test/history"
+                className={cn(
+                  "px-2 sm:px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+                  pathname.startsWith("/load-test/history")
+                    ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                )}
+              >
+                History
               </Link>
             </nav>
 

@@ -42,8 +42,13 @@ export function MetricsSnapshot() {
   // Check if we have block metrics (live mode with raw block data)
   const hasBlockMetrics = blockMetrics.length > 0;
 
-  // In historical mode, check if we have time series data with Mgas/s
-  const hasHistoricalMgasData = isHistoricalMode && timeSeries.mgasPerSec.some(v => v > 0);
+  // In historical mode, check if we have Mgas/s data either in time series OR in snapshot aggregates
+  // (On-chain fallback populates snapshot aggregates even when time series per-sample data is missing)
+  const hasHistoricalMgasData = isHistoricalMode && (
+    timeSeries.mgasPerSec.some(v => v > 0) ||
+    snapshot.currentMgasPerSec > 0 ||
+    snapshot.peakMgasPerSec > 0
+  );
 
   // Use Mgas display if we have live block metrics OR historical Mgas data
   const showMgasMetrics = hasBlockMetrics || hasHistoricalMgasData;

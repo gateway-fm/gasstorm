@@ -44,6 +44,7 @@ services:
       "--ws",
       "--ws.addr", "0.0.0.0",
       "--ws.port", "8546",
+      "--ws.api", "eth,net,web3",
       # Engine API (authenticated)
       "--authrpc.addr", "0.0.0.0",
       "--authrpc.port", "8551",

@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Header } from "@/components/layout/header";
 import { LoadTestConfig } from "@/components/load-test/load-test-config";
 import { LoadTestRunner } from "@/components/load-test/load-test-runner";
-import { TestHistory } from "@/components/load-test/test-history";
 import { RealTimeChart } from "@/components/metrics/real-time-chart";
 import { LatencyHistogram } from "@/components/metrics/latency-histogram";
 import { MetricsSnapshot } from "@/components/metrics/metrics-snapshot";
@@ -21,7 +20,6 @@ import { useChainStore } from "@/stores/chain-store";
 import { l2 } from "@/lib/rpc-client";
 import type { BlockMetrics, Statistics } from "@/types/metrics";
 import { calculateStatistics } from "@/lib/statistics";
-import Link from "next/link";
 
 export default function LoadTestPage() {
   const { status, checkAndReconnect, latencyStats: goLatencyStats, preconfLatencyStats: goPreconfLatencyStats, wsConnected: loadGenWsConnected } = useGoLoadTestStore();
@@ -190,25 +188,6 @@ export default function LoadTestPage() {
           <TxTypeBreakdown />
         </div>
 
-        {/* Test History */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-lg font-semibold">Test History</h2>
-            <Link
-              href="/load-test/history"
-              className="text-sm text-muted-foreground hover:text-foreground hover:underline"
-            >
-              View All History →
-            </Link>
-          </div>
-          <TestHistory />
-        </div>
-
-        {/* Export Controls */}
-        <div className="mb-6">
-          <ExportControls />
-        </div>
-
         {/* Statistics Table - Full width for better readability */}
         {(status === "initializing" || status === "running" || status === "completed") && (
           <div className="mb-6">
@@ -221,6 +200,11 @@ export default function LoadTestPage() {
             />
           </div>
         )}
+
+        {/* Export Controls */}
+        <div className="mb-6">
+          <ExportControls />
+        </div>
       </main>
     </div>
   );

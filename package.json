@@ -1,0 +1,20 @@
+{
+  "name": "sequencer-poc",
+  "version": "1.0.0",
+  "description": "A proof-of-concept sequencer using **reth** (op-reth) with the Engine API pattern, similar to how OP Stack works.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "lib": "lib"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@uniswap/v3-core": "1.0.1",
+    "@uniswap/v3-periphery": "1.4.4"
+  }
+}

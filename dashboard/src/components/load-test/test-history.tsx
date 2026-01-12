@@ -19,6 +19,7 @@ import {
   LineChart,
   ExternalLink,
   Star,
+  Pencil,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import type {
@@ -71,7 +72,7 @@ function transformTestRun(run: any): TestRun {
     peakMgasPerSec: run?.PeakMgasPerSec || run?.peakMgasPerSec,
     avgMgasPerSec: run?.AvgMgasPerSec || run?.avgMgasPerSec,
     // User metadata
-    customName: run?.CustomName || run?.customName,
+    customName: run?.CustomName ?? run?.customName,
     isFavorite: run?.IsFavorite ?? run?.isFavorite ?? false,
   };
 }
@@ -224,7 +225,9 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
         body: JSON.stringify(update),
       });
       if (response.ok) {
-        const updatedRun = transformTestRun(await response.json());
+        const rawResponse = await response.json();
+        const updatedRun = transformTestRun(rawResponse);
+        console.log("[TestHistory] Metadata updated:", { testId, update, response: rawResponse, transformed: { customName: updatedRun.customName, isFavorite: updatedRun.isFavorite } });
         setHistory((prev) =>
           prev.map((h) =>
             h.id === testId
@@ -233,10 +236,11 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
           )
         );
       } else {
-        console.error(`Failed to update test metadata: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        console.error(`[TestHistory] Failed to update test metadata: ${response.status} ${response.statusText}`, errorText);
       }
     } catch (err) {
-      console.error("Failed to update test metadata:", err);
+      console.error("[TestHistory] Failed to update test metadata:", err);
     }
   }, []);
 
@@ -377,8 +381,11 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
                       />
                     </button>
 
-                    {/* Name (editable) or placeholder */}
-                    <div className="flex-1 min-w-0 mr-2">
+                    {/* Name with edit icon */}
+                    <div
+                      className="flex-1 min-w-0 mr-2 flex items-center gap-1 cursor-pointer"
+                      onClick={() => handleExpand(result.id)}
+                    >
                       {editingNameId === result.id ? (
                         <Input
                           value={editingNameValue}
@@ -388,25 +395,27 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
                             if (e.key === "Enter") saveName(result.id, editingNameValue);
                             if (e.key === "Escape") setEditingNameId(null);
                           }}
-                          className="h-6 text-sm"
+                          className="h-6 text-sm max-w-[200px]"
                           placeholder="Enter test name..."
                           autoFocus
                           onClick={(e) => e.stopPropagation()}
                         />
                       ) : (
-                        <span
-                          className={`text-sm cursor-pointer truncate block ${
-                            result.customName
-                              ? "font-medium"
-                              : "text-muted-foreground italic"
-                          }`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            startEditingName(result.id, result.customName);
-                          }}
-                        >
-                          {result.customName || "Click to add name"}
-                        </span>
+                        <>
+                          <span className="text-sm font-medium truncate">
+                            {result.customName || `${result.pattern} test`}
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startEditingName(result.id, result.customName);
+                            }}
+                            className="p-1 hover:bg-accent rounded opacity-50 hover:opacity-100 transition-opacity"
+                            title="Edit name"
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                        </>
                       )}
                     </div>
 
@@ -632,8 +641,11 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
                         />
                       </button>
 
-                      {/* Name (editable) or placeholder */}
-                      <div className="flex-1 min-w-0 mr-2">
+                      {/* Name with edit icon */}
+                      <div
+                        className="flex-1 min-w-0 mr-2 flex items-center gap-1 cursor-pointer"
+                        onClick={() => handleExpand(result.id)}
+                      >
                         {editingNameId === result.id ? (
                           <Input
                             value={editingNameValue}
@@ -643,25 +655,27 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
                               if (e.key === "Enter") saveName(result.id, editingNameValue);
                               if (e.key === "Escape") setEditingNameId(null);
                             }}
-                            className="h-6 text-sm"
+                            className="h-6 text-sm max-w-[200px]"
                             placeholder="Enter test name..."
                             autoFocus
                             onClick={(e) => e.stopPropagation()}
                           />
                         ) : (
-                          <span
-                            className={`text-sm cursor-pointer truncate block ${
-                              result.customName
-                                ? "font-medium"
-                                : "text-muted-foreground italic"
-                            }`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              startEditingName(result.id, result.customName);
-                            }}
-                          >
-                            {result.customName || "Click to add name"}
-                          </span>
+                          <>
+                            <span className="text-sm font-medium truncate">
+                              {result.customName || `${result.pattern} test`}
+                            </span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startEditingName(result.id, result.customName);
+                              }}
+                              className="p-1 hover:bg-accent rounded opacity-50 hover:opacity-100 transition-opacity"
+                              title="Edit name"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                          </>
                         )}
                       </div>
 

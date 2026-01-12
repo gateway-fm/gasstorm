@@ -10,6 +10,7 @@ export function VerificationSummary() {
     txSentCount,
     txConfirmedCount,
     txFailedCount,
+    txDiscardedCount,
     averageTps,
     // Preconfirmation stage counters (Flashblocks-compliant)
     txPendingCount,
@@ -23,10 +24,13 @@ export function VerificationSummary() {
     return null;
   }
 
-  const pendingCount = Math.max(0, txSentCount - txConfirmedCount - txFailedCount);
-  const allConfirmed = txSentCount > 0 && pendingCount === 0 && txFailedCount === 0;
+  // Pending = sent - confirmed - failed - discarded
+  const pendingCount = Math.max(0, txSentCount - txConfirmedCount - txFailedCount - txDiscardedCount);
+  // All transactions accounted for (no pending), even if some were discarded
+  const allAccountedFor = txSentCount > 0 && pendingCount === 0 && txFailedCount === 0;
   const hasFailures = txFailedCount > 0;
   const hasPending = pendingCount > 0;
+  const hasDiscarded = txDiscardedCount > 0;
   const hasRevoked = txRevokedCount > 0;
 
   const confirmRate = txSentCount > 0 ? (txConfirmedCount / txSentCount) * 100 : 0;
@@ -40,8 +44,11 @@ export function VerificationSummary() {
           {status === "running" && (
             <Clock className="h-4 w-4 animate-pulse text-blue-400" />
           )}
-          {status === "completed" && allConfirmed && (
+          {status === "completed" && allAccountedFor && !hasDiscarded && (
             <CheckCircle className="h-4 w-4 text-green-500" />
+          )}
+          {status === "completed" && allAccountedFor && hasDiscarded && (
+            <CheckCircle className="h-4 w-4 text-orange-500" />
           )}
           {status === "completed" && hasFailures && (
             <XCircle className="h-4 w-4 text-red-500" />
@@ -71,12 +78,22 @@ export function VerificationSummary() {
               </div>
               <div className="text-xs text-muted-foreground">Failed</div>
             </div>
-            <div className="bg-yellow-500/10 rounded p-2">
-              <div className="text-lg font-mono font-bold text-yellow-400">
-                {pendingCount.toLocaleString()}
+            {/* Show Discarded if we have discarded txs, otherwise show Pending */}
+            {txDiscardedCount > 0 ? (
+              <div className="bg-orange-500/10 rounded p-2">
+                <div className="text-lg font-mono font-bold text-orange-400">
+                  {txDiscardedCount.toLocaleString()}
+                </div>
+                <div className="text-xs text-muted-foreground">Discarded</div>
               </div>
-              <div className="text-xs text-muted-foreground">Pending</div>
-            </div>
+            ) : (
+              <div className="bg-yellow-500/10 rounded p-2">
+                <div className="text-lg font-mono font-bold text-yellow-400">
+                  {pendingCount.toLocaleString()}
+                </div>
+                <div className="text-xs text-muted-foreground">Pending</div>
+              </div>
+            )}
           </div>
 
           {/* Preconfirmation Pipeline (Flashblocks-compliant) */}
@@ -149,10 +166,17 @@ export function VerificationSummary() {
             </div>
           )}
 
-          {status === "completed" && allConfirmed && (
+          {status === "completed" && allAccountedFor && !hasDiscarded && (
             <div className="flex items-center gap-2 text-sm text-green-400 bg-green-400/10 rounded p-2">
               <CheckCircle className="h-4 w-4" />
               All {txSentCount.toLocaleString()} transactions confirmed on-chain
+            </div>
+          )}
+
+          {status === "completed" && allAccountedFor && hasDiscarded && (
+            <div className="flex items-center gap-2 text-sm text-orange-400 bg-orange-400/10 rounded p-2">
+              <AlertTriangle className="h-4 w-4" />
+              {txConfirmedCount.toLocaleString()} confirmed, {txDiscardedCount.toLocaleString()} discarded (pending at test end)
             </div>
           )}
 

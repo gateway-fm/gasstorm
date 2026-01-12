@@ -17,8 +17,9 @@ import { useMemo } from "react";
 export function RealTimeChart() {
   const { timeSeries, snapshot, isHistoricalMode } = useMetricsStore();
 
-  // Check if we have Mgas/s data with actual values
-  const hasMgasData = timeSeries.mgasPerSec.some(v => v > 0);
+  // Check if we have Mgas/s data with actual values (either per-sample or aggregates)
+  const hasMgasData = timeSeries.mgasPerSec.some(v => v > 0) ||
+    (isHistoricalMode && (snapshot.currentMgasPerSec > 0 || snapshot.peakMgasPerSec > 0));
 
   const chartData = useMemo(() => {
     // For historical mode, show all data points (they're already aggregated)
@@ -31,14 +32,45 @@ export function RealTimeChart() {
       ? Math.max(1, Math.floor(totalPoints / maxPoints))
       : Math.max(1, Math.round(1000 / 2000)); // Default ~2s block time for live
 
-    // Sample every Nth point from recent data
-    const sampledData: { time: string; mgasPerSec: number; txPerSec: number }[] = [];
+    // For historical mode, filter out initial zero-value points that create jumps
+    let startIndex = 0;
+    if (isHistoricalMode) {
+      for (let i = 0; i < totalPoints; i++) {
+        const hasMgas = (timeSeries.mgasPerSec[i] ?? 0) > 0;
+        const hasTxs = (timeSeries.txPerSec[i] ?? 0) > 0;
+        if (hasMgas || hasTxs) {
+          startIndex = i;
+          break;
+        }
+      }
+    }
 
-    for (let i = totalPoints - 1; i >= 0 && sampledData.length < maxPoints; i -= sampleInterval) {
+    // For historical mode, use the first non-zero point as base for relative time
+    const baseTimestamp = isHistoricalMode && totalPoints > startIndex
+      ? timeSeries.timestamps[startIndex]
+      : 0;
+
+    // Sample every Nth point from recent data
+    const sampledData: { time: string; mgasPerSec: number; txPerSec: number; fillRate: number }[] = [];
+
+    for (let i = totalPoints - 1; i >= startIndex && sampledData.length < maxPoints; i -= sampleInterval) {
+      // For historical mode, show relative time (e.g., "0:05", "0:10")
+      // For live mode, show clock time
+      let timeLabel: string;
+      if (isHistoricalMode) {
+        const relativeSeconds = Math.round(timeSeries.timestamps[i] - baseTimestamp);
+        const minutes = Math.floor(relativeSeconds / 60);
+        const seconds = relativeSeconds % 60;
+        timeLabel = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      } else {
+        timeLabel = new Date(timeSeries.timestamps[i] * 1000).toLocaleTimeString();
+      }
+
       sampledData.unshift({
-        time: new Date(timeSeries.timestamps[i] * 1000).toLocaleTimeString(),
+        time: timeLabel,
         mgasPerSec: timeSeries.mgasPerSec[i] ?? 0,
         txPerSec: timeSeries.txPerSec[i] ?? 0,
+        fillRate: timeSeries.blockFillRate[i] ?? 0,
       });
     }
 
@@ -66,6 +98,12 @@ export function RealTimeChart() {
                 <span className="text-muted-foreground">Peak: </span>
                 <span className="font-mono font-semibold text-green-400">
                   {snapshot.peakMgasPerSec.toFixed(2)} Mgas/s
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Fill: </span>
+                <span className="font-mono font-semibold text-orange-400">
+                  {snapshot.averageFillRate.toFixed(1)}%
                 </span>
               </div>
             </>
@@ -151,16 +189,29 @@ export function RealTimeChart() {
                 />
                 <Legend />
                 {hasMgasData && (
-                  <Line
-                    yAxisId="left"
-                    type="monotone"
-                    dataKey="mgasPerSec"
-                    name="Mgas/s"
-                    stroke="#60a5fa"
-                    strokeWidth={2}
-                    dot={false}
-                    activeDot={{ r: 4 }}
-                  />
+                  <>
+                    <Line
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="mgasPerSec"
+                      name="Mgas/s"
+                      stroke="#60a5fa"
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4 }}
+                    />
+                    <Line
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="fillRate"
+                      name="Fill %"
+                      stroke="#fb923c"
+                      strokeWidth={1.5}
+                      strokeDasharray="4 2"
+                      dot={false}
+                      activeDot={{ r: 3 }}
+                    />
+                  </>
                 )}
                 <Line
                   yAxisId={hasMgasData ? "right" : "left"}

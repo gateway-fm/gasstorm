@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import type { LoadTestConfig, LoadTestStatus, LoadPattern, TransactionType, RealisticTestConfig, TipHistogramBucket, TxTypeMetrics } from "@/types/load-test";
 import { DEFAULT_LOAD_TEST_CONFIG, DEFAULT_REALISTIC_CONFIG } from "@/types/load-test";
 import { useMetricsStore } from "./metrics-store";
@@ -135,6 +134,7 @@ interface HistoricalTestRun {
   txSent: number;
   txConfirmed: number;
   txFailed: number;
+  txDiscarded?: number; // Transactions discarded (e.g., pending at test end)
   averageTps: number;
   peakTps: number;
   latencyStats?: LatencyStats;
@@ -182,6 +182,7 @@ interface GoLoadTestState {
   txSentCount: number;
   txConfirmedCount: number;
   txFailedCount: number;
+  txDiscardedCount: number; // Transactions discarded (e.g., pending at test end)
   averageTps: number;
   targetTps: number;
   peakTps: number; // For adaptive pattern
@@ -259,8 +260,7 @@ async function fetchLoadGenAPI(endpoint: string, options?: RequestInit): Promise
 }
 
 export const useGoLoadTestStore = create<GoLoadTestStore>()(
-  persist(
-    (set, get) => {
+  (set, get) => {
       let ws: WebSocket | null = null;
       let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
       let isConnecting = false;
@@ -410,6 +410,7 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
     txSentCount: 0,
     txConfirmedCount: 0,
     txFailedCount: 0,
+    txDiscardedCount: 0,
     averageTps: 0,
     targetTps: 0,
     peakTps: 0,
@@ -558,6 +559,7 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
           txSentCount: 0,
           txConfirmedCount: 0,
           txFailedCount: 0,
+          txDiscardedCount: 0,
           currentRate: 0,
           averageTps: 0,
           targetTps: initialTargetTps,
@@ -637,6 +639,7 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
           txSentCount: 0,
           txConfirmedCount: 0,
           txFailedCount: 0,
+          txDiscardedCount: 0,
           currentRate: 0,
           averageTps: 0,
           targetTps: 0,
@@ -788,6 +791,7 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
         txSentCount: run.txSent,
         txConfirmedCount: run.txConfirmed,
         txFailedCount: run.txFailed,
+        txDiscardedCount: run.txDiscarded ?? 0,
         averageTps: run.averageTps,
         targetTps,
         peakTps: run.peakTps,
@@ -901,39 +905,5 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
       }
     },
   };
-    },
-    {
-      name: "load-test-storage",
-      // Only persist config - status and metrics should come from the backend
-      // Persisting status causes issues when reconnecting to running tests
-      partialize: (state) => ({
-        config: state.config,
-      }),
-      // Custom serialization to handle BigInt values (config.txValue is bigint)
-      storage: {
-        getItem: (name) => {
-          const str = localStorage.getItem(name);
-          if (!str) return null;
-          // Parse with BigInt revival
-          return JSON.parse(str, (key, value) => {
-            if (typeof value === "string" && value.startsWith("__bigint__")) {
-              return BigInt(value.slice(10));
-            }
-            return value;
-          });
-        },
-        setItem: (name, value) => {
-          // Stringify with BigInt handling
-          const str = JSON.stringify(value, (key, val) => {
-            if (typeof val === "bigint") {
-              return `__bigint__${val.toString()}`;
-            }
-            return val;
-          });
-          localStorage.setItem(name, str);
-        },
-        removeItem: (name) => localStorage.removeItem(name),
-      },
-    }
-  )
+  }
 );

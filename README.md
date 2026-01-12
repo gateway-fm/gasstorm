@@ -50,11 +50,39 @@ cast send --rpc-url http://localhost:13000 \
 cast balance 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 --rpc-url http://localhost:18546
 ```
 
+## Load Testing
+
+The load generator creates realistic blockchain transaction workloads for benchmarking sequencer throughput.
+
+```bash
+# Start a Uniswap swap load test at 100 TPS for 60 seconds
+curl -X POST http://localhost:13001/start \
+  -H "Content-Type: application/json" \
+  -d '{"pattern":"constant","durationSec":60,"constantRate":100,"transactionType":"uniswap-swap"}'
+
+# Or use the dashboard
+open http://localhost:18000/load-test/
+```
+
+### Transaction Types
+
+| Type | Gas | Description |
+|------|-----|-------------|
+| `eth-transfer` | 21k | Basic ETH transfers |
+| `erc20-transfer` | 65k | ERC20 token transfers |
+| `uniswap-swap` | 180-250k | **Real Uniswap V3 AMM swaps** |
+| `heavy-compute` | 500k | Compute-intensive operations |
+
+The `uniswap-swap` type deploys full Uniswap V3 infrastructure (Factory, SwapRouter, NonfungiblePositionManager) with a WETH/USDC pool and executes real AMM swaps - the same code path as mainnet DEX transactions.
+
+See [load-generator/README.md](load-generator/README.md) for detailed documentation on all transaction types and their realism.
+
 ## Ports
 
 | Service | Port | Description |
 |---------|------|-------------|
 | Dashboard | 18000 | R&D Test Rig Dashboard |
+| Load Generator | 13001 | Load test API |
 | L1 (Anvil) | 18545 | Ethereum L1 RPC |
 | L2 (op-reth) | 18546 | L2 JSON-RPC |
 | L2 (op-reth) | 18547 | L2 WebSocket |

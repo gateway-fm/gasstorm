@@ -218,6 +218,44 @@ export interface LatencyStats {
   buckets: { label: string; count: number }[];
 }
 
+// TX Flow Statistics - tracks transaction journey through stages
+export interface TxFlowStats {
+  directConfirmed: number; // sent → confirmed (no preconf)
+  pendingConfirmed: number; // sent → pending → confirmed
+  preconfConfirmed: number; // sent → pending → preconfirmed → confirmed
+  droppedRequeued: number; // had dropped/requeued in flow
+  revokedFlow: number; // had revoked in flow
+  failedFlow: number; // ended in failed
+  totalTracked: number; // Total TXs tracked
+  avgStageCount: number; // Average stages per TX
+}
+
+// Block rejections from builder
+export interface BuilderBlockRejections {
+  nonceTooLow: number;
+  nonceTooHigh: number;
+  gasLimitExceeded: number;
+  insufficientFunds: number;
+  duplicate: number;
+  other: number;
+}
+
+// Block metrics event from builder's /block-metrics WebSocket
+export interface BuilderBlockMetrics {
+  blockNumber: number;
+  blockHash: string;
+  timestamp: number; // Block timestamp (Unix seconds)
+  emittedAt: number; // When event was emitted (Unix ms)
+  gasUsed: number;
+  gasLimit: number;
+  txCount: number;
+  fillRate: number; // gasUsed/gasLimit * 100
+  filterDurationMs: number;
+  engineApiDurationMs: number;
+  totalBuildDurationMs: number;
+  rejections: BuilderBlockRejections;
+}
+
 // Test result from history
 export interface TestResult {
   id: string;
@@ -234,6 +272,7 @@ export interface TestResult {
   peakTps?: number;
   latency?: LatencyStats;
   preconfLatency?: LatencyStats;
+  flowStats?: TxFlowStats; // TX flow tracking stats
   config: {
     pattern: LoadPattern;
     durationSec: number;
@@ -308,6 +347,86 @@ export interface TransactionLogEntry {
 // Execution layer type
 export type ExecutionLayer = "reth" | "cdk-erigon";
 
+// TX ordering mode from block builder
+export type TxOrdering = "fifo" | "tip_desc" | "tip_asc";
+
+// Environment snapshot captures builder and load-gen config at test start
+export interface EnvironmentSnapshot {
+  // Block builder config (from /status)
+  builderBlockTimeMs: number;
+  builderGasLimit: number;
+  builderMaxTxsPerBlock: number;
+  builderTxOrdering: TxOrdering;
+  builderEnablePreconfs: boolean;
+  builderSkipEmptyBlocks: boolean;
+  // Load generator config
+  loadGenGasTipCapGwei: number;
+  loadGenGasFeeCapGwei: number;
+  loadGenExecutionLayer: ExecutionLayer;
+}
+
+// Single ordering violation in a block
+export interface OrderingViolation {
+  blockNumber: number;
+  txIndex: number;
+  expectedTip: number; // Tip at index-1
+  actualTip: number;
+}
+
+// Per-block tip analysis
+export interface BlockTipAnalysis {
+  blockNumber: number;
+  txCount: number;
+  tips: number[]; // First 10 tips for inspection
+  isOrdered: boolean;
+}
+
+// Tip ordering verification result
+export interface TipOrderingResult {
+  verified: boolean;
+  totalBlocks: number;
+  blocksSampled: number;
+  correctlyOrdered: number;
+  orderingViolations?: OrderingViolation[];
+  sampleBlocks?: BlockTipAnalysis[];
+}
+
+// Individual TX receipt sample
+export interface TxReceiptSample {
+  txHash: string;
+  blockNumber: number;
+  gasUsed: number;
+  status: number; // 1=success, 0=revert
+  effectiveGasPrice: number;
+}
+
+// TX receipt verification result
+export interface TxReceiptVerification {
+  sampleSize: number;
+  successCount: number;
+  revertCount: number;
+  avgGasUsed: number;
+  minGasUsed: number;
+  maxGasUsed: number;
+  totalGasVerified: number;
+  samples?: TxReceiptSample[]; // First 10 for inspection
+}
+
+// Overall verification result
+export interface VerificationResult {
+  // On-chain metrics comparison
+  metricsMatch: boolean;
+  txCountDelta: number; // OnChain - Confirmed
+  gasUsedDelta: number;
+  // Tip ordering verification (if tip_desc or tip_asc)
+  tipOrdering?: TipOrderingResult;
+  // TX receipt sampling
+  txReceipts?: TxReceiptVerification;
+  // Summary
+  allChecksPass: boolean;
+  warnings?: string[];
+}
+
 // Test run from persistent storage (enhanced version of TestResult)
 export interface TestRun {
   id: string;
@@ -344,6 +463,8 @@ export interface TestRun {
   pendingLatency?: LatencyStats;
   accountsActive?: number;
   accountsFunded?: number;
+  // TX flow tracking stats
+  flowStats?: TxFlowStats;
   // On-chain verification metrics (actual chain state after test)
   onChainFirstBlock?: number;
   onChainLastBlock?: number;
@@ -352,6 +473,29 @@ export interface TestRun {
   onChainMgasPerSec?: number;
   onChainTps?: number;
   onChainDurationSecs?: number;
+  // Environment snapshot (builder + load-gen config at test start)
+  environment?: EnvironmentSnapshot;
+  // Verification results (post-test chain analysis)
+  verification?: VerificationResult;
+  // Deployed contracts info
+  deployedContracts?: DeployedContractInfo[];
+  // Test accounts info
+  testAccounts?: TestAccountsInfo;
+}
+
+// Deployed contract information
+export interface DeployedContractInfo {
+  name: string;
+  address: string;
+}
+
+// Test accounts information
+export interface TestAccountsInfo {
+  totalCount: number;
+  dynamicCount: number;
+  fundedCount: number;
+  funderAddress: string;
+  accounts?: string[]; // Limited to first 100
 }
 
 // Update request for test run metadata
