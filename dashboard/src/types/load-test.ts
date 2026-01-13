@@ -489,13 +489,24 @@ export interface DeployedContractInfo {
   address: string;
 }
 
+// Account role in the test
+export type AccountRole = "deployer" | "funder" | "funded" | "built-in";
+
+// Individual account with its role
+export interface AccountInfo {
+  address: string;
+  role: AccountRole;
+  index: number; // Index within its category
+}
+
 // Test accounts information
 export interface TestAccountsInfo {
   totalCount: number;
   dynamicCount: number;
   fundedCount: number;
   funderAddress: string;
-  accounts?: string[]; // Limited to first 100
+  accounts?: string[]; // Legacy: Limited to first 100
+  allAccounts?: AccountInfo[]; // All accounts with their roles
 }
 
 // Update request for test run metadata
