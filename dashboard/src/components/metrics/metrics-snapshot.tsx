@@ -37,10 +37,25 @@ function formatGasPrice(gwei: number): string {
 
 export function MetricsSnapshot() {
   const { snapshot, blockMetrics, timeSeries, isHistoricalMode } = useMetricsStore();
-  const { latestBaseFeeGwei, latestGasPriceGwei } = useGoLoadTestStore();
+  const {
+    latestBaseFeeGwei,
+    latestGasPriceGwei,
+    txConfirmedCount,
+    // Aggregate block metrics from Go load generator
+    totalGasUsed: goTotalGasUsed,
+    blockCount: goBlockCount,
+    peakMgasPerSec: goPeakMgasPerSec,
+    avgMgasPerSec: goAvgMgasPerSec,
+    avgFillRate: goAvgFillRate,
+  } = useGoLoadTestStore();
 
-  // Check if we have block metrics (live mode with raw block data)
-  const hasBlockMetrics = blockMetrics.length > 0;
+  // In live mode, use metrics from go-load-test-store (which comes directly from the load generator)
+  // In historical mode, use snapshot values (which are hydrated from stored test data)
+  const totalTxs = isHistoricalMode ? snapshot.totalTransactions : txConfirmedCount;
+
+  // Check if we have block metrics from Go load generator (live mode) or from metrics-store
+  const hasGoBlockMetrics = goBlockCount > 0 || goTotalGasUsed > 0;
+  const hasBlockMetrics = blockMetrics.length > 0 || hasGoBlockMetrics;
 
   // In historical mode, check if we have Mgas/s data either in time series OR in snapshot aggregates
   // (On-chain fallback populates snapshot aggregates even when time series per-sample data is missing)
@@ -60,16 +75,24 @@ export function MetricsSnapshot() {
   // This ensures label and value/unit are always consistent
   const showMgasLabel = showMgasMetrics;
 
+  // In live mode, use Go load generator metrics; in historical mode, use hydrated snapshot values
+  // This ensures live and history views use the same data source (the Go load generator)
+  const peakMgasPerSec = isHistoricalMode ? snapshot.peakMgasPerSec : goPeakMgasPerSec;
+  const avgMgasPerSec = isHistoricalMode ? snapshot.currentMgasPerSec : goAvgMgasPerSec;
+  const avgFillRate = isHistoricalMode ? snapshot.averageFillRate : goAvgFillRate;
+  const blocksProduced = isHistoricalMode ? snapshot.blocksProduced : goBlockCount;
+  const totalGasUsed = isHistoricalMode ? snapshot.totalGasUsed : BigInt(goTotalGasUsed);
+
   const metrics = [
     {
       label: showMgasLabel ? (isHistoricalMode ? "Avg Mgas/s" : "Current Mgas/s") : "Avg tx/s",
-      value: showMgasMetrics ? snapshot.currentMgasPerSec.toFixed(2) : snapshot.currentTxPerSec.toFixed(1),
+      value: showMgasMetrics ? avgMgasPerSec.toFixed(2) : snapshot.currentTxPerSec.toFixed(1),
       unit: showMgasMetrics ? "Mgas/s" : "tx/s",
       color: showMgasMetrics ? "text-blue-400" : "text-purple-400",
     },
     {
       label: showMgasLabel ? "Peak Mgas/s" : "Peak tx/s",
-      value: showMgasMetrics ? snapshot.peakMgasPerSec.toFixed(2) : snapshot.peakTxPerSec.toFixed(1),
+      value: showMgasMetrics ? peakMgasPerSec.toFixed(2) : snapshot.peakTxPerSec.toFixed(1),
       unit: showMgasMetrics ? "Mgas/s" : "tx/s",
       color: "text-green-400",
     },
@@ -89,25 +112,25 @@ export function MetricsSnapshot() {
     },
     {
       label: "Block Time",
-      value: hasBlockMetrics ? formatBlockTime(snapshot.currentBlockTimeMs) : "N/A",
-      unit: hasBlockMetrics && snapshot.currentBlockTimeMs > 0 && snapshot.currentBlockTimeMs < 1000 ? "ms" : "",
-      color: hasBlockMetrics ? getBlockTimeColor(snapshot.currentBlockTimeMs, targetBlockTimeMs) : "text-muted-foreground",
+      value: blockMetrics.length > 0 ? formatBlockTime(snapshot.currentBlockTimeMs) : "N/A",
+      unit: blockMetrics.length > 0 && snapshot.currentBlockTimeMs > 0 && snapshot.currentBlockTimeMs < 1000 ? "ms" : "",
+      color: blockMetrics.length > 0 ? getBlockTimeColor(snapshot.currentBlockTimeMs, targetBlockTimeMs) : "text-muted-foreground",
     },
     {
       label: "Avg Block Time",
-      value: hasBlockMetrics ? formatBlockTime(snapshot.avgBlockTimeMs) : "N/A",
-      unit: hasBlockMetrics && snapshot.avgBlockTimeMs > 0 && snapshot.avgBlockTimeMs < 1000 ? "ms" : "",
-      color: hasBlockMetrics ? getBlockTimeColor(snapshot.avgBlockTimeMs, targetBlockTimeMs) : "text-muted-foreground",
+      value: blockMetrics.length > 0 ? formatBlockTime(snapshot.avgBlockTimeMs) : "N/A",
+      unit: blockMetrics.length > 0 && snapshot.avgBlockTimeMs > 0 && snapshot.avgBlockTimeMs < 1000 ? "ms" : "",
+      color: blockMetrics.length > 0 ? getBlockTimeColor(snapshot.avgBlockTimeMs, targetBlockTimeMs) : "text-muted-foreground",
     },
     {
       label: "Avg Fill Rate",
-      value: showMgasMetrics ? formatPercent(snapshot.averageFillRate) : "N/A",
+      value: showMgasMetrics ? formatPercent(avgFillRate) : "N/A",
       unit: "",
       color: showMgasMetrics ? "text-orange-400" : "text-muted-foreground",
     },
     {
       label: "Blocks",
-      value: showMgasMetrics ? snapshot.blocksProduced.toString() : "N/A",
+      value: showMgasMetrics ? blocksProduced.toString() : "N/A",
       unit: "",
       color: "text-muted-foreground",
     },
@@ -125,13 +148,13 @@ export function MetricsSnapshot() {
     },
     {
       label: "Total Gas",
-      value: showMgasMetrics ? formatGas(snapshot.totalGasUsed) : "N/A",
+      value: showMgasMetrics ? formatGas(totalGasUsed) : "N/A",
       unit: "",
       color: "text-cyan-400",
     },
     {
       label: "Total Txs",
-      value: snapshot.totalTransactions.toLocaleString(),
+      value: totalTxs.toLocaleString(),
       unit: "",
       color: "text-amber-400",
     },

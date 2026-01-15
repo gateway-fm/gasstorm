@@ -156,10 +156,11 @@ export function ContractsAccounts({ testRun }: ContractsAccountsProps) {
   const { deployedContracts, testAccounts } = testRun;
 
   // Group accounts by role
+  const allAccounts = testAccounts?.allAccounts;
   const groupedAccounts = useMemo(() => {
-    if (!testAccounts?.allAccounts) return null;
-    return groupAccountsByRole(testAccounts.allAccounts);
-  }, [testAccounts?.allAccounts]);
+    if (!allAccounts) return null;
+    return groupAccountsByRole(allAccounts);
+  }, [allAccounts]);
 
   // Don't render if no data
   if (!deployedContracts?.length && !testAccounts) {

@@ -387,7 +387,8 @@ export interface TipOrderingResult {
   totalBlocks: number;
   blocksSampled: number;
   correctlyOrdered: number;
-  orderingViolations?: OrderingViolation[];
+  violationCount: number; // Total violations (works for both incremental and non-incremental modes)
+  orderingViolations?: OrderingViolation[]; // Detailed violations (may be empty in incremental mode)
   sampleBlocks?: BlockTipAnalysis[];
 }
 
@@ -410,6 +411,7 @@ export interface TxReceiptVerification {
   maxGasUsed: number;
   totalGasVerified: number;
   samples?: TxReceiptSample[]; // First 10 for inspection
+  revertedTxs?: TxReceiptSample[]; // All reverted TXs (up to 100)
 }
 
 // Overall verification result

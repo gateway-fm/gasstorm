@@ -79,6 +79,15 @@ interface GoLoadTestMetrics {
   latestBaseFeeGwei?: number;
   latestGasPriceGwei?: number;
   latestGasUsed?: number;
+  // Aggregate block metrics (for live dashboard - matches history metrics)
+  totalGasUsed?: number;
+  blockCount?: number;
+  peakMgasPerSec?: number;
+  avgMgasPerSec?: number;
+  avgFillRate?: number;
+  // Current rolling metrics (for live chart - sampled at 200ms)
+  currentMgasPerSec?: number;
+  currentFillRate?: number;
 }
 
 // Request payload to Go load generator
@@ -219,6 +228,22 @@ interface GoLoadTestState {
   latestBaseFeeGwei: number;
   latestGasPriceGwei: number;
   latestGasUsed: number;
+  // Aggregate block metrics (for live dashboard - matches history metrics)
+  totalGasUsed: number;
+  blockCount: number;
+  peakMgasPerSec: number;
+  avgMgasPerSec: number;
+  avgFillRate: number;
+  // Current rolling metrics (for live chart - sampled at 200ms from Go load generator)
+  currentMgasPerSec: number;
+  currentFillRate: number;
+  // Time series for live chart (built from Go load generator WebSocket data)
+  chartTimeSeries: {
+    timestamps: number[];
+    mgasPerSec: number[];
+    txPerSec: number[];
+    fillRate: number[];
+  };
   // Historical mode - when true, ignores live updates
   isHistoricalMode: boolean;
 }
@@ -337,9 +362,46 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
             latestBaseFeeGwei: metrics.latestBaseFeeGwei ?? 0,
             latestGasPriceGwei: metrics.latestGasPriceGwei ?? 0,
             latestGasUsed: metrics.latestGasUsed ?? 0,
+            // Aggregate block metrics
+            totalGasUsed: metrics.totalGasUsed ?? 0,
+            blockCount: metrics.blockCount ?? 0,
+            peakMgasPerSec: metrics.peakMgasPerSec ?? 0,
+            avgMgasPerSec: metrics.avgMgasPerSec ?? 0,
+            avgFillRate: metrics.avgFillRate ?? 0,
+            // Current rolling metrics (for live chart)
+            currentMgasPerSec: metrics.currentMgasPerSec ?? 0,
+            currentFillRate: metrics.currentFillRate ?? 0,
           };
 
-          set(newState);
+          // Build time series for live chart (only during active test)
+          const currentState = get();
+          if (status === "running" && metrics.elapsedMs > 0) {
+            const timestamp = metrics.elapsedMs / 1000; // Convert to seconds
+            const mgasPerSec = metrics.currentMgasPerSec ?? 0;
+            const txPerSec = metrics.currentTps ?? 0;
+            const fillRate = metrics.currentFillRate ?? 0;
+
+            // Append to time series (limit to last 600 points = 2 minutes at 200ms)
+            const maxPoints = 600;
+            const prevSeries = currentState.chartTimeSeries;
+            const newTimeSeries = {
+              timestamps: [...prevSeries.timestamps.slice(-maxPoints + 1), timestamp],
+              mgasPerSec: [...prevSeries.mgasPerSec.slice(-maxPoints + 1), mgasPerSec],
+              txPerSec: [...prevSeries.txPerSec.slice(-maxPoints + 1), txPerSec],
+              fillRate: [...prevSeries.fillRate.slice(-maxPoints + 1), fillRate],
+            };
+
+            set({ ...newState, chartTimeSeries: newTimeSeries });
+          } else if (status === "idle" || status === "initializing") {
+            // Clear time series when test is reset/starting
+            if (currentState.chartTimeSeries.timestamps.length > 0) {
+              set({ ...newState, chartTimeSeries: { timestamps: [], mgasPerSec: [], txPerSec: [], fillRate: [] } });
+            } else {
+              set(newState);
+            }
+          } else {
+            set(newState);
+          }
 
           // Disconnect immediately when test completes - don't wait for pending to clear
           // Pending count at test end is just a stat, not a completion blocker
@@ -447,6 +509,22 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
     latestBaseFeeGwei: 0,
     latestGasPriceGwei: 0,
     latestGasUsed: 0,
+    // Aggregate block metrics
+    totalGasUsed: 0,
+    blockCount: 0,
+    peakMgasPerSec: 0,
+    avgMgasPerSec: 0,
+    avgFillRate: 0,
+    // Current rolling metrics (for live chart)
+    currentMgasPerSec: 0,
+    currentFillRate: 0,
+    // Time series for live chart
+    chartTimeSeries: {
+      timestamps: [],
+      mgasPerSec: [],
+      txPerSec: [],
+      fillRate: [],
+    },
     // Historical mode
     isHistoricalMode: false,
 
@@ -675,6 +753,22 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
           latestBaseFeeGwei: 0,
           latestGasPriceGwei: 0,
           latestGasUsed: 0,
+          // Aggregate block metrics
+          totalGasUsed: 0,
+          blockCount: 0,
+          peakMgasPerSec: 0,
+          avgMgasPerSec: 0,
+          avgFillRate: 0,
+          // Current rolling metrics
+          currentMgasPerSec: 0,
+          currentFillRate: 0,
+          // Time series
+          chartTimeSeries: {
+            timestamps: [],
+            mgasPerSec: [],
+            txPerSec: [],
+            fillRate: [],
+          },
           // Historical mode
           isHistoricalMode: false,
         });

@@ -12,10 +12,40 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { useMetricsStore } from "@/stores/metrics-store";
+import { useGoLoadTestStore } from "@/stores/go-load-test-store";
 import { useMemo } from "react";
 
 export function RealTimeChart() {
-  const { timeSeries, snapshot, isHistoricalMode } = useMetricsStore();
+  const { timeSeries: historicalTimeSeries, snapshot: historicalSnapshot, isHistoricalMode } = useMetricsStore();
+  const {
+    chartTimeSeries: liveTimeSeries,
+    currentMgasPerSec,
+    currentFillRate,
+    peakMgasPerSec: livePeakMgasPerSec,
+    avgFillRate: liveAvgFillRate,
+    currentRate: liveTxPerSec,
+    peakTps: livePeakTps,
+  } = useGoLoadTestStore();
+
+  // Select data source based on mode
+  // Live mode: Use Go load generator data (sampled at 200ms)
+  // Historical mode: Use hydrated metrics-store data
+  const timeSeries = isHistoricalMode ? {
+    timestamps: historicalTimeSeries.timestamps,
+    mgasPerSec: historicalTimeSeries.mgasPerSec,
+    txPerSec: historicalTimeSeries.txPerSec,
+    fillRate: historicalTimeSeries.blockFillRate,
+  } : liveTimeSeries;
+
+  // Snapshot values for header display
+  const snapshot = isHistoricalMode ? historicalSnapshot : {
+    currentMgasPerSec,
+    currentTxPerSec: liveTxPerSec,
+    peakMgasPerSec: livePeakMgasPerSec,
+    peakTxPerSec: livePeakTps,
+    averageFillRate: liveAvgFillRate,
+    currentFillRate,
+  };
 
   // Check if we have Mgas/s data with actual values (either per-sample or aggregates)
   const hasMgasData = timeSeries.mgasPerSec.some(v => v > 0) ||
@@ -23,30 +53,26 @@ export function RealTimeChart() {
 
   const chartData = useMemo(() => {
     // For historical mode, show all data points (they're already aggregated)
-    // For live mode, downsample to ~1 point per second for smoother chart
-    const maxPoints = isHistoricalMode ? 300 : 120; // Show more points for historical data
+    // For live mode, show more points since we have 200ms samples
+    const maxPoints = isHistoricalMode ? 300 : 300; // More points for smoother live chart
     const totalPoints = timeSeries.timestamps.length;
 
-    // For historical data, use simpler sampling
-    const sampleInterval = isHistoricalMode
-      ? Math.max(1, Math.floor(totalPoints / maxPoints))
-      : Math.max(1, Math.round(1000 / 2000)); // Default ~2s block time for live
+    // Sample interval: for live mode, show every Nth point to fit maxPoints
+    const sampleInterval = Math.max(1, Math.floor(totalPoints / maxPoints));
 
-    // For historical mode, filter out initial zero-value points that create jumps
+    // Filter out initial zero-value points that create jumps
     let startIndex = 0;
-    if (isHistoricalMode) {
-      for (let i = 0; i < totalPoints; i++) {
-        const hasMgas = (timeSeries.mgasPerSec[i] ?? 0) > 0;
-        const hasTxs = (timeSeries.txPerSec[i] ?? 0) > 0;
-        if (hasMgas || hasTxs) {
-          startIndex = i;
-          break;
-        }
+    for (let i = 0; i < totalPoints; i++) {
+      const hasMgas = (timeSeries.mgasPerSec[i] ?? 0) > 0;
+      const hasTxs = (timeSeries.txPerSec[i] ?? 0) > 0;
+      if (hasMgas || hasTxs) {
+        startIndex = i;
+        break;
       }
     }
 
-    // For historical mode, use the first non-zero point as base for relative time
-    const baseTimestamp = isHistoricalMode && totalPoints > startIndex
+    // Use the first non-zero point as base for relative time
+    const baseTimestamp = totalPoints > startIndex
       ? timeSeries.timestamps[startIndex]
       : 0;
 
@@ -54,23 +80,18 @@ export function RealTimeChart() {
     const sampledData: { time: string; mgasPerSec: number; txPerSec: number; fillRate: number }[] = [];
 
     for (let i = totalPoints - 1; i >= startIndex && sampledData.length < maxPoints; i -= sampleInterval) {
-      // For historical mode, show relative time (e.g., "0:05", "0:10")
-      // For live mode, show clock time
-      let timeLabel: string;
-      if (isHistoricalMode) {
-        const relativeSeconds = Math.round(timeSeries.timestamps[i] - baseTimestamp);
-        const minutes = Math.floor(relativeSeconds / 60);
-        const seconds = relativeSeconds % 60;
-        timeLabel = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-      } else {
-        timeLabel = new Date(timeSeries.timestamps[i] * 1000).toLocaleTimeString();
-      }
+      // Show relative time for both live and historical (e.g., "0:05", "0:10")
+      // Live mode now uses elapsed seconds from Go load generator
+      const relativeSeconds = Math.round(timeSeries.timestamps[i] - baseTimestamp);
+      const minutes = Math.floor(relativeSeconds / 60);
+      const seconds = relativeSeconds % 60;
+      const timeLabel = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
       sampledData.unshift({
         time: timeLabel,
         mgasPerSec: timeSeries.mgasPerSec[i] ?? 0,
         txPerSec: timeSeries.txPerSec[i] ?? 0,
-        fillRate: timeSeries.blockFillRate[i] ?? 0,
+        fillRate: timeSeries.fillRate[i] ?? 0,
       });
     }
 

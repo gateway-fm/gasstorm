@@ -125,9 +125,9 @@ function TipOrderingCard({ result }: { result: TipOrderingResult }) {
               </div>
               <div className="text-xs text-muted-foreground">Correct</div>
             </div>
-            <div className={`rounded p-2 ${result.orderingViolations?.length ? "bg-red-500/10" : "bg-muted/50"}`}>
-              <div className={`text-lg font-mono font-bold ${result.orderingViolations?.length ? "text-red-400" : ""}`}>
-                {(result.orderingViolations?.length ?? 0).toLocaleString()}
+            <div className={`rounded p-2 ${result.violationCount > 0 ? "bg-red-500/10" : "bg-muted/50"}`}>
+              <div className={`text-lg font-mono font-bold ${result.violationCount > 0 ? "text-red-400" : ""}`}>
+                {result.violationCount.toLocaleString()}
               </div>
               <div className="text-xs text-muted-foreground">Violations</div>
             </div>
@@ -247,6 +247,35 @@ function TxReceiptsCard({ result }: { result: TxReceiptVerification }) {
               <span className="font-mono">{(result.totalGasVerified / 1e6).toFixed(2)}M</span>
             </div>
           </div>
+
+          {result.revertedTxs && result.revertedTxs.length > 0 && (
+            <div className="pt-2 border-t border-border/50">
+              <div className="text-xs text-red-400 mb-2 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                Reverted Transactions ({result.revertedTxs.length})
+              </div>
+              <div className="space-y-1 max-h-48 overflow-y-auto">
+                {result.revertedTxs.map((tx) => (
+                  <div
+                    key={tx.txHash}
+                    className="flex items-center justify-between text-xs p-1.5 rounded bg-red-500/10"
+                  >
+                    <a
+                      href={`https://explorer.example.com/tx/${tx.txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono truncate max-w-[140px] text-red-400 hover:underline"
+                      title={tx.txHash}
+                    >
+                      {tx.txHash.slice(0, 14)}...
+                    </a>
+                    <span className="text-muted-foreground">Block {tx.blockNumber.toLocaleString()}</span>
+                    <span className="text-muted-foreground">{tx.gasUsed.toLocaleString()} gas</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {result.samples && result.samples.length > 0 && (
             <div className="pt-2 border-t border-border/50">
