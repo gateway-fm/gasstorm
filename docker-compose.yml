@@ -194,6 +194,7 @@ services:
       - NONCE_TIMEOUT_MS=${NONCE_TIMEOUT_MS:-500}
       # Debug options
       - DEBUG_REJECTION_REASONS=${DEBUG_REJECTION_REASONS:-true}
+      - STRESS_THRESHOLD_PCT=${STRESS_THRESHOLD_PCT:-80}
     volumes:
       - ./genesis/jwt.hex:/config/jwt.hex:ro
     ports:
@@ -251,22 +252,29 @@ services:
       - "13001:3001"   # REST API for load test control
     restart: unless-stopped
 
-  # Hyperlane Relayer (Phase 3)
+  # Hyperlane Relayer - Relays messages between L1 and L2
+  # Start with: docker compose --profile bridge up -d hyperlane-relayer
+  # Prerequisites: Deploy Hyperlane contracts first with ./scripts/deploy-hyperlane.sh
   hyperlane-relayer:
-    image: gcr.io/abacus-labs-dev/hyperlane-agent:main
+    image: gcr.io/abacus-labs-dev/hyperlane-agent:agents-v1.3.0
     container_name: sequencer-poc-relayer
     profiles: ["bridge"]
     depends_on:
       l1:
         condition: service_healthy
-      l2-reth:
-        condition: service_healthy
     environment:
-      - HYP_BASE_CHAINS_L1_CONNECTION_URL=http://l1:8545
-      - HYP_BASE_CHAINS_L2_CONNECTION_URL=http://l2-reth:8545
-      - HYP_BASE_RELAYCHAINS=l1,l2
+      # Logging
+      - RUST_LOG=info,hyperlane=debug
+      - RUST_BACKTRACE=1
+      # Config file path
+      - CONFIG_FILES=/config/relayer.json
     volumes:
-      - ./contracts/hyperlane/config:/config:ro
+      - hyperlane-relayer-data:/data
+      - ./config/hyperlane-relayer.json:/config/relayer.json:ro
+    ports:
+      - "19090:9090"  # Metrics
+    entrypoint: ["/app/relayer"]
+    command: []
     restart: unless-stopped
 
   # =============================================================================
@@ -460,6 +468,7 @@ volumes:
   op-succinct-data:
   agglayer-data:
   aggkit-data:
+  hyperlane-relayer-data:
 
 networks:
   default:

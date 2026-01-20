@@ -51,3 +51,18 @@ export const CHAIN_IDS = {
   L1: 1n,
   L2: 42069n,
 } as const;
+
+export const HYPERLANE_CONTRACTS = {
+  L1_WARP_ROUTE: "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1",
+  L2_WARP_ROUTE: "0xacb32FA0Af94c47818FB01543ebA4C7BcaC1bF1D",
+  L1_MAILBOX: "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
+  L2_MAILBOX: "0xF817690b2d885D120e623e9Bc70806eBC29b47dc",
+  L1_DOMAIN_ID: 31337,
+  L2_DOMAIN_ID: 42069,
+} as const;
+
+export const WARP_ROUTE_ABI = [
+  "function transferRemote(uint32 _destination, bytes32 _recipient, uint256 _amount) payable returns (bytes32)",
+  "function quoteGasPayment(uint32 _destination) view returns (uint256)",
+  "function balanceOf(address) view returns (uint256)",
+] as const;

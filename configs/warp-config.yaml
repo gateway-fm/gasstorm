@@ -1,0 +1,15 @@
+# Hyperlane Warp Route Configuration for ETH bridging
+
+l1local:
+  type: native
+  owner: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+  interchainSecurityModule:
+    type: trustedRelayerIsm
+    relayer: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+
+l2local:
+  type: native
+  owner: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+  interchainSecurityModule:
+    type: trustedRelayerIsm
+    relayer: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"

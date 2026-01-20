@@ -1,4 +1,4 @@
-.PHONY: run run-reth run-cdk-erigon stop restart logs status clean build test test-block-builder test-load-generator test-dashboard test-tx bench-block-builder bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-builder dev-loadgen dev-dashboard dev-stop dev-cdk-erigon
+.PHONY: run run-reth run-cdk-erigon run-metal stop restart logs status clean clean-metal build test test-block-builder test-load-generator test-dashboard test-tx bench-block-builder bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-builder dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help
 
 # =============================================================================
 # Configuration: Source .env file if it exists
@@ -45,6 +45,16 @@ run-reth:
 # Start with cdk-erigon (standalone sequencer)
 run-cdk-erigon:
 	docker compose --profile cdk-erigon up --build -d
+
+# Start in native "Metal" mode (no Docker, maximum performance)
+# Requires: op-reth, go, node installed locally
+run-metal:
+	./scripts/run-metal.sh
+
+# Clean Metal mode data directory
+clean-metal:
+	rm -rf ./data/metal
+	@echo "Metal mode data cleaned"
 
 # Start with logs attached
 run-attached:
@@ -200,6 +210,72 @@ run-agglayer:
 # Stop AggLayer
 stop-agglayer:
 	docker compose --profile agglayer down
+
+# =============================================================================
+# Hyperlane Bridge
+# =============================================================================
+
+# Deploy Hyperlane core and warp route contracts
+bridge-deploy:
+	@echo "Deploying Hyperlane bridge infrastructure..."
+	./scripts/deploy-hyperlane.sh
+
+# Start the Hyperlane relayer (requires bridge-deploy first)
+bridge-relayer:
+	docker compose --profile bridge up -d hyperlane-relayer
+	@echo "Relayer started. View logs with: make bridge-logs"
+
+# Stop the Hyperlane relayer
+bridge-relayer-stop:
+	docker compose --profile bridge down
+
+# View relayer logs
+bridge-logs:
+	docker compose logs -f hyperlane-relayer
+
+# Bridge ETH from L1 to L2 (usage: make bridge-deposit AMOUNT=1)
+bridge-deposit:
+	@if [ -z "$(AMOUNT)" ]; then echo "Usage: make bridge-deposit AMOUNT=<eth_amount>"; exit 1; fi
+	./scripts/bridge-deposit.sh $(AMOUNT)
+
+# Bridge ETH from L2 to L1 (usage: make bridge-withdraw AMOUNT=1)
+bridge-withdraw:
+	@if [ -z "$(AMOUNT)" ]; then echo "Usage: make bridge-withdraw AMOUNT=<eth_amount>"; exit 1; fi
+	./scripts/bridge-withdraw.sh $(AMOUNT)
+
+# Check bridge balances
+bridge-balances:
+	@echo "L1 (Anvil) Balances:"
+	@cast balance 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --rpc-url http://localhost:18545 | xargs -I{} echo "  Account 0: {} wei ($(shell cast from-wei {} ether 2>/dev/null || echo '?') ETH)"
+	@echo ""
+	@echo "L2 (op-reth) Balances:"
+	@cast balance 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --rpc-url http://localhost:18546 | xargs -I{} echo "  Account 0: {} wei ($(shell cast from-wei {} ether 2>/dev/null || echo '?') ETH)"
+
+# Full bridge setup: deploy contracts and start relayer
+bridge-setup: bridge-deploy bridge-relayer
+	@echo ""
+	@echo "Bridge setup complete!"
+	@echo "  - Test deposit:  make bridge-deposit AMOUNT=1"
+	@echo "  - Test withdraw: make bridge-withdraw AMOUNT=1"
+	@echo "  - View balances: make bridge-balances"
+	@echo "  - View logs:     make bridge-logs"
+
+# Bridge help
+bridge-help:
+	@echo "Hyperlane Bridge Commands:"
+	@echo "  make bridge-deploy        - Deploy Hyperlane contracts to L1 and L2"
+	@echo "  make bridge-relayer       - Start the Hyperlane relayer"
+	@echo "  make bridge-relayer-stop  - Stop the relayer"
+	@echo "  make bridge-logs          - View relayer logs"
+	@echo "  make bridge-deposit AMOUNT=1   - Bridge ETH from L1 to L2"
+	@echo "  make bridge-withdraw AMOUNT=1  - Bridge ETH from L2 to L1"
+	@echo "  make bridge-balances      - Check bridge account balances"
+	@echo "  make bridge-setup         - Full setup (deploy + start relayer)"
+	@echo ""
+	@echo "Prerequisites:"
+	@echo "  1. Start the stack: make run-reth"
+	@echo "  2. Deploy bridge:   make bridge-deploy"
+	@echo "  3. Start relayer:   make bridge-relayer"
 
 # =============================================================================
 # Polycli Load Testing
@@ -477,6 +553,7 @@ help:
 	@echo "    make run              - Start with EXECUTION_LAYER from .env (default: reth)"
 	@echo "    make run-reth         - Start with op-reth (block-builder + Engine API)"
 	@echo "    make run-cdk-erigon   - Start with cdk-erigon (standalone sequencer)"
+	@echo "    make run-metal        - Native mode (no Docker, maximum performance)"
 	@echo ""
 	@echo "  Basic:"
 	@echo "    make run-attached     - Start system with logs"
@@ -485,6 +562,7 @@ help:
 	@echo "    make logs             - Follow all logs"
 	@echo "    make status           - Show service status"
 	@echo "    make clean            - Stop and remove volumes"
+	@echo "    make clean-metal      - Remove native mode data"
 	@echo "    make build            - Build without starting"
 	@echo ""
 	@echo "  Performance Profiles (uses current EXECUTION_LAYER):"

@@ -1,0 +1,18 @@
+# Hyperlane Chain Metadata - L1 (Local Anvil)
+# This file defines the L1 chain for Hyperlane CLI
+
+name: l1local
+chainId: 1
+domainId: 31337  # Use Hardhat/Anvil standard domain to avoid collisions
+protocol: ethereum
+rpcUrls:
+  - http: http://localhost:18545
+nativeToken:
+  name: Ether
+  symbol: ETH
+  decimals: 18
+blocks:
+  confirmations: 1
+  reorgPeriod: 0
+  estimateBlockTime: 12
+isTestnet: true

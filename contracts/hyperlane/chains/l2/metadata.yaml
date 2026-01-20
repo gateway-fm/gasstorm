@@ -1,0 +1,19 @@
+# Hyperlane Chain Metadata - L2 (Sequencer PoC)
+# This file defines the L2 chain for Hyperlane CLI
+# Uses block-builder (port 13000) for transaction submission
+
+name: l2local
+chainId: 42069
+domainId: 42069
+protocol: ethereum
+rpcUrls:
+  - http: http://localhost:13000
+nativeToken:
+  name: Ether
+  symbol: ETH
+  decimals: 18
+blocks:
+  confirmations: 1
+  reorgPeriod: 0
+  estimateBlockTime: 1
+isTestnet: true

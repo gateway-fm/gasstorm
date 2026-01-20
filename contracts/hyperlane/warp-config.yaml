@@ -1,29 +1,35 @@
 # Hyperlane Warp Route Configuration
-# Enables ETH bridging between L1 and L2
+# Enables native ETH bridging between L1 and L2
 #
-# Usage: npx @hyperlane-xyz/cli deploy warp --config warp-config.yaml
+# Usage: hyperlane warp deploy --config warp-config.yaml
+#
+# This uses HypNative (EvmHypNative) for native token bridging:
+# - L1: Collateral - locks ETH in the contract
+# - L2: Synthetic - mints/burns wrapped ETH
+#
+# After deployment, addresses will be saved to ~/.hyperlane/
 
 tokens:
+  # L1 Native ETH (collateral side)
   - chainName: l1
-    standard: native      # Native ETH on L1
-    type: collateral      # Lock ETH on L1
+    standard: EvmHypNative
     name: "Ether"
     symbol: "ETH"
     decimals: 18
+    # Owner of the warp route contract
+    owner: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+    # ISM configuration - use trusted relayer for PoC
+    interchainSecurityModule:
+      type: trustedRelayerIsm
+      relayer: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
 
+  # L2 Native ETH (synthetic side)
   - chainName: l2
-    standard: native      # Native ETH on L2
-    type: synthetic       # Mint wrapped ETH on L2
-    name: "Wrapped Ether"
-    symbol: "WETH"
+    standard: EvmHypNative
+    name: "Ether"
+    symbol: "ETH"
     decimals: 18
-
-# Connection defines the bridge route
-connections:
-  - from: l1
-    to: l2
-
-# ISM for warp route messages
-warpRouteIsm:
-  l1: trustedRelayerIsm
-  l2: trustedRelayerIsm
+    owner: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+    interchainSecurityModule:
+      type: trustedRelayerIsm
+      relayer: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"

@@ -64,6 +64,17 @@ export function Header({ l1WsConnected, l2WsConnected, loadGenWsConnected }: Hea
               >
                 History
               </Link>
+              <Link
+                href="/bridge"
+                className={cn(
+                  "px-2 sm:px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+                  pathname === "/bridge" || pathname === "/bridge/"
+                    ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                )}
+              >
+                Bridge
+              </Link>
             </nav>
 
             {/* WS indicators - shown on same row on mobile */}
