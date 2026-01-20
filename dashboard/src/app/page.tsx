@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
-import { Header } from "@/components/layout/header";
+import { useCallback, useEffect, useRef } from "react";
 import { ChainStatusCard } from "@/components/status/chain-status-card";
 import { BlockBuilderCard } from "@/components/status/block-builder-card";
 import { AccountCard } from "@/components/status/account-card";
@@ -10,7 +9,7 @@ import { ActivityLog } from "@/components/status/activity-log";
 import { ArchitectureDiagram } from "@/components/status/architecture-diagram";
 import { useChainStore } from "@/stores/chain-store";
 import { useChainData } from "@/hooks/use-rpc";
-import { useL1WebSocket, useL2WebSocket } from "@/hooks/use-websocket";
+import { useL1NewHead, useL2NewHead } from "@/contexts/websocket-context";
 
 export default function DashboardPage() {
   const { refreshAll, fetchBalances } = useChainData();
@@ -30,44 +29,57 @@ export default function DashboardPage() {
     setLastL2Block,
   } = useChainStore();
 
+  // Use refs to track last block numbers to avoid stale closures
+  const lastL1BlockRef = useRef(lastL1Block);
+  const lastL2BlockRef = useRef(lastL2Block);
+
+  // Sync refs with state (must be in useEffect, not during render)
+  useEffect(() => {
+    lastL1BlockRef.current = lastL1Block;
+  }, [lastL1Block]);
+
+  useEffect(() => {
+    lastL2BlockRef.current = lastL2Block;
+  }, [lastL2Block]);
+
   // Handle L1 new block via WebSocket
   const handleL1NewHead = useCallback(
     (head: { number: string; hash: string }) => {
       const blockNum = parseInt(head.number, 16);
-      if (blockNum > lastL1Block) {
+      if (blockNum > lastL1BlockRef.current) {
         setL1Status({ blockNumber: blockNum, isOnline: true, latestBlockHash: head.hash });
-        if (lastL1Block > 0) {
+        if (lastL1BlockRef.current > 0) {
           addLog(`L1 Block ${blockNum} (${head.hash.slice(0, 10)}...)`, "block");
         }
         setLastL1Block(blockNum);
         fetchBalances();
       }
     },
-    [lastL1Block, setL1Status, addLog, setLastL1Block, fetchBalances]
+    [setL1Status, addLog, setLastL1Block, fetchBalances]
   );
 
   // Handle L2 new block via WebSocket
   const handleL2NewHead = useCallback(
     (head: { number: string; hash: string }) => {
       const blockNum = parseInt(head.number, 16);
-      if (blockNum > lastL2Block) {
+      if (blockNum > lastL2BlockRef.current) {
         setL2Status({ blockNumber: blockNum, isOnline: true, latestBlockHash: head.hash });
-        if (lastL2Block > 0) {
+        if (lastL2BlockRef.current > 0) {
           addLog(`Block ${blockNum} produced by sequencer`, "block");
         }
         setLastL2Block(blockNum);
         fetchBalances();
       }
     },
-    [lastL2Block, setL2Status, addLog, setLastL2Block, fetchBalances]
+    [setL2Status, addLog, setLastL2Block, fetchBalances]
   );
 
-  const { isConnected: l1WsConnected } = useL1WebSocket(handleL1NewHead);
-  const { isConnected: l2WsConnected } = useL2WebSocket(handleL2NewHead);
+  // Subscribe to new block events from global WebSocket context
+  useL1NewHead(handleL1NewHead);
+  useL2NewHead(handleL2NewHead);
 
   return (
     <div className="min-h-screen bg-background">
-      <Header l1WsConnected={l1WsConnected} l2WsConnected={l2WsConnected} />
 
       <main className="container mx-auto px-4 py-6">
         {/* Status Cards Grid */}

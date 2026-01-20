@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { l1, l2, rpcCall } from "@/lib/rpc-client";
+import { l1, l2 } from "@/lib/rpc-client";
 import { RPC_ENDPOINTS, HYPERLANE_CONTRACTS, TEST_ACCOUNT, WARP_ROUTE_ABI } from "@/types/chain";
 
 interface BridgeTransaction {
@@ -31,7 +31,6 @@ export function BridgePanel() {
   const [isDepositing, setIsDepositing] = useState(false);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [transactions, setTransactions] = useState<BridgeTransaction[]>([]);
-  const [relayerStatus, setRelayerStatus] = useState<"running" | "stopped" | "unknown">("unknown");
 
   const fetchBalances = useCallback(async () => {
     try {

@@ -3,15 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useWebSocketContext } from "@/contexts/websocket-context";
 
-interface HeaderProps {
-  l1WsConnected?: boolean;
-  l2WsConnected?: boolean;
-  loadGenWsConnected?: boolean;
-}
-
-export function Header({ l1WsConnected, l2WsConnected, loadGenWsConnected }: HeaderProps) {
+export function Header() {
   const pathname = usePathname();
+  const { l1Connected, l2Connected, loadGenConnected } = useWebSocketContext();
+
+  // Use context values for WebSocket connection status
+  const l1WsConnected = l1Connected;
+  const l2WsConnected = l2Connected;
+  const loadGenWsConnected = loadGenConnected;
 
   return (
     <header className="border-b">
@@ -97,17 +98,15 @@ export function Header({ l1WsConnected, l2WsConnected, loadGenWsConnected }: Hea
                 />
                 <span>L2</span>
               </div>
-              {loadGenWsConnected !== undefined && (
-                <div className="flex items-center gap-1">
-                  <span
-                    className={cn(
-                      "h-2 w-2 rounded-full",
-                      loadGenWsConnected ? "bg-green-500" : "bg-red-500"
-                    )}
-                  />
-                  <span>LG</span>
-                </div>
-              )}
+              <div className="flex items-center gap-1">
+                <span
+                  className={cn(
+                    "h-2 w-2 rounded-full",
+                    loadGenWsConnected ? "bg-green-500" : "bg-red-500"
+                  )}
+                />
+                <span>LG</span>
+              </div>
             </div>
           </div>
 
@@ -131,17 +130,15 @@ export function Header({ l1WsConnected, l2WsConnected, loadGenWsConnected }: Hea
               />
               <span>L2 WS</span>
             </div>
-            {loadGenWsConnected !== undefined && (
-              <div className="flex items-center gap-2">
-                <span
-                  className={cn(
-                    "h-2 w-2 rounded-full",
-                    loadGenWsConnected ? "bg-green-500" : "bg-red-500"
-                  )}
-                />
-                <span>LoadGen WS</span>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  "h-2 w-2 rounded-full",
+                  loadGenWsConnected ? "bg-green-500" : "bg-red-500"
+                )}
+              />
+              <span>LoadGen WS</span>
+            </div>
           </div>
         </div>
       </div>

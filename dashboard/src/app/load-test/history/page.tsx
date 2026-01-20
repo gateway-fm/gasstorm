@@ -2,7 +2,6 @@
 
 import { Suspense, useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Header } from "@/components/layout/header";
 import { TestHistory } from "@/components/load-test/test-history";
 import { HistoryHeader } from "@/components/load-test/history-header";
 import { RealTimeChart } from "@/components/metrics/real-time-chart";
@@ -316,8 +315,6 @@ function HistoryPageContent() {
 export default function HistoryPage() {
   return (
     <div className="min-h-screen bg-background">
-      <Header l1WsConnected={false} l2WsConnected={false} loadGenWsConnected={false} />
-
       <Suspense fallback={
         <main className="container mx-auto px-4 py-6">
           <div className="flex items-center justify-center py-20">

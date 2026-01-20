@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { Header } from "@/components/layout/header";
 import { LoadTestConfig } from "@/components/load-test/load-test-config";
 import { LoadTestRunner } from "@/components/load-test/load-test-runner";
 import { RealTimeChart } from "@/components/metrics/real-time-chart";
@@ -13,7 +12,7 @@ import { TxTypeBreakdown } from "@/components/metrics/tx-type-breakdown";
 import { PercentileTable } from "@/components/reports/percentile-table";
 import { ExportControls } from "@/components/reports/export-controls";
 import { VerificationSummary } from "@/components/reports/verification-summary";
-import { useL1WebSocket, useL2WebSocket } from "@/hooks/use-websocket";
+import { useL2NewHead } from "@/contexts/websocket-context";
 import { useGoLoadTestStore } from "@/stores/go-load-test-store";
 import { useMetricsStore } from "@/stores/metrics-store";
 import { useChainStore } from "@/stores/chain-store";
@@ -22,12 +21,19 @@ import type { BlockMetrics, Statistics } from "@/types/metrics";
 import { calculateStatistics } from "@/lib/statistics";
 
 export default function LoadTestPage() {
-  const { status, checkAndReconnect, latencyStats: goLatencyStats, preconfLatencyStats: goPreconfLatencyStats, wsConnected: loadGenWsConnected } = useGoLoadTestStore();
+  const { status, checkAndReconnect, latencyStats: goLatencyStats, preconfLatencyStats: goPreconfLatencyStats } = useGoLoadTestStore();
   const { addBlockMetrics, timeSeries } = useMetricsStore();
   const { builder } = useChainStore();
   const prevStatusRef = useRef(status);
   // Track previous block arrival time in a ref to avoid stale closure issues
   const lastBlockArrivalRef = useRef<number | null>(null);
+  // Track status in ref to avoid stale closures in WebSocket callback
+  const statusRef = useRef(status);
+
+  // Sync statusRef with status state (must be in useEffect, not during render)
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
 
   // On mount, check if a test is already running and reconnect to it
   useEffect(() => {
@@ -36,8 +42,12 @@ export default function LoadTestPage() {
 
   // Track status changes (Go load generator handles verification internally)
   useEffect(() => {
-    // Reset block arrival tracking when test ends (to avoid stale timing on next test)
-    if (status === "idle" && prevStatusRef.current !== "idle") {
+    // Reset block arrival tracking when test ends OR when new test starts
+    // The initializing check handles rapid start/stop/start cycles
+    if (
+      (status === "idle" && prevStatusRef.current !== "idle") ||
+      (status === "initializing" && prevStatusRef.current !== "initializing")
+    ) {
       lastBlockArrivalRef.current = null;
     }
     prevStatusRef.current = status;
@@ -86,10 +96,10 @@ export default function LoadTestPage() {
 
   // Handle new L2 block - collect metrics and check for TX confirmations
   const handleL2NewHead = useCallback(
-    async (head: { number: string; hash: string; timestamp: string; gasUsed: string; gasLimit: string }) => {
+    async (head: { number: string; hash: string; timestamp?: string; gasUsed?: string; gasLimit?: string }) => {
       // Only collect block metrics while a test is running
       // This prevents the chart from updating after test completion
-      if (status !== "running") {
+      if (statusRef.current !== "running") {
         return;
       }
 
@@ -142,15 +152,14 @@ export default function LoadTestPage() {
         console.error("Failed to fetch block:", error);
       }
     },
-    [status, addBlockMetrics, builder.blockTimeMs]
+    [addBlockMetrics, builder.blockTimeMs]
   );
 
-  const { isConnected: l1WsConnected } = useL1WebSocket();
-  const { isConnected: l2WsConnected } = useL2WebSocket(handleL2NewHead);
+  // Subscribe to L2 new block events from global WebSocket context
+  useL2NewHead(handleL2NewHead);
 
   return (
     <div className="min-h-screen bg-background">
-      <Header l1WsConnected={l1WsConnected} l2WsConnected={l2WsConnected} loadGenWsConnected={loadGenWsConnected} />
 
       <main className="container mx-auto px-4 py-6">
         {/* Configuration and Runner */}
