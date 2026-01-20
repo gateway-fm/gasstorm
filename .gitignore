@@ -81,3 +81,15 @@ temp/
 # Foundry cache
 cache/
 out/
+
+# Claude Code
+.claude/
+
+# Build output
+output/
+
+# Runtime data (Metal mode, etc)
+data/
+
+# Test contracts at root
+Test.sol
