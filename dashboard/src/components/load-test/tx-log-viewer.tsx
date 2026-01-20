@@ -18,7 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
-import type { TransactionLogEntry, PaginatedTxLogs } from "@/types/load-test";
+import type { TransactionLogEntry } from "@/types/load-test";
 
 // Transform Go API PascalCase to TypeScript camelCase for TransactionLogEntry
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

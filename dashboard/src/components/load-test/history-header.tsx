@@ -3,8 +3,8 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Clock, Calendar, Zap, Download, FileJson, FileSpreadsheet } from "lucide-react";
-import type { TestRun, TimeSeriesPoint } from "@/types/load-test";
+import { ArrowLeft, Clock, Calendar, Zap, FileJson, FileSpreadsheet } from "lucide-react";
+import type { TestRun } from "@/types/load-test";
 import { useMetricsStore } from "@/stores/metrics-store";
 import { useGoLoadTestStore } from "@/stores/go-load-test-store";
 

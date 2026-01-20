@@ -30,12 +30,14 @@ export function RealTimeChart() {
   // Select data source based on mode
   // Live mode: Use Go load generator data (sampled at 200ms)
   // Historical mode: Use hydrated metrics-store data
-  const timeSeries = isHistoricalMode ? {
-    timestamps: historicalTimeSeries.timestamps,
-    mgasPerSec: historicalTimeSeries.mgasPerSec,
-    txPerSec: historicalTimeSeries.txPerSec,
-    fillRate: historicalTimeSeries.blockFillRate,
-  } : liveTimeSeries;
+  const timeSeries = useMemo(() => {
+    return isHistoricalMode ? {
+      timestamps: historicalTimeSeries.timestamps,
+      mgasPerSec: historicalTimeSeries.mgasPerSec,
+      txPerSec: historicalTimeSeries.txPerSec,
+      fillRate: historicalTimeSeries.blockFillRate,
+    } : liveTimeSeries;
+  }, [isHistoricalMode, historicalTimeSeries, liveTimeSeries]);
 
   // Snapshot values for header display
   const snapshot = isHistoricalMode ? historicalSnapshot : {

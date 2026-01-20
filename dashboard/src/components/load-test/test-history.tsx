@@ -24,9 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import type {
   TestResult,
-  TestRunDetail,
   TimeSeriesPoint,
-  PaginatedTestRuns,
   TestRun,
   TestRunMetadataUpdate,
 } from "@/types/load-test";

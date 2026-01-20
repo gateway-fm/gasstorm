@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { TestRun, AccountInfo, AccountRole } from "@/types/load-test";
-import { FileCode, Users, Copy, ChevronDown, ChevronUp, Wallet, Send, CircleDot, Coins } from "lucide-react";
+import { FileCode, Users, Copy, ChevronDown, ChevronUp, Wallet, Send, Coins } from "lucide-react";
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";

@@ -290,6 +290,31 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
       let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
       let isConnecting = false;
 
+      // Batching: accumulate updates and apply them on next animation frame
+      let pendingUpdate: Partial<GoLoadTestState> | null = null;
+      let rafId: number | null = null;
+
+      const flushUpdate = () => {
+        if (pendingUpdate) {
+          set(pendingUpdate);
+          pendingUpdate = null;
+        }
+        rafId = null;
+      };
+
+      const batchedSet = (update: Partial<GoLoadTestState>) => {
+        // Merge with any pending update
+        pendingUpdate = pendingUpdate ? { ...pendingUpdate, ...update } : update;
+
+        // Schedule flush on next animation frame (if not already scheduled)
+        if (rafId === null && typeof requestAnimationFrame !== 'undefined') {
+          rafId = requestAnimationFrame(flushUpdate);
+        } else if (typeof requestAnimationFrame === 'undefined') {
+          // SSR fallback: apply immediately
+          flushUpdate();
+        }
+      };
+
   const connectWebSocket = () => {
     if (ws?.readyState === WebSocket.OPEN || isConnecting) {
       console.log("[LoadTest] WebSocket already connected or connecting");
@@ -391,16 +416,17 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
               fillRate: [...prevSeries.fillRate.slice(-maxPoints + 1), fillRate],
             };
 
-            set({ ...newState, chartTimeSeries: newTimeSeries });
+            // Use batched update for high-frequency WebSocket messages
+            batchedSet({ ...newState, chartTimeSeries: newTimeSeries });
           } else if (status === "idle" || status === "initializing") {
             // Clear time series when test is reset/starting
             if (currentState.chartTimeSeries.timestamps.length > 0) {
-              set({ ...newState, chartTimeSeries: { timestamps: [], mgasPerSec: [], txPerSec: [], fillRate: [] } });
+              batchedSet({ ...newState, chartTimeSeries: { timestamps: [], mgasPerSec: [], txPerSec: [], fillRate: [] } });
             } else {
-              set(newState);
+              batchedSet(newState);
             }
           } else {
-            set(newState);
+            batchedSet(newState);
           }
 
           // Disconnect immediately when test completes - don't wait for pending to clear
