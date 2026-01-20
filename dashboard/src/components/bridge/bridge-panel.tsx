@@ -60,6 +60,14 @@ export function BridgePanel() {
     return parseFloat(ethers.formatEther(wei)).toFixed(4);
   };
 
+  // Helper to get full RPC URL (ethers needs absolute URL with protocol)
+  const getFullRpcUrl = (path: string) => {
+    if (typeof window !== 'undefined') {
+      return `${window.location.origin}${path}`;
+    }
+    return path;
+  };
+
   const handleDeposit = async () => {
     if (!depositAmount || parseFloat(depositAmount) <= 0) {
       toast.error("Please enter a valid amount");
@@ -70,8 +78,8 @@ export function BridgePanel() {
     const txId = Date.now().toString();
 
     try {
-      // Create provider and wallet
-      const provider = new ethers.JsonRpcProvider(RPC_ENDPOINTS.L1_RPC);
+      // Create provider and wallet (need full URL for ethers)
+      const provider = new ethers.JsonRpcProvider(getFullRpcUrl(RPC_ENDPOINTS.L1_RPC));
       const wallet = new ethers.Wallet(TEST_ACCOUNT.privateKey, provider);
 
       // Create contract interface
@@ -164,8 +172,8 @@ export function BridgePanel() {
     const txId = Date.now().toString();
 
     try {
-      // Create provider and wallet (use builder RPC for L2 tx submission)
-      const provider = new ethers.JsonRpcProvider(RPC_ENDPOINTS.BUILDER_RPC);
+      // Create provider and wallet (use builder RPC for L2 tx submission, need full URL)
+      const provider = new ethers.JsonRpcProvider(getFullRpcUrl(RPC_ENDPOINTS.BUILDER_RPC));
       const wallet = new ethers.Wallet(TEST_ACCOUNT.privateKey, provider);
 
       // Create contract interface
