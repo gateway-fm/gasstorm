@@ -91,7 +91,7 @@ check_prereqs() {
 # =============================================================================
 
 DATA_DIR="${PROJECT_DIR}/data/metal"
-BLOCK_TIME_MS="${BLOCK_TIME_MS:-150}"
+BLOCK_TIME_MS="${BLOCK_TIME_MS:-1000}"
 SKIP_EMPTY_BLOCKS="${SKIP_EMPTY_BLOCKS:-true}"
 GAS_LIMIT="${GAS_LIMIT:-1500000000}"
 MAX_TXS_PER_BLOCK="${MAX_TXS_PER_BLOCK:-50000}"

@@ -32,7 +32,7 @@ log_error() {
 cleanup() {
     log_info "Cleaning up Docker Compose stack..."
     cd "$PROJECT_DIR"
-    docker compose down --volumes --remove-orphans 2>/dev/null || true
+    docker compose --profile reth down --volumes --remove-orphans 2>/dev/null || true
 }
 
 wait_for_service() {
@@ -137,8 +137,8 @@ main() {
     # Start Docker Compose stack
     if [ "$skip_startup" != "true" ]; then
         log_info "Starting Docker Compose stack..."
-        docker compose down --volumes 2>/dev/null || true
-        docker compose up -d --build
+        docker compose --profile reth down --volumes 2>/dev/null || true
+        docker compose --profile reth up -d --build
 
         # Wait for services
         wait_for_service "http://localhost:13000/health" "block-builder" "$STARTUP_TIMEOUT" || exit 1
