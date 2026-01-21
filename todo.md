@@ -6,6 +6,7 @@
 - [ ] **Reduce SeenHashTracker memory** - Change `DefaultMaxSeenHashes` from 10M to 1M (32 MB vs 320 MB). See `block-builder/internal/txpool/seen.go:27`
 - [ ] **Add MAX_SEEN_HASHES env var** - Make seen hash limit configurable via environment variable
 - [ ] **Implement batch signature verification** - Amortize CGO overhead for 2-5x throughput improvement
+- [ ] **Profile block-builder with pprof** - Run benchmarks with CPU/memory profiling, identify optimization opportunities via code review
 
 ### Medium Priority
 - [ ] **Engine API SYNCING recovery** - When op-reth returns SYNCING, builder gets stuck. Implement recovery in `pipeline.go`

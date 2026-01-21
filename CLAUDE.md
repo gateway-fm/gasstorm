@@ -2,6 +2,15 @@
 
 Preconfirmation sequencer proof-of-concept with sub-second block times.
 
+**Task Tracking:** See [todo.md](./todo.md) for current tasks and priorities.
+
+## Git Workflow
+
+When committing, use `--no-gpg-sign` to avoid GPG timeout issues:
+```bash
+git commit --no-gpg-sign -m "commit message"
+```
+
 ## Execution Layer Selection
 
 The project supports two execution layer backends, selected via `EXECUTION_LAYER` environment variable:
@@ -27,6 +36,32 @@ load-generator → cdk-erigon:8545 (direct sequencer)
 | Preconfirmations | Yes (WebSocket) | No |
 | Engine API | Required | Not used |
 | Services | l2-reth, block-builder | l2-cdk-erigon |
+
+## Prover Selection
+
+The project supports two validity proof backends, selected via `PROVER` environment variable:
+
+| Prover | Description | Profile |
+|--------|-------------|---------|
+| `sp1` (default) | OP Succinct with SP1 zkVM | `prover-sp1` |
+| `zisk` | ZisK zkVM (Polygon) | `prover-zisk` |
+
+```bash
+# Start with SP1 prover (default)
+make run-agglayer
+
+# Start with ZisK prover
+PROVER=zisk make run-agglayer
+# or
+make run-zisk
+```
+
+| Aspect | SP1 (op-succinct) | ZisK |
+|--------|-------------------|------|
+| Architecture | RISC-V 32-bit | RISC-V 64-bit |
+| Precompiles | keccak, sha256, secp256k1 | keccak, sha256 (no secp256k1) |
+| Mode | Mock by default | Emulator by default |
+| Port | 13337 | 13337 |
 
 ## Architecture (reth Mode)
 
