@@ -1,0 +1,19 @@
+# Hyperlane Chain Metadata - L2 (Sequencer PoC)
+# Docker-internal hostname for init container
+# Uses block-builder for transaction submission
+
+name: l2local
+chainId: 42069
+domainId: 42069
+protocol: ethereum
+rpcUrls:
+  - http: http://block-builder:3000
+nativeToken:
+  name: Ether
+  symbol: ETH
+  decimals: 18
+blocks:
+  confirmations: 1
+  reorgPeriod: 0
+  estimateBlockTime: 1
+isTestnet: true

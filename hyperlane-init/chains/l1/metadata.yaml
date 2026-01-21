@@ -1,0 +1,18 @@
+# Hyperlane Chain Metadata - L1 (Local Anvil)
+# Docker-internal hostname for init container
+
+name: l1local
+chainId: 1
+domainId: 31337
+protocol: ethereum
+rpcUrls:
+  - http: http://l1:8545
+nativeToken:
+  name: Ether
+  symbol: ETH
+  decimals: 18
+blocks:
+  confirmations: 1
+  reorgPeriod: 0
+  estimateBlockTime: 12
+isTestnet: true

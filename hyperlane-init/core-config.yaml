@@ -1,0 +1,31 @@
+# Hyperlane Core Deployment Configuration
+# Deploys Mailbox, ISM, and Hooks to both chains
+
+# Using Anvil account #1 to avoid nonce conflicts with load generator
+l1local:
+  owner: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+  defaultIsm:
+    type: trustedRelayerIsm
+    relayer: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+  defaultHook:
+    type: merkleTreeHook
+  requiredHook:
+    type: protocolFee
+    owner: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+    beneficiary: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+    maxProtocolFee: "100000000000000000"
+    protocolFee: "0"
+
+l2local:
+  owner: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+  defaultIsm:
+    type: trustedRelayerIsm
+    relayer: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+  defaultHook:
+    type: merkleTreeHook
+  requiredHook:
+    type: protocolFee
+    owner: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+    beneficiary: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+    maxProtocolFee: "100000000000000000"
+    protocolFee: "0"

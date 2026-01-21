@@ -18,7 +18,7 @@ export HYP_KEY="${HYP_KEY:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae7
 
 # RPC URLs
 L1_RPC="${L1_RPC:-http://localhost:18545}"
-L2_RPC="${L2_RPC:-http://localhost:18546}"
+L2_RPC="${L2_RPC:-http://localhost:13000}"
 
 # Colors for output
 RED='\033[0;31m'

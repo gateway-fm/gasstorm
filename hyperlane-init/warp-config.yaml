@@ -1,0 +1,15 @@
+# Hyperlane Warp Route Configuration
+# ETH bridging between L1 and L2 using native token warp routes
+
+tokens:
+  - chainName: l1local
+    standard: EvmHypNative
+    name: "Ether"
+    symbol: "ETH"
+    decimals: 18
+
+  - chainName: l2local
+    standard: EvmHypNative
+    name: "Ether"
+    symbol: "ETH"
+    decimals: 18

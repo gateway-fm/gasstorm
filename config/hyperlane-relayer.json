@@ -17,10 +17,10 @@
       "index": {
         "from": 1
       },
-      "mailbox": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
-      "merkleTreeHook": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
-      "interchainGasPaymaster": "0xB7f8BC63BbcaD18155201308C8f3540b07f84F5e",
-      "validatorAnnounce": "0x0B306BF915C4d645ff596e518fAf3F9669b97016"
+      "mailbox": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+      "merkleTreeHook": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+      "interchainGasPaymaster": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+      "validatorAnnounce": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
     },
     "l2local": {
       "name": "l2local",
@@ -39,10 +39,10 @@
       "index": {
         "from": 1
       },
-      "mailbox": "0xF817690b2d885D120e623e9Bc70806eBC29b47dc",
-      "merkleTreeHook": "0x291D1B98ED1704B5AA281E92eC07451e7FD446f4",
-      "interchainGasPaymaster": "0x291D1B98ED1704B5AA281E92eC07451e7FD446f4",
-      "validatorAnnounce": "0x1f985C1D2886FA2636a0280B7dbbb6052C1e0cac"
+      "mailbox": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+      "merkleTreeHook": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+      "interchainGasPaymaster": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+      "validatorAnnounce": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"
     }
   },
   "relayChains": "l1local,l2local",
@@ -50,6 +50,6 @@
   "metricsPort": 9090,
   "defaultSigner": {
     "type": "hexKey",
-    "key": "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+    "key": "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
   }
 }
