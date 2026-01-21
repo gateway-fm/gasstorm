@@ -74,8 +74,8 @@ ShutdownTimeout = "5s"
 
 # Full node RPC endpoints for connected chains
 [FullNodeRPCs]
-# Chain ID 42069 -> op-reth L2
-42069 = "http://l2-reth:8545"
+# Chain ID 42069 -> L2 via block-builder
+42069 = "http://block-builder:3000"
 
 # Proof signers - sequencer address
 [ProofSigners]

@@ -142,6 +142,8 @@ services:
       - l1
       - l2-reth
       - block-builder
+    volumes:
+      - hyperlane-config:/usr/share/nginx/html/api/hyperlane:ro
     ports:
       - "18000:80"  # Changed from 8000 to avoid conflicts
     restart: unless-stopped
@@ -203,6 +205,30 @@ services:
       - "16060:6060"   # pprof for profiling
     restart: unless-stopped
 
+  # ZisK Prover Service - ZK validity proof generation
+  # Used when PROVER=zisk, alternative to op-succinct
+  zisk-prover:
+    build:
+      context: ./zisk-prover
+      dockerfile: Dockerfile
+    container_name: sequencer-poc-prover
+    profiles: ["prover-zisk"]
+    depends_on:
+      - l2-reth
+    environment:
+      - L2_RPC_URL=http://l2-reth:8545
+      - LISTEN_ADDR=:3000
+      # Emulator mode for development (no proving key required)
+      - USE_EMULATOR=${ZISK_USE_EMULATOR:-true}
+    ports:
+      - "13337:3000"   # Same port as op-succinct for compatibility
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
   # Load Generator Service (Go) - for op-reth mode (profile: reth)
   load-generator:
     build:
@@ -216,7 +242,7 @@ services:
     environment:
       - EXECUTION_LAYER=reth
       - BUILDER_RPC_URL=http://block-builder:3000  # Internal connection to builder
-      - L2_RPC_URL=http://l2-reth:8545             # Internal connection to L2
+      - L2_RPC_URL=http://block-builder:3000        # Route through block-builder for consistency
       - L2_WS_URL=ws://l2-reth:8546                # L2 WebSocket for block metrics (newHeads)
       - PRECONF_WS_URL=ws://block-builder:3001/ws/preconfirmations  # Preconfirmation WebSocket
       - LISTEN_ADDR=:3001
@@ -252,25 +278,49 @@ services:
       - "13001:3001"   # REST API for load test control
     restart: unless-stopped
 
-  # Hyperlane Relayer - Relays messages between L1 and L2
-  # Start with: docker compose --profile bridge up -d hyperlane-relayer
-  # Prerequisites: Deploy Hyperlane contracts first with ./scripts/deploy-hyperlane.sh
-  hyperlane-relayer:
-    image: gcr.io/abacus-labs-dev/hyperlane-agent:agents-v1.3.0
-    container_name: sequencer-poc-relayer
-    profiles: ["bridge"]
+  # Hyperlane Init - Deploys Hyperlane contracts on startup
+  # Automatically runs when bridge profile is enabled
+  hyperlane-init:
+    build:
+      context: .
+      dockerfile: ./hyperlane-init/Dockerfile
+    container_name: sequencer-poc-hyperlane-init
+    profiles: ["bridge", "reth"]
     depends_on:
       l1:
         condition: service_healthy
+      block-builder:
+        condition: service_started
+    environment:
+      - L1_RPC=http://l1:8545
+      - L2_RPC=http://block-builder:3000
+# Use Anvil account #1 to avoid nonce conflicts with load generator (account #0)
+      - HYP_KEY=0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
+      - OUTPUT_DIR=/output
+    volumes:
+      - hyperlane-config:/output
+    restart: "no"
+
+  # Hyperlane Relayer - Relays messages between L1 and L2
+  # Automatically starts after hyperlane-init deploys contracts
+  hyperlane-relayer:
+    image: gcr.io/abacus-labs-dev/hyperlane-agent:agents-v1.3.0
+    container_name: sequencer-poc-relayer
+    profiles: ["bridge", "reth"]
+    depends_on:
+      l1:
+        condition: service_healthy
+      hyperlane-init:
+        condition: service_completed_successfully
     environment:
       # Logging
       - RUST_LOG=info,hyperlane=debug
       - RUST_BACKTRACE=1
-      # Config file path
+      # Config file path - reads from init-generated config
       - CONFIG_FILES=/config/relayer.json
     volumes:
       - hyperlane-relayer-data:/data
-      - ./config/hyperlane-relayer.json:/config/relayer.json:ro
+      - hyperlane-config:/config:ro
     ports:
       - "19090:9090"  # Metrics
     entrypoint: ["/app/relayer"]
@@ -332,11 +382,11 @@ services:
         echo "Contract deployment complete. Check /output for addresses."
 
   # OP Succinct Proposer - SP1 prover for OP Stack validity proofs
-  # Uses mock prover mode for local development
+  # Default prover, used when PROVER=sp1 or not set
   op-succinct:
     image: ghcr.io/agglayer/op-succinct/op-succinct-agglayer:v3.4.0-rc.1-agglayer
-    container_name: sequencer-poc-op-succinct
-    profiles: ["agglayer"]
+    container_name: sequencer-poc-prover
+    profiles: ["prover-sp1"]
     depends_on:
       agglayer-db:
         condition: service_healthy
@@ -469,6 +519,7 @@ volumes:
   agglayer-data:
   aggkit-data:
   hyperlane-relayer-data:
+  hyperlane-config:
 
 networks:
   default:

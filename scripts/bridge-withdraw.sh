@@ -14,8 +14,10 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Configuration
 L1_RPC="${L1_RPC:-http://localhost:18545}"
-L2_RPC="${L2_RPC:-http://localhost:18546}"
-PRIVATE_KEY="${PRIVATE_KEY:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}"
+L2_RPC="${L2_RPC:-http://localhost:13000}"
+# Use Anvil account #2 for bridge operations (not #0 which is used by load generator, not #1 which is used by Hyperlane deployer)
+# Account #2: 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
+PRIVATE_KEY="${PRIVATE_KEY:-0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a}"
 
 # Amount to bridge (in ETH)
 AMOUNT_ETH="${1:-1}"
@@ -92,6 +94,34 @@ check_prerequisites() {
     fi
 
     log_info "Prerequisites OK"
+}
+
+# Check if Hyperlane relayer is running
+check_relayer_health() {
+    log_step "Checking Hyperlane relayer status..."
+
+    # Check if docker is available
+    if ! command -v docker &> /dev/null; then
+        log_warn "Docker not found - cannot verify relayer status"
+        return 0
+    fi
+
+    # Check if relayer container is running
+    local relayer_status
+    relayer_status=$(docker compose -f "$PROJECT_DIR/docker-compose.yml" ps hyperlane-relayer --format '{{.State}}' 2>/dev/null || echo "unknown")
+
+    if [ "$relayer_status" = "running" ]; then
+        log_info "Relayer is running"
+        return 0
+    elif [ "$relayer_status" = "unknown" ]; then
+        log_warn "Could not check relayer status (docker compose not available or not in project dir)"
+        return 0
+    else
+        log_error "Relayer is not running (status: $relayer_status)"
+        log_error "Start the relayer with: docker compose --profile bridge up -d hyperlane-relayer"
+        log_error "Or check logs: docker compose logs hyperlane-relayer"
+        return 1
+    fi
 }
 
 # Main bridge withdraw function
@@ -187,10 +217,11 @@ bridge_withdraw() {
 
     # Wait for L1 message delivery
     log_step "Waiting for relayer to deliver message to L1..."
-    log_info "This may take 30-60 seconds depending on block times..."
+    log_info "This may take 60-120 seconds depending on block times and relayer latency..."
+    log_info "Timeout: 300 seconds (150 attempts x 2s)"
 
     local attempts=0
-    local max_attempts=60
+    local max_attempts=150  # 150 * 2s = 300 seconds timeout
     local l1_balance_after
 
     while [ $attempts -lt $max_attempts ]; do
@@ -203,7 +234,12 @@ bridge_withdraw() {
         fi
 
         attempts=$((attempts + 1))
-        echo -n "."
+        # Show progress every 10 attempts (20 seconds)
+        if [ $((attempts % 10)) -eq 0 ]; then
+            echo " ${attempts}s"
+        else
+            echo -n "."
+        fi
     done
     echo ""
 
@@ -237,8 +273,10 @@ usage() {
     echo ""
     echo "Environment variables:"
     echo "  L1_RPC              L1 RPC URL (default: http://localhost:18545)"
-    echo "  L2_RPC              L2 RPC URL (default: http://localhost:18546)"
-    echo "  PRIVATE_KEY         Private key for signing (default: Anvil account 0)"
+    echo "  L2_RPC              L2 RPC URL (default: http://localhost:13000)"
+    echo "  PRIVATE_KEY         Private key for signing (default: Anvil account 2)"
+    echo "                      Note: Account 2 is used by default to avoid nonce conflicts"
+    echo "                      with load generator (account 0) and Hyperlane deployer (account 1)"
     echo "  HYP_L2_WARP_ADDRESS L2 warp route contract address"
     echo ""
     echo "Example:"
@@ -259,6 +297,7 @@ main() {
     fi
 
     check_prerequisites
+    check_relayer_health
     get_warp_addresses
     bridge_withdraw
 }

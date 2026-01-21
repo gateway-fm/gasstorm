@@ -184,6 +184,7 @@ bench-load-generator:
 # Install git hooks (pre-commit runs full test suite)
 setup-hooks:
 	@echo "Installing git hooks..."
+	@mkdir -p .git/hooks
 	@cp scripts/hooks/pre-commit .git/hooks/pre-commit
 	@chmod +x .git/hooks/pre-commit
 	@echo "Pre-commit hook installed successfully!"

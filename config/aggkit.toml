@@ -18,7 +18,7 @@ RollupManagerAddress = "0x0000000000000000000000000000000000000000"
 
 [L2]
 ChainID = 42069
-RPCURL = "http://l2-reth:8545"
+RPCURL = "http://block-builder:3000"
 WsURL = "ws://l2-reth:8546"
 RPCTimeout = "45s"
 # Bridge address on L2 - update after deployment

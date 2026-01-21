@@ -24,7 +24,7 @@ RetryNumber = 10
 
 [Etherman]
 L1URL = "http://l1:8545"
-L2URLs = ["http://l2-reth:8545"]
+L2URLs = ["http://block-builder:3000"]
 
 [Synchronizer]
 SyncInterval = "2s"
