@@ -1,4 +1,4 @@
-.PHONY: run run-reth run-cdk-erigon run-metal stop restart logs status clean clean-metal build test test-block-builder test-load-generator test-dashboard test-tx bench-block-builder bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-builder dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help
+.PHONY: run run-reth run-cdk-erigon run-metal stop restart logs status clean clean-metal build test test-block-builder test-load-generator test-dashboard test-tx bench-block-builder bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-builder dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks
 
 # =============================================================================
 # Configuration: Source .env file if it exists
@@ -16,6 +16,18 @@ ifeq ($(EXECUTION_LAYER),cdk-erigon)
   COMPOSE_PROFILE := cdk-erigon
 else
   COMPOSE_PROFILE := reth
+endif
+
+# =============================================================================
+# Prover Configuration
+# =============================================================================
+# PROVER can be: sp1 (default), zisk
+PROVER ?= sp1
+
+ifeq ($(PROVER),zisk)
+  PROVER_PROFILE := prover-zisk
+else
+  PROVER_PROFILE := prover-sp1
 endif
 
 # =============================================================================
@@ -45,6 +57,17 @@ run-reth:
 # Start with cdk-erigon (standalone sequencer)
 run-cdk-erigon:
 	docker compose --profile cdk-erigon up --build -d
+
+# Start with op-reth + Hyperlane bridge (auto-deploys contracts)
+run-with-bridge:
+	docker compose --profile reth --profile bridge up --build -d
+	@echo ""
+	@echo "Stack starting with Hyperlane bridge..."
+	@echo "  - hyperlane-init will deploy contracts automatically"
+	@echo "  - hyperlane-relayer will start after contracts are deployed"
+	@echo ""
+	@echo "Monitor progress: docker compose logs -f hyperlane-init"
+	@echo "Bridge UI:        http://localhost:18000/bridge"
 
 # Start in native "Metal" mode (no Docker, maximum performance)
 # Requires: op-reth, go, node installed locally
@@ -158,6 +181,15 @@ bench-block-builder:
 bench-load-generator:
 	cd load-generator && go test -bench=. -benchmem ./...
 
+# Install git hooks (pre-commit runs full test suite)
+setup-hooks:
+	@echo "Installing git hooks..."
+	@cp scripts/hooks/pre-commit .git/hooks/pre-commit
+	@chmod +x .git/hooks/pre-commit
+	@echo "Pre-commit hook installed successfully!"
+	@echo "  - Runs: block-builder tests, load-generator tests, dashboard lint"
+	@echo "  - To skip: git commit --no-verify"
+
 # =============================================================================
 # Integration Tests
 # =============================================================================
@@ -173,7 +205,7 @@ test-e2e:
 	cd load-generator && \
 	BUILDER_RPC_URL=http://localhost:13000 \
 	LOADGEN_API_URL=http://localhost:13001 \
-	L2_RPC_URL=http://localhost:18546 \
+	L2_RPC_URL=http://localhost:13000 \
 	PRECONF_WS_URL=ws://localhost:13002/ws/preconfirmations \
 	go test -v -race -timeout 120s ./internal/integration/... -run "TestE2E"
 
@@ -201,15 +233,16 @@ test-tx:
 
 # Check L2 balance
 balance:
-	cast balance 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 --rpc-url http://localhost:18546
+	cast balance 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 --rpc-url http://localhost:13000
 
-# Start with AggLayer profile
+# Start with AggLayer profile (uses PROVER env var: sp1 or zisk)
 run-agglayer:
-	docker compose --profile agglayer up -d
+	@echo "Starting AggLayer with $(PROVER) prover..."
+	docker compose --profile reth --profile agglayer --profile $(PROVER_PROFILE) up --build -d
 
 # Stop AggLayer
 stop-agglayer:
-	docker compose --profile agglayer down
+	docker compose --profile agglayer --profile prover-sp1 --profile prover-zisk down
 
 # =============================================================================
 # Hyperlane Bridge
@@ -249,7 +282,7 @@ bridge-balances:
 	@cast balance 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --rpc-url http://localhost:18545 | xargs -I{} echo "  Account 0: {} wei ($(shell cast from-wei {} ether 2>/dev/null || echo '?') ETH)"
 	@echo ""
 	@echo "L2 (op-reth) Balances:"
-	@cast balance 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --rpc-url http://localhost:18546 | xargs -I{} echo "  Account 0: {} wei ($(shell cast from-wei {} ether 2>/dev/null || echo '?') ETH)"
+	@cast balance 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 --rpc-url http://localhost:13000 | xargs -I{} echo "  Account 0: {} wei ($(shell cast from-wei {} ether 2>/dev/null || echo '?') ETH)"
 
 # Full bridge setup: deploy contracts and start relayer
 bridge-setup: bridge-deploy bridge-relayer
@@ -389,13 +422,13 @@ dev-infra:
 	docker compose up -d l1 l2-reth
 	@echo "Waiting for L1 and L2 to be ready..."
 	@sleep 3
-	@echo "Infrastructure ready. L1: localhost:18545, L2: localhost:18546"
+	@echo "Infrastructure ready. L1: localhost:18545, L2 (via block-builder): localhost:13000"
 
 # Run block-builder locally (requires dev-infra)
 dev-builder:
 	cd block-builder && \
 	ENGINE_RPC_URL=http://localhost:18551 \
-	L2_RPC_URL=http://localhost:18546 \
+	L2_RPC_URL=http://localhost:13000 \
 	JWT_SECRET_PATH=../genesis/jwt.hex \
 	SEQUENCER_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
 	LISTEN_ADDR=:13000 \
@@ -412,7 +445,7 @@ dev-builder:
 dev-loadgen:
 	cd load-generator && \
 	BUILDER_RPC_URL=http://localhost:13000 \
-	L2_RPC_URL=http://localhost:18546 \
+	L2_RPC_URL=http://localhost:13000 \
 	PRECONF_WS_URL=ws://localhost:13002/ws/preconfirmations \
 	LISTEN_ADDR=:13001 \
 	DATABASE_PATH=./loadgen-dev.db \
@@ -545,6 +578,54 @@ dev:
 		wait \
 	'
 
+# =============================================================================
+# Prover Selection (PROVER=sp1 or PROVER=zisk)
+# =============================================================================
+
+# Run with ZisK prover
+run-zisk:
+	PROVER=zisk $(MAKE) run-agglayer
+
+# Test ZisK prover
+test-zisk:
+	cd zisk-prover && go test -race -v ./...
+
+# Prover status (works for both sp1 and zisk on port 13337)
+prover-status:
+	@curl -s http://localhost:13337/status 2>/dev/null | jq . || \
+	curl -s http://localhost:13337/health 2>/dev/null | jq . || \
+	echo "Prover not running on port 13337"
+
+# Request a proof for a block (ZisK prover)
+prover-prove:
+	@if [ -z "$(BLOCK)" ]; then echo "Usage: make prover-prove BLOCK=<block_number>"; exit 1; fi
+	@curl -X POST http://localhost:13337/prove -H "Content-Type: application/json" -d '{"blockNumber": $(BLOCK)}' | jq .
+
+# List all proofs (ZisK prover)
+prover-proofs:
+	@curl -s http://localhost:13337/proofs | jq . 2>/dev/null || echo "Prover not running"
+
+# Prover help
+prover-help:
+	@echo "Prover Selection:"
+	@echo "  PROVER=sp1    - Use OP Succinct (SP1) prover (default)"
+	@echo "  PROVER=zisk   - Use ZisK prover"
+	@echo ""
+	@echo "Commands:"
+	@echo "  make run-agglayer           - Start with default prover (sp1)"
+	@echo "  PROVER=zisk make run-agglayer - Start with ZisK prover"
+	@echo "  make run-zisk               - Shortcut for PROVER=zisk run-agglayer"
+	@echo "  make prover-status          - Check prover status"
+	@echo "  make prover-prove BLOCK=1   - Request proof for block (ZisK)"
+	@echo "  make prover-proofs          - List all proofs (ZisK)"
+	@echo "  make test-zisk              - Run ZisK prover tests"
+	@echo ""
+	@echo "ZisK API Endpoints (port 13337):"
+	@echo "  GET  /status  - Service status"
+	@echo "  POST /prove   - Submit block for proving"
+	@echo "  GET  /proof/:id - Get proof result"
+	@echo "  GET  /proofs  - List all proofs"
+
 # Show help
 help:
 	@echo "Available commands:"
@@ -591,6 +672,13 @@ help:
 	@echo ""
 	@echo "  AggLayer:"
 	@echo "    make run-agglayer     - Start with AggLayer stack"
+	@echo ""
+	@echo "  Prover Selection (PROVER=sp1|zisk):"
+	@echo "    make run-agglayer     - Start with default prover (sp1)"
+	@echo "    PROVER=zisk make run-agglayer - Start with ZisK"
+	@echo "    make run-zisk         - Shortcut for ZisK prover"
+	@echo "    make prover-status    - Check prover status"
+	@echo "    make prover-help      - Full prover options"
 	@echo ""
 	@echo "  Local Development (HMR):"
 	@echo "    make dev              - Run all services locally (op-reth mode)"

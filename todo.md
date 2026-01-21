@@ -3,8 +3,8 @@
 ## Performance Optimizations
 
 ### High Priority
-- [ ] **Reduce SeenHashTracker memory** - Change `DefaultMaxSeenHashes` from 10M to 1M (32 MB vs 320 MB). See `block-builder/internal/txpool/seen.go:27`
-- [ ] **Add MAX_SEEN_HASHES env var** - Make seen hash limit configurable via environment variable
+- [x] **Reduce SeenHashTracker memory** - Changed `DefaultMaxSeenHashes` from 10M to 1M (32 MB vs 320 MB)
+- [x] **Add MAX_SEEN_HASHES env var** - Make seen hash limit configurable via environment variable
 - [ ] **Implement batch signature verification** - Amortize CGO overhead for 2-5x throughput improvement
 - [ ] **Profile block-builder with pprof** - Run benchmarks with CPU/memory profiling, identify optimization opportunities via code review
 
@@ -28,7 +28,7 @@
 ### Testing
 - [ ] **Add more integration tests** - Current coverage focused on unit tests
 - [ ] **Profile at higher load** - Run profiling at 200+ TPS to identify additional bottlenecks
-- [ ] **Add pre-commit hook** - Run full test suite before commits to catch issues early
+- [x] **Add pre-commit hook** - Run full test suite before commits (`make setup-hooks` to install)
 
 ### Documentation
 - [ ] **Update architecture diagrams** - Reflect current state after recent changes
