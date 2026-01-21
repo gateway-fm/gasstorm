@@ -168,8 +168,8 @@ export default function LoadTestPage() {
           <LoadTestRunner />
         </div>
 
-        {/* Bottleneck Analysis - Always visible during/after test (including initialization) */}
-        {(status === "initializing" || status === "running" || status === "completed") && (
+        {/* Bottleneck Analysis - Always visible during/after test (including initialization and verification) */}
+        {(status === "initializing" || status === "running" || status === "verifying" || status === "completed") && (
           <div className="mb-6">
             <BottleneckAnalysis />
           </div>
@@ -198,7 +198,7 @@ export default function LoadTestPage() {
         </div>
 
         {/* Statistics Table - Full width for better readability */}
-        {(status === "initializing" || status === "running" || status === "completed") && (
+        {(status === "initializing" || status === "running" || status === "verifying" || status === "completed") && (
           <div className="mb-6">
             <PercentileTable
               latencyStats={stats.latencyStats}

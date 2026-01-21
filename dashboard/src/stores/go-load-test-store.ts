@@ -38,7 +38,7 @@ type InitPhase =
 
 // Go load generator API response types
 interface GoLoadTestMetrics {
-  status: "idle" | "initializing" | "running" | "completed" | "error";
+  status: "idle" | "initializing" | "running" | "verifying" | "completed" | "error";
   txSent: number;
   txConfirmed: number;
   txFailed: number;
@@ -344,6 +344,7 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
           let status: LoadTestStatus = "idle";
           if (metrics.status === "initializing") status = "initializing";
           else if (metrics.status === "running") status = "running";
+          else if (metrics.status === "verifying") status = "verifying";
           else if (metrics.status === "completed") status = "completed";
           else if (metrics.status === "error") status = "error";
 
@@ -398,7 +399,7 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
             currentFillRate: metrics.currentFillRate ?? 0,
           };
 
-          // Build time series for live chart (only during active test)
+          // Build time series for live chart (only during active test - NOT during verifying)
           const currentState = get();
           if (status === "running" && metrics.elapsedMs > 0) {
             const timestamp = metrics.elapsedMs / 1000; // Convert to seconds
@@ -425,6 +426,10 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
             } else {
               batchedSet(newState);
             }
+          } else if (status === "verifying") {
+            // During verification: update status but freeze chart (don't append more data)
+            // This prevents the chart from showing dropping tx/s during verification
+            batchedSet(newState);
           } else {
             batchedSet(newState);
           }
@@ -823,6 +828,7 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
         let status: LoadTestStatus = "idle";
         if (metrics.status === "initializing") status = "initializing";
         else if (metrics.status === "running") status = "running";
+        else if (metrics.status === "verifying") status = "verifying";
         else if (metrics.status === "completed") status = "completed";
         else if (metrics.status === "error") status = "error";
 
@@ -950,11 +956,14 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()(
 
         const metrics: GoLoadTestMetrics = await response.json();
 
-        // If a test is running or initializing, start polling and sync state
-        if (metrics.status === "running" || metrics.status === "initializing") {
+        // If a test is running, initializing, or verifying, start polling and sync state
+        if (metrics.status === "running" || metrics.status === "initializing" || metrics.status === "verifying") {
           console.log("Reconnecting to", metrics.status, "load test...");
+          let status: LoadTestStatus = "running";
+          if (metrics.status === "initializing") status = "initializing";
+          else if (metrics.status === "verifying") status = "verifying";
           set({
-            status: metrics.status === "initializing" ? "initializing" : "running",
+            status,
             txSentCount: metrics.txSent,
             txConfirmedCount: metrics.txConfirmed,
             txFailedCount: metrics.txFailed,

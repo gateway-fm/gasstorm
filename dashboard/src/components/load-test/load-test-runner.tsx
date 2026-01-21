@@ -14,6 +14,7 @@ const statusColors: Record<string, string> = {
   initializing: "bg-yellow-600",
   running: "bg-green-600",
   paused: "bg-yellow-600",
+  verifying: "bg-purple-600",
   completed: "bg-blue-600",
   error: "bg-red-600",
 };
@@ -172,6 +173,19 @@ export function LoadTestRunner() {
           </div>
         )}
 
+        {/* Verification Progress */}
+        {status === "verifying" && (
+          <div className="rounded-lg bg-purple-500/10 border border-purple-500/20 p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin text-purple-500" />
+              <p className="text-sm font-medium text-purple-500">Verifying Results</p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Test finished. Verifying on-chain results...
+            </p>
+          </div>
+        )}
+
         {/* Error Display */}
         {error && (
           <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3">
@@ -201,6 +215,12 @@ export function LoadTestRunner() {
           {status === "running" && (
             <Button variant="destructive" className="flex-1" onClick={stop}>
               Stop
+            </Button>
+          )}
+          {status === "verifying" && (
+            <Button variant="outline" className="flex-1" disabled>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Verifying...
             </Button>
           )}
           {(status === "completed" || status === "error") && (

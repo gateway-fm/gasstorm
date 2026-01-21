@@ -40,9 +40,22 @@ export const RPC_ENDPOINTS = {
   L2_WS: "/ws/l2",
 } as const;
 
+// Anvil account #0 - used by load generator (DO NOT use for bridging to avoid nonce conflicts)
 export const TEST_ACCOUNT = {
   address: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
   privateKey: "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+} as const;
+
+// Anvil account #1 - used by Hyperlane deployer
+export const DEPLOYER_ACCOUNT = {
+  address: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+  privateKey: "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d",
+} as const;
+
+// Anvil account #2 - dedicated for bridge operations (separate from load generator and deployer)
+export const BRIDGE_ACCOUNT = {
+  address: "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+  privateKey: "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a",
 } as const;
 
 export const RECIPIENT_ADDRESS = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
@@ -52,11 +65,16 @@ export const CHAIN_IDS = {
   L2: 42069n,
 } as const;
 
+// Hyperlane contract addresses
+// Note: These addresses are from the Foundry deployment - update after chain reset
+// Deployed via DeployBridge.s.sol - same addresses on both chains (deterministic)
 export const HYPERLANE_CONTRACTS = {
-  L1_WARP_ROUTE: "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1",
-  L2_WARP_ROUTE: "0xacb32FA0Af94c47818FB01543ebA4C7BcaC1bF1D",
-  L1_MAILBOX: "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
-  L2_MAILBOX: "0xF817690b2d885D120e623e9Bc70806eBC29b47dc",
+  // Warp routes (HypNativeSimple) for ETH bridging
+  L1_WARP_ROUTE: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+  L2_WARP_ROUTE: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+  // TestMailbox (simplified for POC)
+  L1_MAILBOX: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+  L2_MAILBOX: "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
   L1_DOMAIN_ID: 31337,
   L2_DOMAIN_ID: 42069,
 } as const;

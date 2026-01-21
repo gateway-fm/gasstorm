@@ -38,10 +38,10 @@ const nextConfig: NextConfig = {
               source: "/rpc/l1",
               destination: "http://localhost:18545/",
             },
-            // L2 RPC (Docker)
+            // L2 RPC (via block-builder for tx inclusion)
             {
               source: "/rpc/l2",
-              destination: "http://localhost:18546/",
+              destination: "http://localhost:13000/",
             },
             // L1 WebSocket
             {

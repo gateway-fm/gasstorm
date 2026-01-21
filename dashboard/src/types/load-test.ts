@@ -150,7 +150,7 @@ export interface TransactionRecord {
   status: TransactionStatus;
 }
 
-export type LoadTestStatus = "idle" | "initializing" | "running" | "paused" | "completed" | "error";
+export type LoadTestStatus = "idle" | "initializing" | "running" | "paused" | "verifying" | "completed" | "error";
 
 // Initialization phases during test startup
 export type InitPhase =

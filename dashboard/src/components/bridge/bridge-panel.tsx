@@ -10,7 +10,21 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { l1, l2 } from "@/lib/rpc-client";
-import { RPC_ENDPOINTS, HYPERLANE_CONTRACTS, TEST_ACCOUNT, WARP_ROUTE_ABI } from "@/types/chain";
+import { RPC_ENDPOINTS, HYPERLANE_CONTRACTS, BRIDGE_ACCOUNT, WARP_ROUTE_ABI } from "@/types/chain";
+
+// Dynamic addresses loaded from deployment
+interface HyperlaneAddresses {
+  l1: {
+    domainId: number;
+    mailbox: string;
+    warpRoute?: string;
+  };
+  l2: {
+    domainId: number;
+    mailbox: string;
+    warpRoute?: string;
+  };
+}
 
 interface BridgeTransaction {
   id: string;
@@ -19,6 +33,101 @@ interface BridgeTransaction {
   status: "pending" | "relaying" | "completed" | "failed";
   txHash: string;
   timestamp: Date;
+}
+
+// Validate that an address is not empty or zero
+function isValidAddress(addr: string | undefined): boolean {
+  if (!addr) return false;
+  if (addr === "0x0000000000000000000000000000000000000000") return false;
+  if (addr.length < 42) return false;
+  return true;
+}
+
+// Load dynamic addresses from deployment, fall back to hardcoded
+async function loadHyperlaneAddresses(): Promise<{
+  l1WarpRoute: string;
+  l2WarpRoute: string;
+  l1Mailbox: string;
+  l2Mailbox: string;
+  l1DomainId: number;
+  l2DomainId: number;
+  loadedFromDynamic: boolean;
+  deploymentStatus: "success" | "failed" | "unknown";
+}> {
+  // Try multiple paths where addresses might be stored
+  const paths = [
+    '/api/hyperlane/addresses.json',
+    '/hyperlane/addresses.json',
+  ];
+
+  for (const path of paths) {
+    try {
+      const response = await fetch(path);
+      if (response.ok) {
+        const data: HyperlaneAddresses = await response.json();
+        console.log(`[Bridge] Loaded dynamic addresses from ${path}:`, data);
+
+        // Validate the addresses are real (not zero addresses)
+        const l1MailboxValid = isValidAddress(data.l1?.mailbox);
+        const l2MailboxValid = isValidAddress(data.l2?.mailbox);
+
+        if (!l1MailboxValid || !l2MailboxValid) {
+          console.warn('[Bridge] Dynamic addresses contain invalid mailbox addresses, trying next source');
+          continue;
+        }
+
+        return {
+          l1WarpRoute: data.l1.warpRoute || HYPERLANE_CONTRACTS.L1_WARP_ROUTE,
+          l2WarpRoute: data.l2.warpRoute || HYPERLANE_CONTRACTS.L2_WARP_ROUTE,
+          l1Mailbox: data.l1.mailbox || HYPERLANE_CONTRACTS.L1_MAILBOX,
+          l2Mailbox: data.l2.mailbox || HYPERLANE_CONTRACTS.L2_MAILBOX,
+          l1DomainId: data.l1.domainId || HYPERLANE_CONTRACTS.L1_DOMAIN_ID,
+          l2DomainId: data.l2.domainId || HYPERLANE_CONTRACTS.L2_DOMAIN_ID,
+          loadedFromDynamic: true,
+          deploymentStatus: "success",
+        };
+      }
+    } catch (error) {
+      console.log(`[Bridge] Failed to load from ${path}:`, error);
+    }
+  }
+
+  // Check if there's a deployment status file indicating failure
+  try {
+    const statusResponse = await fetch('/api/hyperlane/deploy-status.json');
+    if (statusResponse.ok) {
+      const status = await statusResponse.json();
+      if (status.status === "failed") {
+        console.error('[Bridge] Hyperlane deployment failed:', status.error);
+        return {
+          l1WarpRoute: HYPERLANE_CONTRACTS.L1_WARP_ROUTE,
+          l2WarpRoute: HYPERLANE_CONTRACTS.L2_WARP_ROUTE,
+          l1Mailbox: HYPERLANE_CONTRACTS.L1_MAILBOX,
+          l2Mailbox: HYPERLANE_CONTRACTS.L2_MAILBOX,
+          l1DomainId: HYPERLANE_CONTRACTS.L1_DOMAIN_ID,
+          l2DomainId: HYPERLANE_CONTRACTS.L2_DOMAIN_ID,
+          loadedFromDynamic: false,
+          deploymentStatus: "failed",
+        };
+      }
+    }
+  } catch {
+    // Ignore - status file may not exist
+  }
+
+  console.log('[Bridge] No dynamic addresses found, using hardcoded');
+
+  // Fall back to hardcoded addresses
+  return {
+    l1WarpRoute: HYPERLANE_CONTRACTS.L1_WARP_ROUTE,
+    l2WarpRoute: HYPERLANE_CONTRACTS.L2_WARP_ROUTE,
+    l1Mailbox: HYPERLANE_CONTRACTS.L1_MAILBOX,
+    l2Mailbox: HYPERLANE_CONTRACTS.L2_MAILBOX,
+    l1DomainId: HYPERLANE_CONTRACTS.L1_DOMAIN_ID,
+    l2DomainId: HYPERLANE_CONTRACTS.L2_DOMAIN_ID,
+    loadedFromDynamic: false,
+    deploymentStatus: "unknown",
+  };
 }
 
 export function BridgePanel() {
@@ -32,13 +141,54 @@ export function BridgePanel() {
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [transactions, setTransactions] = useState<BridgeTransaction[]>([]);
 
+  // Dynamic addresses - use explicit type to allow dynamic values
+  const [addresses, setAddresses] = useState<{
+    l1WarpRoute: string;
+    l2WarpRoute: string;
+    l1Mailbox: string;
+    l2Mailbox: string;
+    l1DomainId: number;
+    l2DomainId: number;
+  }>({
+    l1WarpRoute: HYPERLANE_CONTRACTS.L1_WARP_ROUTE,
+    l2WarpRoute: HYPERLANE_CONTRACTS.L2_WARP_ROUTE,
+    l1Mailbox: HYPERLANE_CONTRACTS.L1_MAILBOX,
+    l2Mailbox: HYPERLANE_CONTRACTS.L2_MAILBOX,
+    l1DomainId: HYPERLANE_CONTRACTS.L1_DOMAIN_ID,
+    l2DomainId: HYPERLANE_CONTRACTS.L2_DOMAIN_ID,
+  });
+  const [deploymentStatus, setDeploymentStatus] = useState<"success" | "failed" | "unknown" | "loading">("loading");
+  const [loadedFromDynamic, setLoadedFromDynamic] = useState(false);
+
+  // Load addresses on mount
+  useEffect(() => {
+    loadHyperlaneAddresses().then((loaded) => {
+      setAddresses({
+        l1WarpRoute: loaded.l1WarpRoute,
+        l2WarpRoute: loaded.l2WarpRoute,
+        l1Mailbox: loaded.l1Mailbox,
+        l2Mailbox: loaded.l2Mailbox,
+        l1DomainId: loaded.l1DomainId,
+        l2DomainId: loaded.l2DomainId,
+      });
+      setDeploymentStatus(loaded.deploymentStatus);
+      setLoadedFromDynamic(loaded.loadedFromDynamic);
+
+      if (loaded.deploymentStatus === "failed") {
+        toast.error("Hyperlane deployment failed - bridge may not work");
+      }
+      // Don't warn about hardcoded addresses - they're the expected deployment addresses
+      // and the warning is confusing when bridge profile isn't running
+    });
+  }, []);
+
   const fetchBalances = useCallback(async () => {
     try {
       const [l1Bal, l2Bal, l1Warp, l2Warp] = await Promise.all([
-        l1.getBalance(TEST_ACCOUNT.address),
-        l2.getBalance(TEST_ACCOUNT.address),
-        l1.getBalance(HYPERLANE_CONTRACTS.L1_WARP_ROUTE),
-        l2.getBalance(HYPERLANE_CONTRACTS.L2_WARP_ROUTE),
+        l1.getBalance(BRIDGE_ACCOUNT.address),
+        l2.getBalance(BRIDGE_ACCOUNT.address),
+        l1.getBalance(addresses.l1WarpRoute),
+        l2.getBalance(addresses.l2WarpRoute),
       ]);
       setL1Balance(l1Bal);
       setL2Balance(l2Bal);
@@ -47,7 +197,7 @@ export function BridgePanel() {
     } catch {
       // Silent fail for balance fetches
     }
-  }, []);
+  }, [addresses]);
 
   useEffect(() => {
     fetchBalances();
@@ -79,17 +229,17 @@ export function BridgePanel() {
     try {
       // Create provider and wallet (need full URL for ethers)
       const provider = new ethers.JsonRpcProvider(getFullRpcUrl(RPC_ENDPOINTS.L1_RPC));
-      const wallet = new ethers.Wallet(TEST_ACCOUNT.privateKey, provider);
+      const wallet = new ethers.Wallet(BRIDGE_ACCOUNT.privateKey, provider);
 
       // Create contract interface
       const warpRoute = new ethers.Contract(
-        HYPERLANE_CONTRACTS.L1_WARP_ROUTE,
+        addresses.l1WarpRoute,
         WARP_ROUTE_ABI,
         wallet
       );
 
       // Pad recipient address to bytes32
-      const recipientPadded = ethers.zeroPadValue(TEST_ACCOUNT.address, 32);
+      const recipientPadded = ethers.zeroPadValue(BRIDGE_ACCOUNT.address, 32);
       const amount = ethers.parseEther(depositAmount);
 
       // Add pending transaction
@@ -106,7 +256,7 @@ export function BridgePanel() {
 
       // Send transaction
       const tx = await warpRoute.transferRemote(
-        HYPERLANE_CONTRACTS.L2_DOMAIN_ID,
+        addresses.l2DomainId,
         recipientPadded,
         amount,
         { value: amount }
@@ -125,13 +275,16 @@ export function BridgePanel() {
       toast.success(`L1 transaction confirmed! Waiting for relayer...`);
 
       // Poll for L2 balance increase (relayer delivery)
-      const startBalance = await l2.getBalance(TEST_ACCOUNT.address);
+      // Increased timeout to 300s to handle slow relayers
+      const startBalance = await l2.getBalance(BRIDGE_ACCOUNT.address);
       let attempts = 0;
-      const maxAttempts = 60; // 60 seconds
+      const maxAttempts = 300; // 300 seconds (5 minutes) - relayer can be slow
+
+      toast.info("Waiting for relayer (up to 5 minutes)...");
 
       const checkDelivery = setInterval(async () => {
         attempts++;
-        const currentBalance = await l2.getBalance(TEST_ACCOUNT.address);
+        const currentBalance = await l2.getBalance(BRIDGE_ACCOUNT.address);
 
         if (currentBalance > startBalance) {
           clearInterval(checkDelivery);
@@ -146,6 +299,9 @@ export function BridgePanel() {
             t.id === txId ? { ...t, status: "relaying" } : t
           ));
           toast.info("Relayer may still be processing. Check balances later.");
+        } else if (attempts % 30 === 0) {
+          // Update progress every 30 seconds
+          toast.info(`Still waiting for relayer... (${attempts}s / ${maxAttempts}s)`);
         }
       }, 1000);
 
@@ -173,17 +329,17 @@ export function BridgePanel() {
     try {
       // Create provider and wallet (use builder RPC for L2 tx submission, need full URL)
       const provider = new ethers.JsonRpcProvider(getFullRpcUrl(RPC_ENDPOINTS.BUILDER_RPC));
-      const wallet = new ethers.Wallet(TEST_ACCOUNT.privateKey, provider);
+      const wallet = new ethers.Wallet(BRIDGE_ACCOUNT.privateKey, provider);
 
       // Create contract interface
       const warpRoute = new ethers.Contract(
-        HYPERLANE_CONTRACTS.L2_WARP_ROUTE,
+        addresses.l2WarpRoute,
         WARP_ROUTE_ABI,
         wallet
       );
 
       // Pad recipient address to bytes32
-      const recipientPadded = ethers.zeroPadValue(TEST_ACCOUNT.address, 32);
+      const recipientPadded = ethers.zeroPadValue(BRIDGE_ACCOUNT.address, 32);
       const amount = ethers.parseEther(withdrawAmount);
 
       // Add pending transaction
@@ -200,7 +356,7 @@ export function BridgePanel() {
 
       // Send transaction
       const tx = await warpRoute.transferRemote(
-        HYPERLANE_CONTRACTS.L1_DOMAIN_ID,
+        addresses.l1DomainId,
         recipientPadded,
         amount,
         { value: amount }
@@ -219,13 +375,16 @@ export function BridgePanel() {
       toast.success(`L2 transaction confirmed! Waiting for relayer...`);
 
       // Poll for L1 balance increase (relayer delivery)
-      const startBalance = await l1.getBalance(TEST_ACCOUNT.address);
+      // Increased timeout to 300s to handle slow relayers
+      const startBalance = await l1.getBalance(BRIDGE_ACCOUNT.address);
       let attempts = 0;
-      const maxAttempts = 60; // 60 seconds
+      const maxAttempts = 300; // 300 seconds (5 minutes) - relayer can be slow
+
+      toast.info("Waiting for relayer (up to 5 minutes)...");
 
       const checkDelivery = setInterval(async () => {
         attempts++;
-        const currentBalance = await l1.getBalance(TEST_ACCOUNT.address);
+        const currentBalance = await l1.getBalance(BRIDGE_ACCOUNT.address);
 
         if (currentBalance > startBalance) {
           clearInterval(checkDelivery);
@@ -240,6 +399,9 @@ export function BridgePanel() {
             t.id === txId ? { ...t, status: "relaying" } : t
           ));
           toast.info("Relayer may still be processing. Check balances later.");
+        } else if (attempts % 30 === 0) {
+          // Update progress every 30 seconds
+          toast.info(`Still waiting for relayer... (${attempts}s / ${maxAttempts}s)`);
         }
       }, 1000);
 
@@ -261,7 +423,7 @@ export function BridgePanel() {
       <Card>
         <CardHeader>
           <CardTitle>Balances</CardTitle>
-          <CardDescription>Account: {TEST_ACCOUNT.address.slice(0, 10)}...{TEST_ACCOUNT.address.slice(-8)}</CardDescription>
+          <CardDescription>Account: {BRIDGE_ACCOUNT.address}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -396,7 +558,7 @@ export function BridgePanel() {
                     </Badge>
                     {tx.txHash && (
                       <span className="text-xs text-muted-foreground font-mono">
-                        {tx.txHash.slice(0, 10)}...
+                        {tx.txHash}
                       </span>
                     )}
                     <span className="text-xs text-muted-foreground">
@@ -414,22 +576,42 @@ export function BridgePanel() {
       <Card className="lg:col-span-2">
         <CardHeader>
           <CardTitle>Hyperlane Configuration</CardTitle>
-          <CardDescription>Deployed contract addresses</CardDescription>
+          <CardDescription className="flex items-center gap-2 flex-wrap">
+            Deployed contract addresses
+            {deploymentStatus === "loading" && (
+              <Badge variant="outline" className="text-xs">loading...</Badge>
+            )}
+            {deploymentStatus === "success" && loadedFromDynamic && (
+              <Badge variant="outline" className="text-xs bg-green-500/20 text-green-400 border-green-500/30">
+                ✓ dynamic
+              </Badge>
+            )}
+            {deploymentStatus === "unknown" && !loadedFromDynamic && (
+              <Badge variant="outline" className="text-xs bg-blue-500/20 text-blue-400 border-blue-500/30">
+                default
+              </Badge>
+            )}
+            {deploymentStatus === "failed" && (
+              <Badge variant="destructive" className="text-xs">
+                ✗ deployment failed
+              </Badge>
+            )}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 gap-4 text-sm">
             <div className="space-y-2">
-              <Label className="text-muted-foreground">L1 (Domain: {HYPERLANE_CONTRACTS.L1_DOMAIN_ID})</Label>
+              <Label className="text-muted-foreground">L1 (Domain: {addresses.l1DomainId})</Label>
               <div className="space-y-1">
-                <div><span className="text-muted-foreground">Mailbox: </span><span className="font-mono text-xs">{HYPERLANE_CONTRACTS.L1_MAILBOX}</span></div>
-                <div><span className="text-muted-foreground">Warp Route: </span><span className="font-mono text-xs">{HYPERLANE_CONTRACTS.L1_WARP_ROUTE}</span></div>
+                <div><span className="text-muted-foreground">Mailbox: </span><span className="font-mono text-xs">{addresses.l1Mailbox}</span></div>
+                <div><span className="text-muted-foreground">Warp Route: </span><span className="font-mono text-xs">{addresses.l1WarpRoute}</span></div>
               </div>
             </div>
             <div className="space-y-2">
-              <Label className="text-muted-foreground">L2 (Domain: {HYPERLANE_CONTRACTS.L2_DOMAIN_ID})</Label>
+              <Label className="text-muted-foreground">L2 (Domain: {addresses.l2DomainId})</Label>
               <div className="space-y-1">
-                <div><span className="text-muted-foreground">Mailbox: </span><span className="font-mono text-xs">{HYPERLANE_CONTRACTS.L2_MAILBOX}</span></div>
-                <div><span className="text-muted-foreground">Warp Route: </span><span className="font-mono text-xs">{HYPERLANE_CONTRACTS.L2_WARP_ROUTE}</span></div>
+                <div><span className="text-muted-foreground">Mailbox: </span><span className="font-mono text-xs">{addresses.l2Mailbox}</span></div>
+                <div><span className="text-muted-foreground">Warp Route: </span><span className="font-mono text-xs">{addresses.l2WarpRoute}</span></div>
               </div>
             </div>
           </div>
