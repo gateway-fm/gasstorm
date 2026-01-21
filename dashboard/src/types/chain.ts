@@ -83,4 +83,12 @@ export const WARP_ROUTE_ABI = [
   "function transferRemote(uint32 _destination, bytes32 _recipient, uint256 _amount) payable returns (bytes32)",
   "function quoteGasPayment(uint32 _destination) view returns (uint256)",
   "function balanceOf(address) view returns (uint256)",
+  "event SentTransferRemote(uint32 indexed destination, bytes32 indexed recipient, uint256 amount)",
+  "event ReceivedTransferRemote(uint32 indexed origin, bytes32 indexed recipient, uint256 amount)",
+] as const;
+
+export const MAILBOX_ABI = [
+  "function nonce() view returns (uint32)",
+  "event Dispatch(address indexed sender, uint32 indexed destination, bytes32 indexed recipient, bytes message)",
+  "event Process(uint32 indexed origin, bytes32 indexed sender, address indexed recipient)",
 ] as const;

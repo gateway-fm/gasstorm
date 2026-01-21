@@ -1,19 +1,87 @@
 # Block Builder Performance Analysis
 
-**Date:** 2026-01-21  
-**Profile Duration:** 30 seconds  
-**Load Test:** 100 TPS, 50 accounts, eth-transfer transactions
+**Date:** 2026-01-22 (updated)
+**Profile Source:** Benchmark suite (`go test -bench=. -cpuprofile -memprofile`)
+**Platform:** Apple M4 Max (arm64, darwin)
 
 ## Executive Summary
 
-The block-builder has two primary performance bottlenecks:
+The block-builder has three primary performance bottlenecks:
 
-1. **Memory:** The `SeenHashTracker` pre-allocates 320 MB for 10M transaction hashes, using 99% of heap memory regardless of actual load
-2. **CPU:** Signature verification via CGO consumes 28% of CPU time
+1. **CPU:** Transaction sorting (`sortExecutableByTip`) consumes 9.62% of CPU
+2. **CPU:** Signature verification via CGO consumes 8.32% of CPU
+3. **Memory:** `filterExecutable` allocates 78.77% of memory (new map + struct per call)
+
+Previously identified issues (now mitigated):
+- ~~`SeenHashTracker` pre-allocates 320 MB~~ → Reduced to 1M hashes (32 MB), configurable via `MAX_SEEN_HASHES`
 
 ---
 
-## Memory Analysis
+## Benchmark CPU Analysis (2026-01-22)
+
+### CPU Profile Summary (from `go test -bench=. -cpuprofile`)
+
+| Function | Flat Time | % | Cumulative % | Notes |
+|----------|-----------|---|--------------|-------|
+| `sortExecutableByTip` | 0.77s | 0.25% | 29.77s (9.62%) | Sorting by gas tip |
+| `runtime.cgocall` | 25.69s | 8.30% | 25.77s (8.32%) | CGO signature verification |
+| `HashTrieMap.Load` | 19.69s | 6.36% | 33.30s (10.76%) | sync.Map lookups |
+| `SeenHashTracker.Has` | 0.72s | 0.23% | 17.37s (5.61%) | Hash deduplication |
+| `getNextTimestamp` | 14.29s | 4.62% | 16.43s (5.31%) | Atomic timestamp generation |
+| `compareTxGasPrice` | 12.81s | 4.14% | direct | Gas price comparison (in sort) |
+| `runtime.gcDrain` | 2.57s | 0.83% | 41.66s (13.46%) | GC pressure |
+
+### Key Findings
+
+1. **Sorting is expensive**: `sortExecutableByTip` with `compareTxGasPrice` takes ~10% of CPU. Uses `sort.Slice` which has closure allocation overhead.
+
+2. **sync.Map overhead**: `HashTrieMap.Load` (used by sync.Map) consumes 6.36%. Consider sharded map for high-contention paths.
+
+3. **GC pressure**: 13.46% cumulative time in GC indicates allocation-heavy code paths.
+
+4. **Timestamp contention**: `getNextTimestamp` uses atomics but still shows 5.31% CPU under concurrent load.
+
+---
+
+## Benchmark Memory Analysis (2026-01-22)
+
+### Memory Profile Summary (from `go test -bench=BenchmarkFilterExecutable -memprofile`)
+
+| Function | Allocation | % | Root Cause |
+|----------|------------|---|------------|
+| `filterExecutable` | 19,094 MB | 78.77% | Map creation + executableTx allocs |
+| `senderBatchPool.New` | 3,889 MB | 16.04% | Pool miss allocations |
+| `futureSlicePool.New` | 484 MB | 1.99% | Pool miss allocations |
+| `sort.Slice` (reflectlite.Swapper) | 397 MB | 1.64% | Closure allocation |
+| `droppedSlicePool.New` | 222 MB | 0.92% | Pool miss allocations |
+
+### Root Cause Analysis
+
+**`filterExecutable` (78.77% of allocations)**
+
+File: `block-builder/builder.go:892`
+
+```go
+func (b *BlockBuilder) filterExecutable(...) {
+    // Allocation 1: New map every call
+    senderMap := make(map[common.Address]*senderBatch, mapSize)  // 🔴
+
+    // Allocation 2: New executableTx per executable tx (pool disabled)
+    etx := &executableTx{...}  // 🔴
+}
+```
+
+The pool for `executableTx` was disabled due to correctness issues, leading to per-tx allocations.
+
+### Optimization Opportunities
+
+1. **Reuse senderMap**: Clear and reuse the map across calls instead of allocating new
+2. **Re-enable executableTx pool**: Fix the correctness issue or use a different pooling strategy
+3. **Replace sort.Slice**: Use a custom sort that doesn't allocate closures
+
+---
+
+## Memory Analysis (Live Profile - 2026-01-21)
 
 ### Heap Profile Summary
 

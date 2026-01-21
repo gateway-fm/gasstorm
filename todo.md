@@ -1,52 +1,50 @@
 # Sequencer PoC - TODO
 
-## Performance Optimizations
+## Review
+- [ ] **Bridge testing** - review the bridge and ensure that e2e tests and manual testing show that it is fully functional with post-verification on-chain of the bridging activity
 
-### High Priority
-- [x] **Reduce SeenHashTracker memory** - Changed `DefaultMaxSeenHashes` from 10M to 1M (32 MB vs 320 MB)
-- [x] **Add MAX_SEEN_HASHES env var** - Make seen hash limit configurable via environment variable
-- [ ] **Implement batch signature verification** - Amortize CGO overhead for 2-5x throughput improvement
-- [ ] **Profile block-builder with pprof** - Run benchmarks with CPU/memory profiling, identify optimization opportunities via code review
+## Performance Profiling Results (2026-01-22)
 
-### Medium Priority
-- [ ] **Engine API SYNCING recovery** - When op-reth returns SYNCING, builder gets stuck. Implement recovery in `pipeline.go`
-- [ ] **Increase signature worker scaling** - Add `SIGNATURE_WORKERS` env var, default to `runtime.NumCPU()`
-- [ ] **Track errors by category** - See TODO in `load-generator/internal/metrics/collector.go`
+### CPU Hotspots (from benchmarks)
+| Function | Time | % | Action |
+|----------|------|---|--------|
+| `sortExecutableByTip` | 29.77s | 9.62% | Consider heap-based ordering |
+| CGO (`cgocall`) | 25.77s | 8.32% | Batch signature verification |
+| `HashTrieMap.Load` | 19.69s | 6.36% | sync.Map overhead |
+| `SeenHashTracker.Has` | 17.37s | 5.61% | Hash deduplication |
+| `getNextTimestamp` | 16.43s | 5.31% | Atomic contention |
+| `compareTxGasPrice` | 12.81s | 4.14% | Part of sorting |
+| GC (`gcDrain`) | 41.66s | 13.46% | Reduce allocations |
 
-## Features
+### Memory Hotspots (filterExecutable benchmark)
+| Allocator | Memory | % |
+|-----------|--------|---|
+| `filterExecutable` | 19 GB | 78.77% |
+| `senderBatchPool.New` | 3.9 GB | 16.04% |
+| `sort.Slice` (reflectlite.Swapper) | 397 MB | 1.64% |
 
-### Hyperlane Integration
-- [x] **Hyperlane cross-chain messaging** - Integrated hyperlane-init, warp routes, and relayer config
-- [x] **Document Hyperlane relayer configuration** - See `docs/hyperlane.md`
-- [ ] **Test L1<->L2 bridge flow end-to-end** - Verify message passing works with deployed contracts
+Root cause: `filterExecutable` allocates per call:
+- `make(map[common.Address]*senderBatch, mapSize)` - new map each time
+- `&executableTx{}` - new struct per executable tx (pool disabled)
 
-### ZisK Prover
-- [x] **ZisK prover integration** - Added zisk-prover/ with Go wrapper and Dockerfile
-- [x] **Document SP1 to ZisK differences** - See `docs/zisk-sp1-mapping.md`
-- [ ] **Run ZisK prover in CI** - Verify prover works in test environment
+### Optimizations Implemented (2026-01-22)
 
-## Code Quality
+| Optimization | Result |
+|--------------|--------|
+| **Pool senderMap in filterExecutable** | 22-34% faster, 17% fewer allocs |
+| **Replace sort.Slice with slices.SortFunc** | 18-37x faster sorting |
 
-### Testing
-- [ ] **Add more integration tests** - Current coverage focused on unit tests
-- [ ] **Profile at higher load** - Run profiling at 200+ TPS to identify additional bottlenecks
-- [x] **Add pre-commit hook** - Run full test suite before commits (`make setup-hooks` to install)
+### Remaining Opportunities
+- [ ] **Batch signature verification** - Amortize CGO overhead (2-5x potential, high complexity)
 
-### Documentation
-- [ ] **Update architecture diagrams** - Reflect current state after recent changes
+## Stability
 
-## Known Issues
+- [ ] **Engine API SYNCING recovery** - When op-reth returns SYNCING, builder gets stuck. Implement retry/backoff in `pipeline.go`
 
-- **Pipeline gets stuck** - Engine API SYNCING state not handled gracefully
-- **200+ TPS bottleneck** - Nonce batching limits throughput beyond 200 TPS
-- **Engine API latency** - FCU + GetPayload take 100-500ms
+## Known Bottlenecks
 
-## Completed
-
-- [x] **Reduce SeenHashTracker memory** - Changed from 10M to 1M hashes (32 MB vs 320 MB)
-- [x] **Add MAX_SEEN_HASHES env var** - Configurable memory limit
-- [x] **Add pre-commit hook** - Run full test suite before commits
-- [x] **Add txpool namespace RPC methods** - txpool_status, txpool_content, txpool_contentFrom, txpool_inspect
-- [x] **Hyperlane integration** - Cross-chain messaging with warp routes
-- [x] **ZisK prover integration** - Alternative zkVM backend
-- [x] **Dashboard bridge panel** - Dynamic Hyperlane address loading
+| Issue | Impact | Notes |
+|-------|--------|-------|
+| Engine API latency | FCU + GetPayload 100-500ms | Limits block rate |
+| Nonce batching | Limits >200 TPS | Per-account sequential nonces |
+| SYNCING state | Pipeline stuck | No recovery implemented |

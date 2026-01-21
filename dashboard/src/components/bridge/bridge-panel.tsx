@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { l1, l2 } from "@/lib/rpc-client";
-import { RPC_ENDPOINTS, HYPERLANE_CONTRACTS, BRIDGE_ACCOUNT, WARP_ROUTE_ABI } from "@/types/chain";
+import { RPC_ENDPOINTS, HYPERLANE_CONTRACTS, BRIDGE_ACCOUNT, WARP_ROUTE_ABI, MAILBOX_ABI } from "@/types/chain";
 
 // Dynamic addresses loaded from deployment
 interface HyperlaneAddresses {
@@ -41,6 +41,39 @@ function isValidAddress(addr: string | undefined): boolean {
   if (addr === "0x0000000000000000000000000000000000000000") return false;
   if (addr.length < 42) return false;
   return true;
+}
+
+// ReceivedTransferRemote event signature
+const RECEIVED_TRANSFER_EVENT = "0xba20947a325f450d232530e5f5fce293e7963499d5309a07cee84a269f2f15a6";
+
+// Check if a ReceivedTransferRemote event exists for a specific recipient from a specific origin
+async function checkReceivedEvent(
+  provider: ethers.JsonRpcProvider,
+  warpRouteAddress: string,
+  originDomain: number,
+  recipientAddress: string,
+  fromBlock: number
+): Promise<boolean> {
+  try {
+    // Pad recipient to bytes32 for topic matching
+    const recipientPadded = ethers.zeroPadValue(recipientAddress, 32);
+
+    // Get logs for ReceivedTransferRemote events
+    const logs = await provider.getLogs({
+      address: warpRouteAddress,
+      topics: [
+        RECEIVED_TRANSFER_EVENT,
+        ethers.zeroPadValue(ethers.toBeHex(originDomain), 32), // origin domain
+        recipientPadded, // recipient
+      ],
+      fromBlock,
+    });
+
+    return logs.length > 0;
+  } catch (error) {
+    console.error("Error checking received event:", error);
+    return false;
+  }
 }
 
 // Load dynamic addresses from deployment, fall back to hardcoded
@@ -254,6 +287,10 @@ export function BridgePanel() {
 
       toast.info(`Sending ${depositAmount} ETH from L1 to L2...`);
 
+      // Capture L2 block BEFORE sending (relayer might deliver while L1 tx confirms)
+      const l2Provider = new ethers.JsonRpcProvider(getFullRpcUrl(RPC_ENDPOINTS.BUILDER_RPC));
+      const startBlock = Math.max(0, await l2Provider.getBlockNumber() - 5);
+
       // Send transaction
       const tx = await warpRoute.transferRemote(
         addresses.l2DomainId,
@@ -274,19 +311,25 @@ export function BridgePanel() {
 
       toast.success(`L1 transaction confirmed! Waiting for relayer...`);
 
-      // Poll for L2 balance increase (relayer delivery)
-      // Increased timeout to 300s to handle slow relayers
-      const startBalance = await l2.getBalance(BRIDGE_ACCOUNT.address);
+      // Poll for ReceivedTransferRemote event on L2 (more reliable than balance checking)
       let attempts = 0;
-      const maxAttempts = 300; // 300 seconds (5 minutes) - relayer can be slow
+      const maxAttempts = 120; // 120 seconds (2 minutes) - event-based should be faster
 
-      toast.info("Waiting for relayer (up to 5 minutes)...");
+      toast.info("Waiting for relayer delivery...");
 
       const checkDelivery = setInterval(async () => {
         attempts++;
-        const currentBalance = await l2.getBalance(BRIDGE_ACCOUNT.address);
 
-        if (currentBalance > startBalance) {
+        // Check for ReceivedTransferRemote event from L1 (domain 31337)
+        const delivered = await checkReceivedEvent(
+          l2Provider,
+          addresses.l2WarpRoute,
+          addresses.l1DomainId,
+          BRIDGE_ACCOUNT.address,
+          startBlock
+        );
+
+        if (delivered) {
           clearInterval(checkDelivery);
           setTransactions(prev => prev.map(t =>
             t.id === txId ? { ...t, status: "completed" } : t
@@ -295,13 +338,11 @@ export function BridgePanel() {
           fetchBalances();
         } else if (attempts >= maxAttempts) {
           clearInterval(checkDelivery);
-          setTransactions(prev => prev.map(t =>
-            t.id === txId ? { ...t, status: "relaying" } : t
-          ));
-          toast.info("Relayer may still be processing. Check balances later.");
-        } else if (attempts % 30 === 0) {
-          // Update progress every 30 seconds
-          toast.info(`Still waiting for relayer... (${attempts}s / ${maxAttempts}s)`);
+          // Still mark as relaying - it might complete later
+          toast.warning("Delivery taking longer than expected. Transaction may still complete.");
+        } else if (attempts % 20 === 0) {
+          // Update progress every 20 seconds
+          toast.info(`Waiting for relayer... (${attempts}s)`);
         }
       }, 1000);
 
@@ -354,6 +395,10 @@ export function BridgePanel() {
 
       toast.info(`Sending ${withdrawAmount} ETH from L2 to L1...`);
 
+      // Capture L1 block BEFORE sending (relayer might deliver while L2 tx confirms)
+      const l1Provider = new ethers.JsonRpcProvider(getFullRpcUrl(RPC_ENDPOINTS.L1_RPC));
+      const startBlock = Math.max(0, await l1Provider.getBlockNumber() - 5);
+
       // Send transaction
       const tx = await warpRoute.transferRemote(
         addresses.l1DomainId,
@@ -374,19 +419,25 @@ export function BridgePanel() {
 
       toast.success(`L2 transaction confirmed! Waiting for relayer...`);
 
-      // Poll for L1 balance increase (relayer delivery)
-      // Increased timeout to 300s to handle slow relayers
-      const startBalance = await l1.getBalance(BRIDGE_ACCOUNT.address);
+      // Poll for ReceivedTransferRemote event on L1 (more reliable than balance checking)
       let attempts = 0;
-      const maxAttempts = 300; // 300 seconds (5 minutes) - relayer can be slow
+      const maxAttempts = 120; // 120 seconds (2 minutes) - event-based should be faster
 
-      toast.info("Waiting for relayer (up to 5 minutes)...");
+      toast.info("Waiting for relayer delivery...");
 
       const checkDelivery = setInterval(async () => {
         attempts++;
-        const currentBalance = await l1.getBalance(BRIDGE_ACCOUNT.address);
 
-        if (currentBalance > startBalance) {
+        // Check for ReceivedTransferRemote event from L2 (domain 42069)
+        const delivered = await checkReceivedEvent(
+          l1Provider,
+          addresses.l1WarpRoute,
+          addresses.l2DomainId,
+          BRIDGE_ACCOUNT.address,
+          startBlock
+        );
+
+        if (delivered) {
           clearInterval(checkDelivery);
           setTransactions(prev => prev.map(t =>
             t.id === txId ? { ...t, status: "completed" } : t
@@ -395,13 +446,11 @@ export function BridgePanel() {
           fetchBalances();
         } else if (attempts >= maxAttempts) {
           clearInterval(checkDelivery);
-          setTransactions(prev => prev.map(t =>
-            t.id === txId ? { ...t, status: "relaying" } : t
-          ));
-          toast.info("Relayer may still be processing. Check balances later.");
-        } else if (attempts % 30 === 0) {
-          // Update progress every 30 seconds
-          toast.info(`Still waiting for relayer... (${attempts}s / ${maxAttempts}s)`);
+          // Still mark as relaying - it might complete later
+          toast.warning("Delivery taking longer than expected. Transaction may still complete.");
+        } else if (attempts % 20 === 0) {
+          // Update progress every 20 seconds
+          toast.info(`Waiting for relayer... (${attempts}s)`);
         }
       }, 1000);
 
