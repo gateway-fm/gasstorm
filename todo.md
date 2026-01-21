@@ -16,12 +16,14 @@
 ## Features
 
 ### Hyperlane Integration
-- [ ] **Finalize hyperlane-init setup** - New untracked directory needs integration
-- [ ] **Document Hyperlane relayer configuration** - See `docs/hyperlane.md`
+- [x] **Hyperlane cross-chain messaging** - Integrated hyperlane-init, warp routes, and relayer config
+- [x] **Document Hyperlane relayer configuration** - See `docs/hyperlane.md`
+- [ ] **Test L1<->L2 bridge flow end-to-end** - Verify message passing works with deployed contracts
 
 ### ZisK Prover
-- [ ] **Complete ZisK prover integration** - Untracked `zisk-prover/` directory
-- [ ] **Document SP1 to ZisK differences** - See `docs/zisk-sp1-mapping.md`
+- [x] **ZisK prover integration** - Added zisk-prover/ with Go wrapper and Dockerfile
+- [x] **Document SP1 to ZisK differences** - See `docs/zisk-sp1-mapping.md`
+- [ ] **Run ZisK prover in CI** - Verify prover works in test environment
 
 ## Code Quality
 
@@ -32,7 +34,6 @@
 
 ### Documentation
 - [ ] **Update architecture diagrams** - Reflect current state after recent changes
-- [ ] **Document broadcast system** - Untracked `broadcast/` directory
 
 ## Known Issues
 
@@ -42,4 +43,10 @@
 
 ## Completed
 
-_Move items here when done_
+- [x] **Reduce SeenHashTracker memory** - Changed from 10M to 1M hashes (32 MB vs 320 MB)
+- [x] **Add MAX_SEEN_HASHES env var** - Configurable memory limit
+- [x] **Add pre-commit hook** - Run full test suite before commits
+- [x] **Add txpool namespace RPC methods** - txpool_status, txpool_content, txpool_contentFrom, txpool_inspect
+- [x] **Hyperlane integration** - Cross-chain messaging with warp routes
+- [x] **ZisK prover integration** - Alternative zkVM backend
+- [x] **Dashboard bridge panel** - Dynamic Hyperlane address loading
