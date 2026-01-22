@@ -38,6 +38,8 @@ POLYCLI_TPS ?= 100
 POLYCLI_DURATION ?= 30
 POLYCLI_CONCURRENCY ?= 10
 POLYCLI_ACCOUNTS ?= 10
+# WARNING: This is a well-known Anvil test key (Account #0) - DO NOT use with real funds
+# Override via environment variable or .env file for different keys
 POLYCLI_PRIVATE_KEY ?= 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 POLYCLI_GAS_MULTIPLIER ?= 1.5
 POLYCLI_FUND_AMOUNT ?= 10000000000000000000
@@ -59,15 +61,20 @@ run-cdk-erigon:
 	docker compose --profile cdk-erigon up --build -d
 
 # Start with op-reth + Hyperlane bridge (auto-deploys contracts)
+# Set WALLET_CONNECT_ID env var for wallet connections (get from https://cloud.walletconnect.com)
 run-with-bridge:
 	docker compose --profile reth --profile bridge up --build -d
 	@echo ""
 	@echo "Stack starting with Hyperlane bridge..."
 	@echo "  - hyperlane-init will deploy contracts automatically"
 	@echo "  - hyperlane-relayer will start after contracts are deployed"
+	@echo "  - bridge-ui will start after contracts are deployed"
 	@echo ""
 	@echo "Monitor progress: docker compose logs -f hyperlane-init"
-	@echo "Bridge UI:        http://localhost:18000/bridge"
+	@echo ""
+	@echo "Bridge UIs:"
+	@echo "  - Hyperlane Warp UI: http://localhost:18001  (connect any wallet)"
+	@echo "  - Dashboard Bridge:  http://localhost:18000/bridge  (test account only)"
 
 # Start in native "Metal" mode (no Docker, maximum performance)
 # Requires: op-reth, go, node installed locally
@@ -297,6 +304,7 @@ bridge-setup: bridge-deploy bridge-relayer
 # Bridge help
 bridge-help:
 	@echo "Hyperlane Bridge Commands:"
+	@echo "  make run-with-bridge      - Start stack with bridge (recommended)"
 	@echo "  make bridge-deploy        - Deploy Hyperlane contracts to L1 and L2"
 	@echo "  make bridge-relayer       - Start the Hyperlane relayer"
 	@echo "  make bridge-relayer-stop  - Stop the relayer"
@@ -306,10 +314,12 @@ bridge-help:
 	@echo "  make bridge-balances      - Check bridge account balances"
 	@echo "  make bridge-setup         - Full setup (deploy + start relayer)"
 	@echo ""
-	@echo "Prerequisites:"
-	@echo "  1. Start the stack: make run-reth"
-	@echo "  2. Deploy bridge:   make bridge-deploy"
-	@echo "  3. Start relayer:   make bridge-relayer"
+	@echo "Bridge UIs:"
+	@echo "  - Hyperlane Warp UI: http://localhost:18001  (connect any wallet)"
+	@echo "  - Dashboard Bridge:  http://localhost:18000/bridge  (test account)"
+	@echo ""
+	@echo "Quick Start:"
+	@echo "  make run-with-bridge      # Starts everything automatically"
 
 # =============================================================================
 # Polycli Load Testing

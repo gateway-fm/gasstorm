@@ -294,8 +294,9 @@ services:
     environment:
       - L1_RPC=http://l1:8545
       - L2_RPC=http://block-builder:3000
-# Use Anvil account #1 to avoid nonce conflicts with load generator (account #0)
-      - HYP_KEY=0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
+      # Use Anvil account #1 to avoid nonce conflicts with load generator (account #0)
+      # WARNING: This is a well-known test key - DO NOT use with real funds
+      - HYP_KEY=${HYP_KEY:-0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d}
       - OUTPUT_DIR=/output
     volumes:
       - hyperlane-config:/output
@@ -325,6 +326,26 @@ services:
       - "19090:9090"  # Metrics
     entrypoint: ["/app/relayer"]
     command: []
+    restart: unless-stopped
+
+  # Hyperlane Bridge UI - Web interface for bridging
+  # Connect any wallet to bridge ETH between L1 and L2
+  hyperlane-bridge-ui:
+    build:
+      context: ./bridge-ui
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_WALLET_CONNECT_ID=${WALLET_CONNECT_ID:-00000000000000000000000000000000}
+        - NEXT_PUBLIC_RPC_OVERRIDES={"l1local":{"http":"http://host.docker.internal:18545"},"l2local":{"http":"http://host.docker.internal:13000"}}
+    container_name: sequencer-poc-hyperlane-bridge-ui
+    profiles: ["bridge"]
+    depends_on:
+      hyperlane-init:
+        condition: service_completed_successfully
+    ports:
+      - "18001:3000"  # Hyperlane Bridge UI
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
   # =============================================================================
@@ -366,7 +387,8 @@ services:
       - L1_RPC_URL=http://l1:8545
       - L1_CHAIN_ID=1
       - L2_CHAIN_ID=42069
-      - DEPLOYER_PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+      # WARNING: This is a well-known Anvil test key - DO NOT use with real funds
+      - DEPLOYER_PRIVATE_KEY=${DEPLOYER_PRIVATE_KEY:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}
       - SEQUENCER_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
       - ADMIN_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
     volumes:
