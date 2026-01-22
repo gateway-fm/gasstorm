@@ -121,8 +121,9 @@
   - Extracted to: history-item-card.tsx (305 lines), history-transforms.ts (55 lines)
   - test-history.tsx reduced to 287 lines (within 300-line limit)
 
-- [ ] **go-load-test-store.ts is 1039 lines** - Exceeds 300-line limit
-  - Fix: Split WebSocket logic to separate file
+- [x] **go-load-test-store.ts is 1039 lines** - Exceeds 300-line limit ✅ FIXED 2026-01-22
+  - Split into: load-test-api.ts (180 lines), load-test-store-state.ts (222 lines), load-test-websocket.ts (238 lines)
+  - go-load-test-store.ts reduced to 318 lines (within ~300-line limit)
 
 #### Engine API
 - [x] **No ACCEPTED status handling** ✅ FIXED 2026-01-22
