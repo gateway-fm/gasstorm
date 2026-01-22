@@ -44,6 +44,7 @@
 
 - [ ] **6 load-generator packages untested** - config/, rpc/, storage/, transport/, txbuilder/, uniswapv3/
   - Add unit tests for each package
+  - Progress: config/ now has tests (22 test cases)
 
 #### Security
 - [x] **No WebSocket connection limits** - DoS risk ✅ FIXED 2026-01-22
