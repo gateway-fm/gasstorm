@@ -220,6 +220,11 @@ export function createWebSocketManager(callbacks: WebSocketCallbacks) {
 
   const disconnect = () => {
     shouldReconnect = false;
+    isConnecting = false;
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
     if (reconnectTimeout) {
       clearTimeout(reconnectTimeout);
       reconnectTimeout = null;
