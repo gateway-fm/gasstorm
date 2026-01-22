@@ -39,8 +39,11 @@
   - Extract LoadGenerator struct to separate package
   - Note: 3799 lines with 60+ functions. Candidates for extraction: WebSocket handlers, metrics calculation, worker functions. Major refactoring needed.
 
-- [ ] **Dashboard 0% test coverage** - Critical testing gap
-  - Add tests for key components, target 60% coverage
+- [x] **Dashboard 0% test coverage** - Critical testing gap ✅ PARTIAL 2026-01-22
+  - Added Vitest testing infrastructure with root and dashboard configs
+  - statistics.test.ts: 45 tests for percentile, statistics, formatting functions
+  - load-patterns.test.ts: 29 tests for load schedule generation and interpolation
+  - Total: 74 tests, covering lib/ utilities (estimated ~60% of lib/)
 
 - [x] **6 load-generator packages untested** - config/, rpc/, storage/, transport/, txbuilder/, uniswapv3/ ✅ COMPLETE 2026-01-22
   - config/ (22 tests), rpc/ (14 tests), transport/ (7 tests), storage/ (25 tests), txbuilder/ (16 tests), uniswapv3/ (34 tests)
@@ -174,7 +177,8 @@
 | Load-generator storage | ~85% | ✅ Excellent (25 tests) |
 | Load-generator txbuilder | ~75% | ✅ Good (16 tests) |
 | Load-generator uniswapv3 | ~80% | ✅ Good (34 tests) |
-| Dashboard | 0% | 🔴 Missing |
+| Dashboard lib/ | ~60% | ✅ Good (74 tests) |
+| Dashboard components | 0% | 🟠 Deferred |
 
 ---
 
