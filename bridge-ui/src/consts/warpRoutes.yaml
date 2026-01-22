@@ -1,0 +1,24 @@
+# Warp Route configuration for Sequencer PoC local chains
+# L1 (Anvil) <-> L2 (op-reth) native ETH bridging
+# Note: TypeScript config in warpRoutes.ts takes precedence
+---
+tokens:
+  - chainName: l1local
+    standard: EvmHypNative
+    addressOrDenom: "0x712516e61c8b383df4a63cfe83d7701bce54b03e"
+    decimals: 18
+    symbol: ETH
+    name: Ether
+    logoURI: /logos/ethereum.svg
+    connections:
+      - token: "ethereum|l2local|0x712516e61c8b383df4a63cfe83d7701bce54b03e"
+  - chainName: l2local
+    standard: EvmHypNative
+    addressOrDenom: "0x712516e61c8b383df4a63cfe83d7701bce54b03e"
+    decimals: 18
+    symbol: ETH
+    name: Ether
+    logoURI: /logos/ethereum.svg
+    connections:
+      - token: "ethereum|l1local|0x712516e61c8b383df4a63cfe83d7701bce54b03e"
+options: {}

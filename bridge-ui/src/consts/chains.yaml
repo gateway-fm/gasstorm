@@ -1,0 +1,41 @@
+# Local development chains for Sequencer PoC
+# L1: Anvil (local Ethereum)
+# L2: op-reth (Optimism-style L2)
+---
+l1local:
+  chainId: 31337
+  domainId: 31337
+  name: l1local
+  displayName: L1 (Anvil)
+  protocol: ethereum
+  rpcUrls:
+    - http: http://localhost:18545
+  nativeToken:
+    name: Ether
+    symbol: ETH
+    decimals: 18
+  blockExplorers: []
+  blocks:
+    confirmations: 1
+    reorgPeriod: 0
+    estimateBlockTime: 12
+  logoURI: /logos/ethereum.svg
+
+l2local:
+  chainId: 42069
+  domainId: 42069
+  name: l2local
+  displayName: L2 (op-reth)
+  protocol: ethereum
+  rpcUrls:
+    - http: http://localhost:13000
+  nativeToken:
+    name: Ether
+    symbol: ETH
+    decimals: 18
+  blockExplorers: []
+  blocks:
+    confirmations: 1
+    reorgPeriod: 0
+    estimateBlockTime: 1
+  logoURI: /logos/optimism.svg
