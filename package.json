@@ -18,6 +18,8 @@
     "@uniswap/v3-periphery": "1.4.4"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "@vitest/coverage-v8": "^4.0.17",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.17"
   }
 }
