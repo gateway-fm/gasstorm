@@ -19,7 +19,6 @@ import {
   INITIAL_STATE,
   getResetState,
   type GoLoadTestStore,
-  type GoLoadTestState,
 } from "./load-test-store-state";
 
 // Re-export types for consumers
@@ -196,7 +195,7 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()((set, get) => {
         await fetchLoadGenAPI("/reset", { method: "POST" });
         wsManager.disconnect();
         useMetricsStore.getState().reset();
-        set(getResetState(get().config));
+        set(getResetState());
       } catch (error) {
         console.error("Failed to reset:", error);
       }

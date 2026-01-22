@@ -48,7 +48,7 @@ contract EnrollRouters is Script {
         vm.startBroadcast(deployerKey);
 
         // Determine which chain we're on and enroll the remote router
-        if (block.chainid == 1) {
+        if (block.chainid == 31337) {
             // We're on L1, enroll L2 router
             console.log("On L1, enrolling L2 router...");
             IHypNativeSimple(l1Warp).enrollRemoteRouter(L2_DOMAIN, bytes32(uint256(uint160(l2Warp))));

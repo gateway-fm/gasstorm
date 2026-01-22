@@ -32,7 +32,7 @@ contract DeployBridge is Script {
 
         // Determine which chain we're on
         uint32 localDomain;
-        if (block.chainid == 1) {
+        if (block.chainid == 31337) {
             localDomain = L1_DOMAIN;
         } else if (block.chainid == 42069) {
             localDomain = L2_DOMAIN;

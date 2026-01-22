@@ -397,8 +397,13 @@ main() {
 
     log_info "Checking L2 contracts..."
     nonce=$(eth_get_nonce "$L2_RPC" "$DEPLOYER_ADDRESS")
+    # Limit scan to most recent 100 transactions to avoid slow iteration
+    local scan_limit=100
+    local start_nonce=$((nonce-1))
+    local end_nonce=$((nonce > scan_limit ? nonce - scan_limit : 0))
     if [ "$nonce" -gt 0 ]; then
-        for i in $(seq $((nonce-1)) -1 0); do
+        log_info "Deployer has $nonce transactions, scanning last $scan_limit..."
+        for i in $(seq $start_nonce -1 $end_nonce); do
             local addr=$(compute_create_address "$DEPLOYER_ADDRESS" "$i")
             local code=$(eth_get_code "$L2_RPC" "$addr")
 

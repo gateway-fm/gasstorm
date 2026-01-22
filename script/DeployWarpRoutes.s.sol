@@ -37,7 +37,7 @@ contract DeployWarpRoutes is Script {
         // Select mailbox based on chain ID
         address mailbox;
         uint32 localDomain;
-        if (block.chainid == 1) {
+        if (block.chainid == 31337) {
             // L1 (Anvil)
             mailbox = L1_MAILBOX;
             localDomain = L1_DOMAIN;

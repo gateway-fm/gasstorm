@@ -143,16 +143,26 @@ Common animations
 }
 
 /*
-Toasts
-======
+Gateway Theme & Toasts
+======================
 */
 :root {
+  /* Gateway brand colors */
+  --gateway-primary: #8950FA;
+  --gateway-primary-light: #A478FC;
+  --gateway-primary-dark: #6B3DD4;
+  --gateway-success: #22C55E;
+  --gateway-warning: #EAB308;
+  --gateway-error: #EF4444;
+  --gateway-background: #F1F5F9;
+
+  /* Toast overrides */
   --toastify-color-light: #ffffff;
-  --toastify-color-dark: #2e3338;
-  --toastify-color-info: #3498db;
-  --toastify-color-success: #35d07f;
-  --toastify-color-warning: #fcd34d;
-  --toastify-color-error: #dc2626;
+  --toastify-color-dark: #1A1A1A;
+  --toastify-color-info: #8950FA;
+  --toastify-color-success: #22C55E;
+  --toastify-color-warning: #EAB308;
+  --toastify-color-error: #EF4444;
   --toastify-color-transparent: rgba(255, 255, 255, 0.7);
 
   --toastify-icon-color-info: var(--toastify-color-info);
@@ -164,34 +174,46 @@ Toasts
   --toastify-toast-background: #fff;
   --toastify-toast-min-height: 64px;
   --toastify-toast-max-height: 800px;
-  --toastify-font-family: Roboto, sans-serif;
+  --toastify-font-family: Inter, system-ui, sans-serif;
   --toastify-z-index: 9999;
 
-  --toastify-text-color-light: #2e3338;
+  --toastify-text-color-light: #0F0F0F;
   --toastify-text-color-dark: #fff;
 
   --toastify-text-color-info: #fff;
   --toastify-text-color-success: #fff;
-  --toastify-text-color-warning: #fff;
+  --toastify-text-color-warning: #0F0F0F;
   --toastify-text-color-error: #fff;
 
-  --toastify-spinner-color: #616161;
-  --toastify-spinner-color-empty-area: #e0e0e0;
+  --toastify-spinner-color: #8950FA;
+  --toastify-spinner-color-empty-area: #E2E8F0;
 
   --toastify-color-progress-light: linear-gradient(
     to right,
-    #4cd964,
-    #5ac8fa,
-    #007aff,
-    #34aadc,
-    #5856d6,
-    #ff2d55
+    #8950FA,
+    #A478FC,
+    #C4A8FD,
+    #22C55E
   );
-  --toastify-color-progress-dark: #bb86fc;
+  --toastify-color-progress-dark: #8950FA;
   --toastify-color-progress-info: var(--toastify-color-info);
   --toastify-color-progress-success: var(--toastify-color-success);
   --toastify-color-progress-warning: var(--toastify-color-warning);
   --toastify-color-progress-error: var(--toastify-color-error);
+}
+
+/* Gateway focus states */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(137, 80, 250, 0.2);
+}
+
+/* Gateway primary button hover glow */
+button[class*="bg-primary"]:hover {
+  box-shadow: 0 0 20px rgba(137, 80, 250, 0.3);
 }
 
 /*

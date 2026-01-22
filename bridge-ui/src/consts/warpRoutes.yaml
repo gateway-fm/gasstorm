@@ -1,6 +1,11 @@
 # Warp Route configuration for Sequencer PoC local chains
 # L1 (Anvil) <-> L2 (op-reth) native ETH bridging
-# Note: TypeScript config in warpRoutes.ts takes precedence
+#
+# NOTE: These are DEFAULT addresses used as fallback when dynamic loading fails.
+# In production, addresses are loaded dynamically from /api/hyperlane/addresses.json
+# because hyperlane-init deploys fresh contracts on each stack start.
+#
+# TypeScript config in warpRoutes.ts now uses the same defaults and loads dynamically.
 ---
 tokens:
   - chainName: l1local

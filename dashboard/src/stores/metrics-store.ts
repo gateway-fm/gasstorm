@@ -46,6 +46,10 @@ interface HistoricalTimeSeriesPoint {
   blockCount?: number;
   mgasPerSec?: number;
   fillRate?: number;
+  // Block timing and gas pricing
+  avgBlockTimeMs?: number;
+  baseFeeGwei?: number;
+  gasPriceGwei?: number;
 }
 
 interface MetricsActions {
@@ -268,6 +272,32 @@ export const useMetricsStore = create<MetricsStore>()(
     const txPerSec = applySmoothing(filteredTps);
     const blockFillRate = applySmoothing(filteredFillRate);
 
+    // Extract block times from time series
+    const rawBlockTimes = timeSeries.map(p => p.avgBlockTimeMs ?? 0).slice(startIndex);
+    const blockTimes = rawBlockTimes.filter(t => t > 0);
+
+    // Calculate block time statistics from time series
+    const avgBlockTimeMs = blockTimes.length > 0
+      ? blockTimes.reduce((a, b) => a + b, 0) / blockTimes.length
+      : 0;
+    const minBlockTimeMs = blockTimes.length > 0 ? Math.min(...blockTimes) : 0;
+    const maxBlockTimeMs = blockTimes.length > 0 ? Math.max(...blockTimes) : 0;
+    const currentBlockTimeMs = blockTimes.length > 0 ? blockTimes[blockTimes.length - 1] : 0;
+
+    // Get gas pricing from last non-zero values in time series
+    let baseFeeGwei = 0;
+    let gasPriceGwei = 0;
+    for (let i = timeSeries.length - 1; i >= 0; i--) {
+      const point = timeSeries[i];
+      if (baseFeeGwei === 0 && point.baseFeeGwei && point.baseFeeGwei > 0) {
+        baseFeeGwei = point.baseFeeGwei;
+      }
+      if (gasPriceGwei === 0 && point.gasPriceGwei && point.gasPriceGwei > 0) {
+        gasPriceGwei = point.gasPriceGwei;
+      }
+      if (baseFeeGwei > 0 && gasPriceGwei > 0) break;
+    }
+
     set({
       blockMetrics: [], // Raw block data not available, but time series has aggregated values
       timeSeries: {
@@ -276,7 +306,7 @@ export const useMetricsStore = create<MetricsStore>()(
         txPerSec,
         blockFillRate,
         latencies: [],
-        blockTimes: [], // Not available in historical data
+        blockTimes: rawBlockTimes, // Now available from time series
       },
       snapshot: {
         currentMgasPerSec: run.avgMgasPerSec ?? 0,
@@ -288,11 +318,14 @@ export const useMetricsStore = create<MetricsStore>()(
         totalGasUsed: BigInt(run.totalGasUsed ?? 0),
         totalTransactions: run.txConfirmed,
         blocksProduced: run.blockCount ?? 0,
-        // Block time stats not available in historical data
-        currentBlockTimeMs: 0,
-        avgBlockTimeMs: 0,
-        minBlockTimeMs: 0,
-        maxBlockTimeMs: 0,
+        // Block time stats from time series
+        currentBlockTimeMs,
+        avgBlockTimeMs,
+        minBlockTimeMs,
+        maxBlockTimeMs,
+        // Gas pricing from time series
+        baseFeeGwei,
+        gasPriceGwei,
       },
       transactions: [],
       latencies: [],

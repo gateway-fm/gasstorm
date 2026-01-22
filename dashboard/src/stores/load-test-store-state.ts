@@ -156,7 +156,7 @@ export const INITIAL_STATE: GoLoadTestState = {
 };
 
 // Reset state (same as initial except preserves config)
-export function getResetState(currentConfig: LoadTestConfig): Partial<GoLoadTestState> {
+export function getResetState(): Partial<GoLoadTestState> {
   return {
     status: "idle",
     startTime: null,

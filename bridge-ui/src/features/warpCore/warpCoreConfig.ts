@@ -13,18 +13,37 @@ import {
 import { isObjEmpty, objFilter, objMerge } from '@hyperlane-xyz/utils';
 import { config } from '../../consts/config.ts';
 import { warpRouteWhitelist } from '../../consts/warpRouteWhitelist.ts';
-import { warpRouteConfigs as tsWarpRoutes } from '../../consts/warpRoutes.ts';
+import { buildWarpRouteConfig, DEFAULT_WARP_ADDRESSES } from '../../consts/warpRoutes.ts';
 import yamlWarpRoutes from '../../consts/warpRoutes.yaml';
 import { logger } from '../../utils/logger.ts';
+import { loadDynamicAddresses } from '../../utils/dynamicConfig.ts';
 
 export async function assembleWarpCoreConfig(
   storeOverrides: WarpCoreConfig[],
   registry: IRegistry,
 ): Promise<WarpCoreConfig> {
+  // Load dynamic addresses from deployment endpoint
+  // This is critical for bridge-ui to work with fresh hyperlane-init deployments
+  const dynamicAddresses = await loadDynamicAddresses();
+
+  // Build warp route config with dynamic addresses if available, otherwise use defaults
+  const l1WarpRoute = dynamicAddresses.l1WarpRoute || DEFAULT_WARP_ADDRESSES.l1;
+  const l2WarpRoute = dynamicAddresses.l2WarpRoute || DEFAULT_WARP_ADDRESSES.l2;
+  const dynamicWarpRoutes = buildWarpRouteConfig(l1WarpRoute, l2WarpRoute);
+
+  if (dynamicAddresses.loadedFromDynamic) {
+    logger.debug('Using dynamic warp route addresses:', { l1WarpRoute, l2WarpRoute });
+  } else {
+    logger.debug('Using default warp route addresses (dynamic loading failed)');
+  }
+
+  // Use dynamic config instead of static tsWarpRoutes
+  const tsResult = WarpCoreConfigSchema.safeParse(dynamicWarpRoutes);
+  const tsConfig = validateZodResult(tsResult, 'warp core typescript config');
+
+  // Parse yaml config (kept for backwards compatibility, but dynamic takes precedence)
   const yamlResult = WarpCoreConfigSchema.safeParse(yamlWarpRoutes);
   const yamlConfig = validateZodResult(yamlResult, 'warp core yaml config');
-  const tsResult = WarpCoreConfigSchema.safeParse(tsWarpRoutes);
-  const tsConfig = validateZodResult(tsResult, 'warp core typescript config');
 
   let registryWarpRoutes: Record<string, WarpCoreConfig>;
 

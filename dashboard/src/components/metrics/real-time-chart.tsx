@@ -15,6 +15,17 @@ import { useMetricsStore } from "@/stores/metrics-store";
 import { useGoLoadTestStore } from "@/stores/go-load-test-store";
 import { useMemo } from "react";
 
+// Gateway chart colors
+const COLORS = {
+  primary: "#8950FA",      // Gateway purple
+  secondary: "#A478FC",    // Lighter purple
+  tertiary: "#C4A8FD",     // Even lighter purple
+  success: "#22C55E",      // Green
+  warning: "#EAB308",      // Yellow/Orange
+  grid: "#E2E8F0",         // Light gray for grid
+  axis: "#6B7280",         // Medium gray for axis
+};
+
 export function RealTimeChart() {
   const { timeSeries: historicalTimeSeries, snapshot: historicalSnapshot, isHistoricalMode } = useMetricsStore();
   const {
@@ -113,19 +124,19 @@ export function RealTimeChart() {
             <>
               <div>
                 <span className="text-muted-foreground">{isHistoricalMode ? "Avg: " : "Current: "}</span>
-                <span className="font-mono font-semibold text-blue-400">
+                <span className="font-mono font-semibold" style={{ color: COLORS.primary }}>
                   {snapshot.currentMgasPerSec.toFixed(2)} Mgas/s
                 </span>
               </div>
               <div>
                 <span className="text-muted-foreground">Peak: </span>
-                <span className="font-mono font-semibold text-green-400">
+                <span className="font-mono font-semibold" style={{ color: COLORS.success }}>
                   {snapshot.peakMgasPerSec.toFixed(2)} Mgas/s
                 </span>
               </div>
               <div>
                 <span className="text-muted-foreground">Fill: </span>
-                <span className="font-mono font-semibold text-orange-400">
+                <span className="font-mono font-semibold" style={{ color: COLORS.warning }}>
                   {snapshot.averageFillRate.toFixed(1)}%
                 </span>
               </div>
@@ -134,13 +145,13 @@ export function RealTimeChart() {
             <>
               <div>
                 <span className="text-muted-foreground">Avg: </span>
-                <span className="font-mono font-semibold text-purple-400">
+                <span className="font-mono font-semibold" style={{ color: COLORS.secondary }}>
                   {snapshot.currentTxPerSec.toFixed(1)} tx/s
                 </span>
               </div>
               <div>
                 <span className="text-muted-foreground">Peak: </span>
-                <span className="font-mono font-semibold text-green-400">
+                <span className="font-mono font-semibold" style={{ color: COLORS.success }}>
                   {snapshot.peakTxPerSec.toFixed(1)} tx/s
                 </span>
               </div>
@@ -153,10 +164,10 @@ export function RealTimeChart() {
           {chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%" debounce={1}>
               <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} />
                 <XAxis
                   dataKey="time"
-                  stroke="#666"
+                  stroke={COLORS.axis}
                   fontSize={10}
                   tickLine={false}
                 />
@@ -164,51 +175,51 @@ export function RealTimeChart() {
                   <>
                     <YAxis
                       yAxisId="left"
-                      stroke="#60a5fa"
+                      stroke={COLORS.primary}
                       fontSize={10}
                       tickLine={false}
                       label={{
                         value: "Mgas/s",
                         angle: -90,
                         position: "insideLeft",
-                        style: { fill: "#60a5fa", fontSize: 10 },
+                        style: { fill: COLORS.primary, fontSize: 10 },
                       }}
                     />
                     <YAxis
                       yAxisId="right"
                       orientation="right"
-                      stroke="#a855f7"
+                      stroke={COLORS.secondary}
                       fontSize={10}
                       tickLine={false}
                       label={{
                         value: "tx/s",
                         angle: 90,
                         position: "insideRight",
-                        style: { fill: "#a855f7", fontSize: 10 },
+                        style: { fill: COLORS.secondary, fontSize: 10 },
                       }}
                     />
                   </>
                 ) : (
                   <YAxis
                     yAxisId="left"
-                    stroke="#a855f7"
+                    stroke={COLORS.secondary}
                     fontSize={10}
                     tickLine={false}
                     label={{
                       value: "tx/s",
                       angle: -90,
                       position: "insideLeft",
-                      style: { fill: "#a855f7", fontSize: 10 },
+                      style: { fill: COLORS.secondary, fontSize: 10 },
                     }}
                   />
                 )}
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "#1a1a1a",
-                    border: "1px solid #333",
+                    backgroundColor: "#FFFFFF",
+                    border: "1px solid #E2E8F0",
                     borderRadius: "8px",
                   }}
-                  labelStyle={{ color: "#999" }}
+                  labelStyle={{ color: COLORS.axis }}
                 />
                 <Legend />
                 {hasMgasData && (
@@ -218,7 +229,7 @@ export function RealTimeChart() {
                       type="monotone"
                       dataKey="mgasPerSec"
                       name="Mgas/s"
-                      stroke="#60a5fa"
+                      stroke={COLORS.primary}
                       strokeWidth={2}
                       dot={false}
                       activeDot={{ r: 4 }}
@@ -228,7 +239,7 @@ export function RealTimeChart() {
                       type="monotone"
                       dataKey="fillRate"
                       name="Fill %"
-                      stroke="#fb923c"
+                      stroke={COLORS.warning}
                       strokeWidth={1.5}
                       strokeDasharray="4 2"
                       dot={false}
@@ -241,7 +252,7 @@ export function RealTimeChart() {
                   type="monotone"
                   dataKey="txPerSec"
                   name="tx/s"
-                  stroke="#a855f7"
+                  stroke={COLORS.secondary}
                   strokeWidth={2}
                   dot={false}
                   activeDot={{ r: 4 }}

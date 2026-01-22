@@ -13,15 +13,22 @@ import {
 } from "recharts";
 import { useGoLoadTestStore } from "@/stores/go-load-test-store";
 
+// Gateway chart colors
+const CHART_COLORS = {
+  grid: "#E2E8F0",
+  axis: "#6B7280",
+};
+
+// Tip distribution colors - green to red gradient
 const TIP_COLORS = [
-  "#22c55e", // lowest tips - green
-  "#84cc16",
-  "#a3e635",
-  "#facc15",
-  "#f97316",
-  "#ef4444",
-  "#dc2626",
-  "#b91c1c", // highest tips - dark red
+  "#22C55E", // lowest tips - green (success)
+  "#4ADE80", // lighter green
+  "#86EFAC", // even lighter
+  "#EAB308", // yellow (warning)
+  "#F97316", // orange
+  "#EF4444", // red (destructive)
+  "#DC2626", // darker red
+  "#B91C1C", // highest tips - dark red
 ];
 
 export function TipHistogram() {
@@ -62,24 +69,24 @@ export function TipHistogram() {
           {totalCount > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={histogramData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} vertical={false} />
                 <XAxis
                   dataKey="name"
-                  stroke="#666"
+                  stroke={CHART_COLORS.axis}
                   fontSize={10}
                   tickLine={false}
                   angle={-45}
                   textAnchor="end"
                   height={50}
                 />
-                <YAxis stroke="#666" fontSize={10} tickLine={false} />
+                <YAxis stroke={CHART_COLORS.axis} fontSize={10} tickLine={false} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "#1a1a1a",
-                    border: "1px solid #333",
+                    backgroundColor: "#FFFFFF",
+                    border: "1px solid #E2E8F0",
                     borderRadius: "8px",
                   }}
-                  labelStyle={{ color: "#999" }}
+                  labelStyle={{ color: CHART_COLORS.axis }}
                   formatter={(value, _name, props) => [
                     `${value} txs`,
                     props.payload.label,

@@ -112,15 +112,15 @@ export function MetricsSnapshot() {
     },
     {
       label: "Block Time",
-      value: blockMetrics.length > 0 ? formatBlockTime(snapshot.currentBlockTimeMs) : "N/A",
-      unit: blockMetrics.length > 0 && snapshot.currentBlockTimeMs > 0 && snapshot.currentBlockTimeMs < 1000 ? "ms" : "",
-      color: blockMetrics.length > 0 ? getBlockTimeColor(snapshot.currentBlockTimeMs, targetBlockTimeMs) : "text-muted-foreground",
+      value: (blockMetrics.length > 0 || snapshot.currentBlockTimeMs > 0) ? formatBlockTime(snapshot.currentBlockTimeMs) : "N/A",
+      unit: (blockMetrics.length > 0 || snapshot.currentBlockTimeMs > 0) && snapshot.currentBlockTimeMs > 0 && snapshot.currentBlockTimeMs < 1000 ? "ms" : "",
+      color: (blockMetrics.length > 0 || snapshot.currentBlockTimeMs > 0) ? getBlockTimeColor(snapshot.currentBlockTimeMs, targetBlockTimeMs) : "text-muted-foreground",
     },
     {
       label: "Avg Block Time",
-      value: blockMetrics.length > 0 ? formatBlockTime(snapshot.avgBlockTimeMs) : "N/A",
-      unit: blockMetrics.length > 0 && snapshot.avgBlockTimeMs > 0 && snapshot.avgBlockTimeMs < 1000 ? "ms" : "",
-      color: blockMetrics.length > 0 ? getBlockTimeColor(snapshot.avgBlockTimeMs, targetBlockTimeMs) : "text-muted-foreground",
+      value: (blockMetrics.length > 0 || snapshot.avgBlockTimeMs > 0) ? formatBlockTime(snapshot.avgBlockTimeMs) : "N/A",
+      unit: (blockMetrics.length > 0 || snapshot.avgBlockTimeMs > 0) && snapshot.avgBlockTimeMs > 0 && snapshot.avgBlockTimeMs < 1000 ? "ms" : "",
+      color: (blockMetrics.length > 0 || snapshot.avgBlockTimeMs > 0) ? getBlockTimeColor(snapshot.avgBlockTimeMs, targetBlockTimeMs) : "text-muted-foreground",
     },
     {
       label: "Avg Fill Rate",
@@ -136,15 +136,15 @@ export function MetricsSnapshot() {
     },
     {
       label: "Base Fee",
-      value: !isHistoricalMode ? formatGasPrice(latestBaseFeeGwei) : "N/A",
-      unit: !isHistoricalMode && latestBaseFeeGwei > 0 ? "gwei" : "",
-      color: latestBaseFeeGwei > 1.5 ? "text-red-400" : (latestBaseFeeGwei > 1.0 ? "text-yellow-400" : "text-green-400"),
+      value: formatGasPrice(isHistoricalMode ? snapshot.baseFeeGwei ?? 0 : latestBaseFeeGwei),
+      unit: (isHistoricalMode ? (snapshot.baseFeeGwei ?? 0) > 0 : latestBaseFeeGwei > 0) ? "gwei" : "",
+      color: (isHistoricalMode ? (snapshot.baseFeeGwei ?? 0) : latestBaseFeeGwei) > 1.5 ? "text-red-400" : ((isHistoricalMode ? (snapshot.baseFeeGwei ?? 0) : latestBaseFeeGwei) > 1.0 ? "text-yellow-400" : "text-green-400"),
     },
     {
       label: "Gas Price",
-      value: !isHistoricalMode ? formatGasPrice(latestGasPriceGwei) : "N/A",
-      unit: !isHistoricalMode && latestGasPriceGwei > 0 ? "gwei" : "",
-      color: latestGasPriceGwei > 2.0 ? "text-red-400" : (latestGasPriceGwei > 1.5 ? "text-yellow-400" : "text-green-400"),
+      value: formatGasPrice(isHistoricalMode ? snapshot.gasPriceGwei ?? 0 : latestGasPriceGwei),
+      unit: (isHistoricalMode ? (snapshot.gasPriceGwei ?? 0) > 0 : latestGasPriceGwei > 0) ? "gwei" : "",
+      color: (isHistoricalMode ? (snapshot.gasPriceGwei ?? 0) : latestGasPriceGwei) > 2.0 ? "text-red-400" : ((isHistoricalMode ? (snapshot.gasPriceGwei ?? 0) : latestGasPriceGwei) > 1.5 ? "text-yellow-400" : "text-green-400"),
     },
     {
       label: "Total Gas",

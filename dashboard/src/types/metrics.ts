@@ -48,4 +48,7 @@ export interface MetricsSnapshot {
   avgBlockTimeMs: number;
   minBlockTimeMs: number;
   maxBlockTimeMs: number;
+  // Gas pricing (historical mode)
+  baseFeeGwei?: number;
+  gasPriceGwei?: number;
 }

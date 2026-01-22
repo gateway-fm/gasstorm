@@ -13,31 +13,37 @@ import {
 } from "recharts";
 import { useGoLoadTestStore } from "@/stores/go-load-test-store";
 
-// Pending latency uses very tight buckets (0-50ms range typically)
+// Gateway chart colors
+const CHART_COLORS = {
+  grid: "#E2E8F0",
+  axis: "#6B7280",
+};
+
+// Pending latency uses Gateway purple gradient
 const PENDING_BUCKET_COLORS = [
-  "#a855f7", // purple-500
-  "#c084fc", // purple-400
-  "#d8b4fe", // purple-300
-  "#f97316", // orange
-  "#ef4444", // red
+  "#8950FA", // Gateway primary
+  "#A478FC", // Lighter purple
+  "#C4A8FD", // Even lighter
+  "#EAB308", // Warning
+  "#EF4444", // Error
 ];
 
-// Preconf latency uses tighter buckets (0-200ms range typically)
+// Preconf latency uses green gradient
 const PRECONF_BUCKET_COLORS = [
-  "#22c55e", // green
-  "#84cc16", // lime
-  "#eab308", // yellow
-  "#f97316", // orange
-  "#ef4444", // red
+  "#22C55E", // Success green
+  "#4ADE80", // Lighter green
+  "#86EFAC", // Even lighter
+  "#EAB308", // Warning
+  "#EF4444", // Error
 ];
 
-// Confirmation latency uses wider buckets (0-2s+ range)
+// Confirmation latency uses purple gradient (different shades)
 const CONFIRM_BUCKET_COLORS = [
-  "#3b82f6", // blue-500
-  "#60a5fa", // blue-400
-  "#93c5fd", // blue-300
-  "#f97316", // orange
-  "#ef4444", // red
+  "#6B3DD4", // Darker purple
+  "#8950FA", // Gateway primary
+  "#A478FC", // Lighter purple
+  "#EAB308", // Warning
+  "#EF4444", // Error
 ];
 
 interface LatencyCardProps {
@@ -102,16 +108,16 @@ function LatencyCard({ title, stats, colors, emptyMessage }: LatencyCardProps) {
           {totalCount > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={histogramData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" vertical={false} />
-                <XAxis dataKey="name" stroke="#666" fontSize={9} tickLine={false} />
-                <YAxis stroke="#666" fontSize={9} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} vertical={false} />
+                <XAxis dataKey="name" stroke={CHART_COLORS.axis} fontSize={9} tickLine={false} />
+                <YAxis stroke={CHART_COLORS.axis} fontSize={9} tickLine={false} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "#1a1a1a",
-                    border: "1px solid #333",
+                    backgroundColor: "#FFFFFF",
+                    border: "1px solid #E2E8F0",
                     borderRadius: "8px",
                   }}
-                  labelStyle={{ color: "#999" }}
+                  labelStyle={{ color: CHART_COLORS.axis }}
                   formatter={(value) => [`${value} txs`, "Count"]}
                 />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]}>

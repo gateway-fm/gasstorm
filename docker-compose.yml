@@ -10,7 +10,7 @@ services:
       "--block-time", "12",
       "--accounts", "20",
       "--balance", "100000",
-      "--chain-id", "1",
+      "--chain-id", "31337",
       "--gas-limit", "30000000"
     ]
     ports:
@@ -342,6 +342,8 @@ services:
     depends_on:
       hyperlane-init:
         condition: service_completed_successfully
+    volumes:
+      - hyperlane-config:/config:ro  # Mounted for Next.js API route to read
     ports:
       - "18001:3000"  # Hyperlane Bridge UI
     extra_hosts:

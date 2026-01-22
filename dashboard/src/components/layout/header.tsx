@@ -21,9 +21,9 @@ export function Header() {
           {/* Logo, Title, and Nav */}
           <div className="flex items-center justify-between sm:gap-4">
             <div className="flex items-center gap-3">
-              <div className="h-8 w-8 shrink-0 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600" />
+              <div className="h-8 w-8 shrink-0 rounded-lg bg-gradient-to-br from-[#8950FA] to-[#6B3DD4]" />
               <div className="min-w-0">
-                <h1 className="text-base sm:text-lg font-semibold truncate">R&D Test Rig</h1>
+                <h1 className="text-base sm:text-lg font-semibold truncate">Gateway R&D Test Rig</h1>
                 <p className="text-xs text-muted-foreground truncate hidden sm:block">
                   Reth Sequencer PoC | Engine API Block Builder
                 </p>
@@ -37,7 +37,7 @@ export function Header() {
                 className={cn(
                   "px-2 sm:px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
                   pathname === "/" || pathname === ""
-                    ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
+                    ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 )}
               >
@@ -48,7 +48,7 @@ export function Header() {
                 className={cn(
                   "px-2 sm:px-3 py-1.5 text-sm font-medium rounded-md transition-colors whitespace-nowrap",
                   pathname === "/load-test" || pathname === "/load-test/"
-                    ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
+                    ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 )}
               >
@@ -59,7 +59,7 @@ export function Header() {
                 className={cn(
                   "px-2 sm:px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
                   pathname.startsWith("/load-test/history")
-                    ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
+                    ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 )}
               >
@@ -70,7 +70,7 @@ export function Header() {
                 className={cn(
                   "px-2 sm:px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
                   pathname === "/bridge" || pathname === "/bridge/"
-                    ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
+                    ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 )}
               >

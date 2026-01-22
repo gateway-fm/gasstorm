@@ -1,15 +1,15 @@
-import { Space_Grotesk as SpaceGrotesk } from 'next/font/google';
-import { Color } from '../styles/Color';
+import { Inter } from 'next/font/google';
 
-export const MAIN_FONT = SpaceGrotesk({
+export const MAIN_FONT = Inter({
   subsets: ['latin'],
   variable: '--font-main',
   preload: true,
-  fallback: ['sans-serif'],
+  fallback: ['system-ui', 'sans-serif'],
 });
-export const APP_NAME = 'Hyperlane Warp UI Template';
-export const APP_DESCRIPTION = 'A DApp for Hyperlane Warp Route transfers';
-export const APP_URL = 'hyperlane-warp-template.vercel.app';
-export const BRAND_COLOR = Color.primary['500'];
-export const BACKGROUND_COLOR = Color.primary['500'];
-export const BACKGROUND_IMAGE = 'url(/backgrounds/main.svg)';
+
+export const APP_NAME = 'Gateway Bridge';
+export const APP_DESCRIPTION = 'Cross-chain token transfers powered by Hyperlane';
+export const APP_URL = 'bridge.gateway.fm';
+export const BRAND_COLOR = '#8950FA';
+export const BACKGROUND_COLOR = '#F1F5F9';
+export const BACKGROUND_IMAGE = 'url(/backgrounds/gateway-bg.svg)';

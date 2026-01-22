@@ -1,4 +1,4 @@
-.PHONY: run run-reth run-cdk-erigon run-metal stop restart logs status clean clean-metal build test test-block-builder test-load-generator test-dashboard test-tx bench-block-builder bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-builder dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks
+.PHONY: run run-reth run-cdk-erigon run-metal stop restart logs status clean clean-metal build test test-block-builder test-load-generator test-dashboard test-tx bench-block-builder bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-builder dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help
 
 # =============================================================================
 # Configuration: Source .env file if it exists
@@ -49,32 +49,17 @@ POLYCLI_FUND_AMOUNT ?= 10000000000000000000
 # =============================================================================
 
 # Start the system (builds if needed) - uses .env configuration and EXECUTION_LAYER
+# Includes bridge profile for Hyperlane UI
 run:
-	docker compose --profile $(COMPOSE_PROFILE) up --build -d
+	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
 
 # Start with op-reth (block-builder + Engine API)
 run-reth:
-	docker compose --profile reth up --build -d
+	docker compose --profile reth --profile bridge up --build -d
 
 # Start with cdk-erigon (standalone sequencer)
 run-cdk-erigon:
-	docker compose --profile cdk-erigon up --build -d
-
-# Start with op-reth + Hyperlane bridge (auto-deploys contracts)
-# Set WALLET_CONNECT_ID env var for wallet connections (get from https://cloud.walletconnect.com)
-run-with-bridge:
-	docker compose --profile reth --profile bridge up --build -d
-	@echo ""
-	@echo "Stack starting with Hyperlane bridge..."
-	@echo "  - hyperlane-init will deploy contracts automatically"
-	@echo "  - hyperlane-relayer will start after contracts are deployed"
-	@echo "  - bridge-ui will start after contracts are deployed"
-	@echo ""
-	@echo "Monitor progress: docker compose logs -f hyperlane-init"
-	@echo ""
-	@echo "Bridge UIs:"
-	@echo "  - Hyperlane Warp UI: http://localhost:18001  (connect any wallet)"
-	@echo "  - Dashboard Bridge:  http://localhost:18000/bridge  (test account only)"
+	docker compose --profile cdk-erigon --profile bridge up --build -d
 
 # Start in native "Metal" mode (no Docker, maximum performance)
 # Requires: op-reth, go, node installed locally
@@ -88,7 +73,7 @@ clean-metal:
 
 # Start with logs attached
 run-attached:
-	docker compose --profile $(COMPOSE_PROFILE) up --build
+	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build
 
 # =============================================================================
 # Performance Profiles (uses current EXECUTION_LAYER)
@@ -99,14 +84,14 @@ run-high-throughput:
 	GAS_LIMIT=1000000000 \
 	MAX_TXS_PER_BLOCK=25000 \
 	BLOCK_TIME_MS=100 \
-	docker compose --profile $(COMPOSE_PROFILE) up --build -d
+	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
 
 # Fast confirmations: 150M gas, 50ms blocks
 run-fast-confirm:
 	GAS_LIMIT=150000000 \
 	MAX_TXS_PER_BLOCK=7000 \
 	BLOCK_TIME_MS=50 \
-	docker compose --profile $(COMPOSE_PROFILE) up --build -d
+	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
 
 # Preconfirmations enabled: 1 gigagas, 100ms blocks
 run-with-preconf:
@@ -114,7 +99,7 @@ run-with-preconf:
 	MAX_TXS_PER_BLOCK=25000 \
 	BLOCK_TIME_MS=100 \
 	ENABLE_PRECONFIRMATIONS=true \
-	docker compose --profile $(COMPOSE_PROFILE) up --build -d
+	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
 
 # Conservative: Smaller blocks, longer intervals (for stability testing)
 run-conservative:
@@ -122,7 +107,7 @@ run-conservative:
 	MAX_TXS_PER_BLOCK=1000 \
 	BLOCK_TIME_MS=2000 \
 	SKIP_EMPTY_BLOCKS=false \
-	docker compose --profile $(COMPOSE_PROFILE) up --build -d
+	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
 
 # Flashblocks-style: 500ms blocks with preconfirmations
 run-flashblocks:
@@ -130,15 +115,15 @@ run-flashblocks:
 	MAX_TXS_PER_BLOCK=25000 \
 	BLOCK_TIME_MS=500 \
 	ENABLE_PRECONFIRMATIONS=true \
-	docker compose --profile $(COMPOSE_PROFILE) up --build -d
+	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
 
 # Stop all services (stops all profiles)
 stop:
-	docker compose --profile reth --profile cdk-erigon down
+	docker compose --profile reth --profile cdk-erigon --profile bridge down
 
 # Restart all services
 restart:
-	docker compose --profile reth --profile cdk-erigon down && docker compose --profile $(COMPOSE_PROFILE) up --build -d
+	docker compose --profile reth --profile cdk-erigon --profile bridge down && docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
 
 # View logs (follow mode)
 logs:
@@ -636,6 +621,32 @@ prover-help:
 	@echo "  POST /prove   - Submit block for proving"
 	@echo "  GET  /proof/:id - Get proof result"
 	@echo "  GET  /proofs  - List all proofs"
+
+# =============================================================================
+# SBOM Generation
+# =============================================================================
+
+# Generate Software Bill of Materials for all components
+sbom:
+	@./scripts/generate-sbom.sh ./sbom
+
+# SBOM help
+sbom-help:
+	@echo "SBOM Generation:"
+	@echo "  make sbom               - Generate SBOM for all components"
+	@echo ""
+	@echo "Output: ./sbom/*.sbom.json (CycloneDX format)"
+	@echo ""
+	@echo "Components covered:"
+	@echo "  - block-builder (Go)"
+	@echo "  - load-generator (Go)"
+	@echo "  - zisk-prover (Go)"
+	@echo "  - dashboard (Node.js)"
+	@echo "  - bridge-ui (Node.js)"
+	@echo ""
+	@echo "For comprehensive SBOM with vulnerability data, install syft:"
+	@echo "  brew install syft (macOS)"
+	@echo "  https://github.com/anchore/syft (other platforms)"
 
 # Show help
 help:

@@ -33,7 +33,7 @@ Port = 5578
 PrometheusAddr = "0.0.0.0:9092"
 
 [L1]
-ChainID = 1
+ChainID = 31337
 RPCURL = "http://l1:8545"
 WsURL = "ws://l1:8545"
 RPCTimeout = "45s"

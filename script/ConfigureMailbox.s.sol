@@ -31,7 +31,7 @@ contract ConfigureMailbox is Script {
 
         // Select mailbox based on chain ID
         address mailboxAddr;
-        if (block.chainid == 1) {
+        if (block.chainid == 31337) {
             mailboxAddr = L1_MAILBOX;
         } else if (block.chainid == 42069) {
             mailboxAddr = L2_MAILBOX;
