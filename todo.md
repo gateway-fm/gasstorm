@@ -25,9 +25,10 @@
 ### 🟠 High Priority Issues
 
 #### Architecture
-- [ ] **BlockBuilder God Object** - 40+ fields, violates Single Responsibility Principle
+- [x] **BlockBuilder God Object** - 40+ fields, violates Single Responsibility Principle ✅ FIXED 2026-01-22
   - `block-builder/builder.go:52-171`
-  - Fix: Extract circuit_breaker.go, metrics.go, stress_detector.go
+  - Fix: Extracted circuit_breaker.go (115 lines) and stress_detector.go (115 lines)
+  - Note: Metrics are simple atomic counters; complex metrics logic already in internal/metrics/
 
 - [ ] **builder.go exceeds 2300 lines** - Should be max 300 lines
   - Split into: builder.go, pipeline.go, circuit_breaker.go, stress.go, metrics.go
@@ -46,9 +47,10 @@
   - `block-builder/internal/preconf/hub.go:175-194`
   - Fix: Added global max connections (1000) and per-IP limits (10) with proper HTTP status codes
 
-- [ ] **CORS allows all origins (*)** - Should be configurable
+- [x] **CORS allows all origins (*)** - Should be configurable ✅ FIXED 2026-01-22
   - All services use permissive CORS
-  - Fix: Make CORS origins configurable via environment
+  - Fix: Added CORS_ALLOWED_ORIGINS environment variable to block-builder and load-generator
+  - Supports comma-separated list of origins or "*" for all (default for dev)
 
 - [x] **No input validation on API endpoints** ✅ FIXED 2026-01-22
   - `load-generator/internal/transport/http.go:126-146`
@@ -62,30 +64,34 @@
   - `load-generator/cmd/loadgen/main.go:1115-1118`
   - Note: sync.Map explicitly supports Delete during Range - added clarifying comment
 
-- [ ] **Double-buffer slice aliasing bug**
+- [x] **Double-buffer slice aliasing bug** ✅ VERIFIED 2026-01-22
   - `block-builder/builder.go:1346-1354`
-  - Fix: Ensure proper buffer swapping without aliasing
+  - Analysis: Implementation is correct - block production is single-threaded
+  - Added detailed comment explaining thread safety of the double-buffer pattern
 
 - [x] **NonceCache.Get() serializes on write lock** - Performance bottleneck ✅ FIXED 2026-01-22
   - Fix: Added Peek() method with RLock for read-only access. Updated filter hot paths to use Peek().
 
-- [ ] **Goroutine leak potential** - No WaitGroup for server goroutines
+- [x] **Goroutine leak potential** - No WaitGroup for server goroutines ✅ FIXED 2026-01-22
   - `block-builder/main.go:64-83`
-  - Fix: Add proper shutdown coordination with WaitGroup
+  - Fix: Added signal handling, WaitGroup for all goroutines, graceful shutdown of all servers
+  - Added Handler() method to RPC server and NewServer() to preconf for shutdown support
 
 ### 🟡 Medium Priority Issues
 
 #### Code Quality
-- [ ] **Error responses not JSON in load-generator**
+- [x] **Error responses not JSON in load-generator** ✅ FIXED 2026-01-22
   - Uses `http.Error()` with plain text
-  - Fix: Return JSON error responses consistently
+  - Fix: Replaced all http.Error() calls with writeJSONError() for consistent JSON responses
 
-- [ ] **Ignored JSON unmarshal errors**
+- [x] **Ignored JSON unmarshal errors** ✅ FIXED 2026-01-22
   - `load-generator/internal/storage/sqlite.go:688-724`
-  - Fix: Handle and log unmarshal errors
+  - Fix: Added unmarshalJSON helper that logs errors with structured logging (slog)
 
-- [ ] **Missing Error Boundaries in React dashboard**
-  - Fix: Add ErrorBoundary components around key sections
+- [x] **Missing Error Boundaries in React dashboard** ✅ FIXED 2026-01-22
+  - Fix: Added Next.js 13+ error handling with error.tsx files
+  - Added global-error.tsx, error.tsx for root, load-test/error.tsx, bridge/error.tsx
+  - Added reusable ErrorBoundary component in components/ui/error-boundary.tsx
 
 - [ ] **Magic numbers throughout codebase**
   - Fix: Replace with named constants
@@ -95,13 +101,13 @@
   - Fix: Added periodic cleanup goroutine that removes entries older than 10 minutes
 
 #### Dashboard Cleanup
-- [ ] **Two load test stores exist** - Legacy duplication
-  - `load-test-store.ts` (legacy) and `go-load-test-store.ts`
-  - Fix: Consolidate into single store
+- [x] **Two load test stores exist** ✅ FIXED 2026-01-22
+  - `load-test-store.ts` was unused dead code
+  - Fix: Removed unused load-test-store.ts, go-load-test-store.ts is the sole implementation
 
-- [ ] **Duplicate WebSocket code**
-  - `use-websocket.ts` and `websocket-context.tsx`
-  - Fix: Consolidate WebSocket logic
+- [x] **Duplicate WebSocket code** ✅ FIXED 2026-01-22
+  - `use-websocket.ts` was unused dead code
+  - Fix: Removed unused use-websocket.ts, websocket-context.tsx is the sole implementation
 
 - [ ] **test-history.tsx is 891 lines** - Exceeds 300-line limit
   - Fix: Extract HistoryItem, HistoryChart components
@@ -110,24 +116,26 @@
   - Fix: Split WebSocket logic to separate file
 
 #### Engine API
-- [ ] **No ACCEPTED status handling** - Only checks for VALID
-  - Fix: Handle ACCEPTED status appropriately
+- [x] **No ACCEPTED status handling** ✅ FIXED 2026-01-22
+  - Only checks for VALID
+  - Fix: Added ACCEPTED status handling with short backoff (50ms) and retry
 
-- [ ] **No retry on initial FCU or GetPayload** - Only final FCU has retry
-  - Fix: Add retry logic with backoff
+- [x] **No retry on initial FCU or GetPayload** - Only final FCU has retry ✅ FIXED 2026-01-22
+  - Fix: Added engineCallWithRetry() with exponential backoff (10ms, 20ms); applied to initial FCU and GetPayload
 
-- [ ] **lastBuiltBlock updated before FCU completes** - State inconsistency
-  - Fix: Update after confirmation
+- [x] **lastBuiltBlock updated before FCU completes** - State inconsistency ✅ FIXED 2026-01-22
+  - Fix: Moved lastBuiltBlock update inside FCU success branch; on FCU failure, keeps old parent
 
 #### Dependencies
-- [ ] **Go version mismatch** - block-builder/load-generator use Go 1.22, zisk-prover uses Go 1.23
-  - Fix: Standardize on Go 1.23
+- [x] **Go version mismatch** ✅ FIXED 2026-01-22
+  - block-builder/load-generator were on Go 1.22, zisk-prover was on Go 1.23
+  - Fix: Standardized all modules to Go 1.25
 
-- [ ] **golang.org/x/sync version inconsistency** - v0.8.0 vs v0.7.0
-  - Fix: Align versions across modules
+- [x] **golang.org/x/sync version inconsistency** - v0.8.0 vs v0.7.0 ✅ FIXED 2026-01-22
+  - Fix: Aligned all modules to v0.19.0
 
-- [ ] **golang.org/x packages 9-10 months old** - March 2024
-  - Fix: Update to latest versions
+- [x] **golang.org/x packages 9-10 months old** - March 2024 ✅ FIXED 2026-01-22
+  - Fix: Updated to latest versions (crypto v0.47.0, sync v0.19.0, sys v0.40.0, arch v0.23.0, exp Jan 2026)
 
 ### 🟢 Low Priority (Nice to Have)
 
