@@ -42,9 +42,9 @@
 - [ ] **Dashboard 0% test coverage** - Critical testing gap
   - Add tests for key components, target 60% coverage
 
-- [ ] **6 load-generator packages untested** - config/, rpc/, storage/, transport/, txbuilder/, uniswapv3/
-  - Add unit tests for each package
-  - Progress: config/ now has tests (22 test cases), rpc/ now has tests (14 test cases)
+- [x] **6 load-generator packages untested** - config/, rpc/, storage/, transport/, txbuilder/, uniswapv3/ ✅ COMPLETE 2026-01-22
+  - config/ (22 tests), rpc/ (14 tests), transport/ (7 tests), storage/ (25 tests), txbuilder/ (16 tests), uniswapv3/ (34 tests)
+  - Total: 118 new unit tests added
 
 #### Security
 - [x] **No WebSocket connection limits** - DoS risk ✅ FIXED 2026-01-22
@@ -167,9 +167,12 @@
 | Block-builder engine | ~80% | ✅ Very Good |
 | Load-generator metrics | ~90% | ✅ Excellent |
 | Load-generator account | ~95% | ✅ Excellent |
-| Load-generator txbuilder | 0% | 🔴 Missing |
-| Load-generator storage | 0% | 🔴 Missing |
-| Load-generator rpc | 0% | 🔴 Missing |
+| Load-generator config | ~80% | ✅ Good (22 tests) |
+| Load-generator rpc | ~70% | ✅ Good (14 tests) |
+| Load-generator transport | ~60% | ✅ Good (7 tests) |
+| Load-generator storage | ~85% | ✅ Excellent (25 tests) |
+| Load-generator txbuilder | ~75% | ✅ Good (16 tests) |
+| Load-generator uniswapv3 | ~80% | ✅ Good (34 tests) |
 | Dashboard | 0% | 🔴 Missing |
 
 ---
