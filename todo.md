@@ -117,8 +117,9 @@
   - `use-websocket.ts` was unused dead code
   - Fix: Removed unused use-websocket.ts, websocket-context.tsx is the sole implementation
 
-- [ ] **test-history.tsx is 891 lines** - Exceeds 300-line limit
-  - Fix: Extract HistoryItem, HistoryChart components
+- [x] **test-history.tsx is 891 lines** - Exceeds 300-line limit ✅ FIXED 2026-01-22
+  - Extracted to: history-item-card.tsx (305 lines), history-transforms.ts (55 lines)
+  - test-history.tsx reduced to 287 lines (within 300-line limit)
 
 - [ ] **go-load-test-store.ts is 1039 lines** - Exceeds 300-line limit
   - Fix: Split WebSocket logic to separate file
