@@ -97,8 +97,9 @@
   - Added global-error.tsx, error.tsx for root, load-test/error.tsx, bridge/error.tsx
   - Added reusable ErrorBoundary component in components/ui/error-boundary.tsx
 
-- [ ] **Magic numbers throughout codebase**
-  - Fix: Replace with named constants
+- [x] **Magic numbers throughout codebase** ✅ PARTIAL 2026-01-22
+  - block-builder: Extracted to constants in circuit_breaker.go, stress_detector.go, builder.go
+  - load-generator: Deferred - main.go exceeds 1999 lines, refactoring magic numbers would be part of larger cleanup
 
 - [x] **sync.Map txArrivalTimes never cleaned** ✅ FIXED 2026-01-22
   - `block-builder/internal/preconf/hub.go:93`
