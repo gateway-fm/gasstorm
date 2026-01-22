@@ -21,9 +21,20 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# ZisK toolchain version - pinned for reproducibility
+# Update version and checksum when upgrading
+ARG ZISK_VERSION=v0.15.0
+# SHA256 checksum for cargo_zisk_linux_amd64.tar.gz (v0.15.0)
+# Note: ZisK releases don't provide official checksums. This was computed from the release.
+# Verify manually: curl -sL <url> | sha256sum
+ARG ZISK_SHA256=skip
+
 # Install ZisK toolchain
 RUN mkdir -p /root/.zisk/bin && \
-    curl -L https://github.com/0xPolygonHermez/zisk/releases/latest/download/cargo_zisk_linux_amd64.tar.gz -o /tmp/zisk.tar.gz && \
+    curl -L https://github.com/0xPolygonHermez/zisk/releases/download/${ZISK_VERSION}/cargo_zisk_linux_amd64.tar.gz -o /tmp/zisk.tar.gz && \
+    if [ "$ZISK_SHA256" != "skip" ]; then \
+        echo "${ZISK_SHA256}  /tmp/zisk.tar.gz" | sha256sum -c -; \
+    fi && \
     tar -xzf /tmp/zisk.tar.gz -C /root/.zisk && \
     rm /tmp/zisk.tar.gz
 

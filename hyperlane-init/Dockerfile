@@ -12,8 +12,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install pycryptodome for keccak hashing
 RUN pip3 install --break-system-packages pycryptodome
 
+# Foundry version - pinned for reproducibility
+# Update version and checksum when upgrading
+ARG FOUNDRY_VERSION=nightly-5b7e4cb3c882b28f3c32ba580de27ce7381f415a
+# SHA256 checksum for foundry_nightly_linux_amd64.tar.gz
+# Note: Foundry nightly releases don't provide official checksums.
+# Verify manually: curl -sL <url> | sha256sum
+ARG FOUNDRY_SHA256=skip
+
 # Install Foundry (forge, cast, anvil) directly from releases
-RUN curl -L https://github.com/foundry-rs/foundry/releases/download/nightly-5b7e4cb3c882b28f3c32ba580de27ce7381f415a/foundry_nightly_linux_amd64.tar.gz -o foundry.tar.gz && \
+RUN curl -L https://github.com/foundry-rs/foundry/releases/download/${FOUNDRY_VERSION}/foundry_nightly_linux_amd64.tar.gz -o foundry.tar.gz && \
+    if [ "$FOUNDRY_SHA256" != "skip" ]; then \
+        echo "${FOUNDRY_SHA256}  foundry.tar.gz" | sha256sum -c -; \
+    fi && \
     tar -xzf foundry.tar.gz -C /usr/local/bin && \
     rm foundry.tar.gz && \
     chmod +x /usr/local/bin/forge /usr/local/bin/cast /usr/local/bin/anvil /usr/local/bin/chisel
