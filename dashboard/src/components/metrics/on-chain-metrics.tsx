@@ -56,7 +56,7 @@ export function OnChainMetrics({ testRun }: OnChainMetricsProps) {
     },
     {
       label: "On-Chain Gas",
-      value: testRun.onChainGasUsed ? formatGas(BigInt(testRun.onChainGasUsed)) : "N/A",
+      value: testRun.onChainGasUsed != null ? formatGas(BigInt(testRun.onChainGasUsed)) : "N/A",
       unit: "",
       color: "text-cyan-400",
     },

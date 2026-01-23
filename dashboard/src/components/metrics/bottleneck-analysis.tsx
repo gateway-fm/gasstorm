@@ -94,7 +94,7 @@ export function BottleneckAnalysis() {
     const targetBlockTimeMs = builder.blockTimeMs || 2000;
 
     // Block time ratio (how close to target)
-    const blockTimeRatio = recentAvgBlockTimeMs / targetBlockTimeMs;
+    const blockTimeRatio = targetBlockTimeMs > 0 ? recentAvgBlockTimeMs / targetBlockTimeMs : 0;
     const blocksOnSchedule = blockTimeRatio >= 0.8 && blockTimeRatio <= 1.3;
 
     // Detect bottleneck type

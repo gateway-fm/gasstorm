@@ -87,6 +87,8 @@ func main() {
 		<-sigCh
 
 		logger.Info("shutting down...")
+		// Close prover first to stop any in-flight proofs
+		p.Close()
 		if err := httpServer.Close(); err != nil {
 			logger.Error("failed to close HTTP server", "error", err)
 		}

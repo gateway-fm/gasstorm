@@ -316,6 +316,9 @@ func (p *Prover) runEmulator(witness *types.BlockWitness) (string, uint64, error
 	}
 
 	// Fallback: compute SHA256 hash as "proof"
+	// WARNING: This is a MOCK proof for testing/emulator fallback only.
+	// SHA256 is NOT a cryptographically valid ZK proof!
+	p.logger.Warn("using mock proof (SHA256 hash) - NOT cryptographically secure")
 	hash := sha256.Sum256(inputData)
 	proofData := hex.EncodeToString(hash[:])
 
