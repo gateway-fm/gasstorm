@@ -6,9 +6,26 @@ import (
 	"fmt"
 )
 
+// Serialization limits to prevent DoS via oversized witness data
+const (
+	MaxAccounts     = 100000   // Max accounts in witness
+	MaxTransactions = 100000   // Max transactions in witness
+	MaxCodeSize     = 24576    // Max contract code size (EIP-170)
+	MaxStorageSlots = 1000000  // Max storage slots per account
+	MaxInputSize    = 1048576  // Max transaction input data (1MB)
+)
+
 // SerializeForZisK serializes a BlockWitness to bincode format for the ZisK guest program.
 // This must match the Rust bincode deserialization in guest/src/main.rs
 func SerializeForZisK(w *BlockWitness) ([]byte, error) {
+	// Bounds checks to prevent DoS via oversized input
+	if len(w.Accounts) > MaxAccounts {
+		return nil, fmt.Errorf("too many accounts: %d > %d", len(w.Accounts), MaxAccounts)
+	}
+	if len(w.Transactions) > MaxTransactions {
+		return nil, fmt.Errorf("too many transactions: %d > %d", len(w.Transactions), MaxTransactions)
+	}
+
 	var buf bytes.Buffer
 
 	// block_number: u64
@@ -65,6 +82,14 @@ func SerializeForZisK(w *BlockWitness) ([]byte, error) {
 }
 
 func serializeAccount(buf *bytes.Buffer, acc *AccountWitness) error {
+	// Bounds checks
+	if len(acc.Code) > MaxCodeSize {
+		return fmt.Errorf("code too large: %d > %d", len(acc.Code), MaxCodeSize)
+	}
+	if len(acc.Storage) > MaxStorageSlots {
+		return fmt.Errorf("too many storage slots: %d > %d", len(acc.Storage), MaxStorageSlots)
+	}
+
 	// address: [u8; 20]
 	if _, err := buf.Write(acc.Address[:]); err != nil {
 		return err
@@ -105,6 +130,11 @@ func serializeAccount(buf *bytes.Buffer, acc *AccountWitness) error {
 }
 
 func serializeTx(buf *bytes.Buffer, tx *TxWitness) error {
+	// Bounds check
+	if len(tx.Input) > MaxInputSize {
+		return fmt.Errorf("tx input too large: %d > %d", len(tx.Input), MaxInputSize)
+	}
+
 	// from: [u8; 20]
 	if _, err := buf.Write(tx.From[:]); err != nil {
 		return err

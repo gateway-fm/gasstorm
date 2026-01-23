@@ -36,12 +36,13 @@ export async function rpcCall<T = unknown>(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
+    signal: AbortSignal.timeout(10000),
   });
 
   const data: JsonRpcResponse<T> = await response.json();
 
   if (data.error) {
-    throw new Error(data.error.message);
+    throw new Error(`RPC error ${data.error.code}: Request failed`);
   }
 
   return data.result as T;
@@ -157,11 +158,21 @@ export interface BuilderStatus {
 }
 
 export async function getBuilderStatus(): Promise<BuilderStatus> {
-  const response = await fetch(`${RPC_ENDPOINTS.BUILDER_RPC}/status`);
+  const response = await fetch(`${RPC_ENDPOINTS.BUILDER_RPC}/status`, {
+    signal: AbortSignal.timeout(5000),
+  });
   if (!response.ok) {
     throw new Error(`Failed to fetch builder status: ${response.statusText}`);
   }
-  return response.json();
+  const data = await response.json();
+  if (!data || typeof data !== 'object' ||
+      typeof data.blockTimeMs !== 'number' ||
+      typeof data.skipEmptyBlocks !== 'boolean' ||
+      typeof data.sequencerAddress !== 'string' ||
+      typeof data.pendingTxCount !== 'number') {
+    throw new Error('Invalid builder status response');
+  }
+  return data as BuilderStatus;
 }
 
 export const builder = {
