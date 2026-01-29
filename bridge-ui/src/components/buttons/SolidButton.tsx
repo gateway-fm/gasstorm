@@ -29,10 +29,10 @@ export function SolidButton(
   let baseColors, onHover;
   if (color === 'primary') {
     baseColors = 'bg-primary-500 text-white';
-    onHover = 'hover:bg-primary-600';
+    onHover = 'hover:bg-primary-600 hover:shadow-primary';
   } else if (color === 'accent') {
     baseColors = 'bg-accent-500 text-white';
-    onHover = 'hover:bg-accent-600';
+    onHover = 'hover:bg-accent-600 hover:shadow-primary';
   } else if (color === 'green') {
     baseColors = 'bg-green-500 text-white';
     onHover = 'hover:bg-green-600';

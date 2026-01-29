@@ -1,10 +1,7 @@
-<svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="gatewayGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#8950FA"/>
-      <stop offset="100%" stop-color="#6B3DD4"/>
-    </linearGradient>
-  </defs>
-  <rect width="40" height="40" rx="8" fill="url(#gatewayGradient)"/>
-  <path d="M20 8C13.373 8 8 13.373 8 20C8 26.627 13.373 32 20 32C23.313 32 26.313 30.687 28.5 28.5V20H20V24H24.5V26.5C23.187 27.437 21.687 28 20 28C15.582 28 12 24.418 12 20C12 15.582 15.582 12 20 12C22.25 12 24.313 12.875 25.813 14.313L28.687 11.437C26.437 9.25 23.375 8 20 8Z" fill="white"/>
+<svg width="30" height="32" viewBox="0 0 30 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M26.141 3.85529L0 17.2381V21.5347L26.1789 8.1325L26.141 3.85529Z" fill="#8950FA"/>
+<path d="M18.8265 0L18.8645 4.38789L0 14.0455V9.63816L18.8265 0Z" fill="#8950FA"/>
+<path d="M14.876 17.1115L19.0724 14.9632L29.12 20.1071V24.4036L14.876 17.1115Z" fill="#8950FA"/>
+<path d="M29.12 9.81943V16.9145L22.1905 13.3669L29.12 9.81943Z" fill="#8950FA"/>
+<path d="M11.7579 18.7078L26.141 26.0712L14.56 32L0.176939 24.6366L4.44343 22.4525L14.6284 27.6666L17.7465 26.0703L7.56154 20.8562L11.7579 18.7078Z" fill="#8950FA"/>
 </svg>

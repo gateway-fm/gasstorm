@@ -345,7 +345,7 @@ export interface TransactionLogEntry {
 }
 
 // Execution layer type
-export type ExecutionLayer = "reth" | "cdk-erigon";
+export type ExecutionLayer = "reth" | "cdk-erigon" | "gravity-reth";
 
 // TX ordering mode from block builder
 export type TxOrdering = "fifo" | "tip_desc" | "tip_asc";
@@ -363,6 +363,12 @@ export interface EnvironmentSnapshot {
   loadGenGasTipCapGwei: number;
   loadGenGasFeeCapGwei: number;
   loadGenExecutionLayer: ExecutionLayer;
+  // Node identification (for test reproducibility and comparison)
+  nodeName: string;        // "op-reth", "gravity-reth", "cdk-erigon"
+  nodeVersion: string;     // e.g., "reth/v1.9.3-op/...", "erigon/..."
+  nodeImage?: string;      // Docker image used (if available)
+  chainId: number;         // Chain ID from eth_chainId
+  useBlockBuilder: boolean; // true if external block builder, false for internal sequencer
 }
 
 // Single ordering violation in a block

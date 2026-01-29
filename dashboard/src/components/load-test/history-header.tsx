@@ -129,6 +129,7 @@ export function HistoryHeader({ testRun, onBack }: HistoryHeaderProps) {
 
   const handleExportCSV = () => {
     const lines: string[] = [];
+    const env = testRun.environment;
 
     // Summary section
     lines.push("# Load Test Results");
@@ -139,6 +140,16 @@ export function HistoryHeader({ testRun, onBack }: HistoryHeaderProps) {
     lines.push(`# Duration: ${testRun.durationMs}ms`);
     lines.push(`# Execution Layer: ${testRun.executionLayer || "reth"}`);
     lines.push("#");
+
+    // Node information (if available)
+    if (env) {
+      lines.push("# Node Information");
+      lines.push(`# Node Name: ${env.nodeName || "N/A"}`);
+      lines.push(`# Node Version: ${env.nodeVersion || "N/A"}`);
+      lines.push(`# Chain ID: ${env.chainId || "N/A"}`);
+      lines.push(`# Block Builder Mode: ${env.useBlockBuilder ? "External" : "Internal Sequencer"}`);
+      lines.push("#");
+    }
 
     // Transaction summary
     lines.push("# Transaction Summary");
@@ -237,18 +248,47 @@ export function HistoryHeader({ testRun, onBack }: HistoryHeaderProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
-          {/* Execution Layer */}
+          {/* Node Name */}
           <div className="flex justify-between items-center">
-            <span className="text-muted-foreground">Execution Layer</span>
+            <span className="text-muted-foreground">Node</span>
             <Badge
               variant="secondary"
               className={`font-mono text-xs ${
-                testRun?.executionLayer === "cdk-erigon"
+                (testRun?.environment?.nodeName || testRun?.executionLayer) === "cdk-erigon"
                   ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
+                  : (testRun?.environment?.nodeName || testRun?.executionLayer) === "gravity-reth"
+                  ? "bg-green-500/10 text-green-400 border-green-500/20"
                   : "bg-orange-500/10 text-orange-400 border-orange-500/20"
               }`}
             >
-              {testRun?.executionLayer || "reth"}
+              {testRun?.environment?.nodeName || testRun?.executionLayer || "op-reth"}
+            </Badge>
+          </div>
+
+          {/* Node Version (if available) */}
+          {testRun?.environment?.nodeVersion && (
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Version</span>
+              <span className="font-mono text-xs truncate max-w-[200px]" title={testRun.environment.nodeVersion}>
+                {testRun.environment.nodeVersion.length > 30
+                  ? testRun.environment.nodeVersion.slice(0, 30) + "..."
+                  : testRun.environment.nodeVersion}
+              </span>
+            </div>
+          )}
+
+          {/* Block Builder Mode */}
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">Mode</span>
+            <Badge
+              variant="outline"
+              className={`text-xs ${
+                testRun?.environment?.useBlockBuilder !== false
+                  ? "border-blue-500/30 text-blue-400"
+                  : "border-gray-500/30 text-gray-400"
+              }`}
+            >
+              {testRun?.environment?.useBlockBuilder !== false ? "External Builder" : "Internal Sequencer"}
             </Badge>
           </div>
 

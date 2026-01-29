@@ -28,8 +28,8 @@
     "regolithTime": 0,
     "canyonTime": 0,
     "ecotoneTime": 0,
-    "fjordTime": 9999999999,
-    "graniteTime": 9999999999,
+    "fjordTime": 0,
+    "graniteTime": 0,
     "holoceneTime": 9999999999,
     "isthmusTime": 9999999999
   },

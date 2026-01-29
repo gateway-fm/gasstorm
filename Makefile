@@ -14,6 +14,8 @@ EXECUTION_LAYER ?= reth
 # Derive docker compose profile from execution layer
 ifeq ($(EXECUTION_LAYER),cdk-erigon)
   COMPOSE_PROFILE := cdk-erigon
+else ifeq ($(EXECUTION_LAYER),gravity-reth)
+  COMPOSE_PROFILE := gravity-reth
 else
   COMPOSE_PROFILE := reth
 endif
@@ -60,6 +62,11 @@ run-reth:
 # Start with cdk-erigon (standalone sequencer)
 run-cdk-erigon:
 	docker compose --profile cdk-erigon --profile bridge up --build -d
+
+# Start with gravity-reth (high-performance parallel EVM, standalone sequencer)
+# First build takes 15-25 minutes (Rust compilation from source)
+run-gravity-reth:
+	docker compose -f docker-compose-base.yaml -f docker-compose-gravity-reth.yaml up --build -d
 
 # Start in native "Metal" mode (no Docker, maximum performance)
 # Requires: op-reth, go, node installed locally
@@ -119,7 +126,8 @@ run-flashblocks:
 
 # Stop all services (stops all profiles)
 stop:
-	docker compose --profile reth --profile cdk-erigon --profile bridge down
+	docker compose --profile reth --profile cdk-erigon --profile bridge down 2>/dev/null || true
+	docker compose -f docker-compose-base.yaml -f docker-compose-gravity-reth.yaml down 2>/dev/null || true
 
 # Restart all services
 restart:
@@ -135,11 +143,13 @@ logs-service:
 
 # Show status of all services
 status:
-	docker compose --profile reth --profile cdk-erigon ps
+	docker compose --profile reth --profile cdk-erigon ps 2>/dev/null || true
+	docker compose -f docker-compose-base.yaml -f docker-compose-gravity-reth.yaml ps 2>/dev/null || true
 
 # Clean up volumes and rebuild
 clean:
-	docker compose --profile reth --profile cdk-erigon down -v
+	docker compose --profile reth --profile cdk-erigon down -v 2>/dev/null || true
+	docker compose -f docker-compose-base.yaml -f docker-compose-gravity-reth.yaml down -v 2>/dev/null || true
 	docker system prune -f
 
 # Build without starting
@@ -656,6 +666,7 @@ help:
 	@echo "    make run              - Start with EXECUTION_LAYER from .env (default: reth)"
 	@echo "    make run-reth         - Start with op-reth (block-builder + Engine API)"
 	@echo "    make run-cdk-erigon   - Start with cdk-erigon (standalone sequencer)"
+	@echo "    make run-gravity-reth - Start with gravity-reth (high-perf parallel EVM)"
 	@echo "    make run-metal        - Native mode (no Docker, maximum performance)"
 	@echo ""
 	@echo "  Basic:"
@@ -722,7 +733,7 @@ help:
 	@echo "    make polycli-help     - Full polycli options"
 	@echo ""
 	@echo "  Configuration (.env file - sourced automatically):"
-	@echo "    EXECUTION_LAYER       - reth (default) or cdk-erigon"
+	@echo "    EXECUTION_LAYER       - reth (default), cdk-erigon, or gravity-reth"
 	@echo "    GAS_LIMIT             - Block gas limit (default: 1000000000)"
 	@echo "    MAX_TXS_PER_BLOCK     - Max txs per block (default: 25000)"
 	@echo "    BLOCK_TIME_MS         - Block interval ms (default: 1000)"
