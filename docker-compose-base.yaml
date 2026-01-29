@@ -1,0 +1,37 @@
+# Base services shared across all execution layer configurations
+# Use with: docker compose -f docker-compose-base.yaml -f docker-compose-<layer>.yaml up
+#
+# This file contains:
+# - L1 Anvil node (local Ethereum)
+# - Shared volumes and networks
+
+services:
+  # Layer 1 - Anvil (local Ethereum node)
+  l1:
+    image: ghcr.io/foundry-rs/foundry:latest
+    container_name: sequencer-poc-l1
+    entrypoint: ["anvil"]
+    command: [
+      "--host", "0.0.0.0",
+      "--port", "8545",
+      "--block-time", "12",
+      "--accounts", "20",
+      "--balance", "100000",
+      "--chain-id", "31337",
+      "--gas-limit", "30000000"
+    ]
+    ports:
+      - "18545:8545"
+    healthcheck:
+      test: ["CMD", "cast", "chain-id", "--rpc-url", "http://localhost:8545"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  loadgen-data:
+
+networks:
+  default:
+    name: sequencer-poc

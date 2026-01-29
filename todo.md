@@ -1,5 +1,37 @@
 # Sequencer PoC - TODO
 
+## Pending
+
+- [ ] **AWS High-Performance Instance Testing** - Validate 25,000 tx/s target on cloud infrastructure
+
+  **Primary Targets: AMD Zen 5 Instances (5.0 GHz)**
+  - [ ] Test on `m8azn.metal` - General-purpose high-frequency instance
+    - Sustained all-core turbo up to 5.0 GHz (highest in cloud)
+    - Good for block builder logic if state fits in memory
+  - [ ] Test on `x8aedz.metal` - High-memory variant with same 5.0 GHz
+    - Higher memory-to-vCPU ratio for larger state requirements
+    - Suitable for architectures keeping entire state trie in RAM
+
+  **Fallback: Apple Silicon Instances (identical to local dev)**
+  - [ ] Test on `mac-m4.metal` - Standard M4 (10-core, ~4.4 GHz+)
+  - [ ] Test on `mac-m4pro.metal` - M4 Pro (14-core, ~4.4 GHz+)
+    - Unified memory architecture matches local benchmarks
+    - Should replicate 25,000 tx/s immediately (same silicon)
+
+  **Notes:**
+  - AMD 5 GHz clock speed compensates for slight IPC gap vs M4
+  - m8azn/x8aedz are only x86_64 instances capable of approaching target without major re-architecture
+  - Mac instances eliminate architectural translation variable
+
+- [ ] **Implement Ecotone deposit format** - Block builder only supports Bedrock/Canyon L1 block info format
+  - Update `block-builder/internal/builder/deposit.go` to support `setL1BlockValuesEcotone`
+  - Ecotone uses packed 32-byte header encoding with blob fee parameters (baseFeeScalar, blobBaseFeeScalar, blobBaseFee)
+  - Should detect hardfork activation time from genesis config and switch formats accordingly
+  - Currently disabled via `genesis/genesis.json` setting `ecotoneTime: 9999999999`
+  - Reference: [OP Stack Ecotone L1 Block Info spec](https://specs.optimism.io/protocol/ecotone/l1-attributes.html)
+
+---
+
 ## Codebase Review (2026-01-22)
 
 ### 🔴 Critical Issues (Security - MUST FIX)

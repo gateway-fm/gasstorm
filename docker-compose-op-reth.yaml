@@ -1,0 +1,163 @@
+# op-reth execution layer with external block builder
+# Use with: docker compose -f docker-compose-base.yaml -f docker-compose-op-reth.yaml up
+#
+# Architecture:
+#   load-generator -> block-builder:13000 -> op-reth Engine API:8551
+#
+# Features:
+# - External block builder for transaction ordering
+# - Preconfirmation WebSocket support
+# - OP Stack Engine API extensions
+
+services:
+  # Layer 2 - op-reth with Engine API
+  l2-reth:
+    image: ghcr.io/paradigmxyz/op-reth:v1.9.3
+    container_name: sequencer-poc-l2
+    depends_on:
+      l1:
+        condition: service_healthy
+    command: [
+      "node",
+      "--chain", "/config/genesis.json",
+      "--datadir", "/data",
+      # RPC
+      "--http",
+      "--http.addr", "0.0.0.0",
+      "--http.port", "8545",
+      "--http.api", "eth,net,web3",
+      "--http.corsdomain", "*",
+      # WebSocket
+      "--ws",
+      "--ws.addr", "0.0.0.0",
+      "--ws.port", "8546",
+      "--ws.api", "eth,net,web3",
+      # Engine API (authenticated)
+      "--authrpc.addr", "0.0.0.0",
+      "--authrpc.port", "8551",
+      "--authrpc.jwtsecret", "/config/jwt.hex",
+      # Sequencer mode - external block builder handles all transactions
+      "--rollup.disable-tx-pool-gossip",
+      # Disable internal txpool (we use external block builder exclusively)
+      "--txpool.pending-max-count", "1",
+      "--txpool.basefee-max-count", "1",
+      "--txpool.queued-max-count", "1",
+      "--txpool.max-account-slots", "1",
+      # MDBX database performance tuning
+      "--db.sync-mode", "safe-no-sync",
+      "--db.growth-step", "4GB",
+      "--db.max-readers", "512",
+      # State root / PMT performance tuning
+      "--engine.multiproof-chunking",
+      "--engine.multiproof-chunk-size", "100",
+      # Performance tuning for high TPS
+      "--rpc.max-connections", "1000",
+      "--rpc.max-request-size", "100",
+      "--rpc.max-response-size", "200",
+      "--rpc.max-tracing-requests", "50",
+      # Logging
+      "--log.stdout.format", "terminal",
+      "-vvv"
+    ]
+    volumes:
+      - ./genesis:/config:ro
+      - l2-data:/data
+    ports:
+      - "18546:8545"   # L2 RPC
+      - "18547:8546"   # L2 WebSocket
+      - "18551:8551"   # Engine API
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 16G
+        reservations:
+          cpus: '4'
+          memory: 8G
+    restart: unless-stopped
+
+  # Block Builder Service (Go)
+  block-builder:
+    build:
+      context: ./block-builder
+      dockerfile: Dockerfile
+    container_name: sequencer-poc-builder
+    depends_on:
+      - l2-reth
+    environment:
+      - ENGINE_RPC_URL=http://l2-reth:8551
+      - L2_RPC_URL=http://l2-reth:8545
+      - JWT_SECRET_PATH=/config/jwt.hex
+      - SEQUENCER_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+      - LISTEN_ADDR=:3000
+      # Block production settings
+      - BLOCK_TIME_MS=${BLOCK_TIME_MS:-150}
+      - SKIP_EMPTY_BLOCKS=${SKIP_EMPTY_BLOCKS:-true}
+      - GAS_LIMIT=${GAS_LIMIT:-1500000000}
+      - MAX_TXS_PER_BLOCK=${MAX_TXS_PER_BLOCK:-50000}
+      # OP Stack settings
+      - INCLUDE_DEPOSIT_TX=${INCLUDE_DEPOSIT_TX:-false}
+      # Transaction ordering
+      - TX_ORDERING=${TX_ORDERING:-fifo}
+      # Preconfirmations
+      - ENABLE_PRECONFIRMATIONS=${ENABLE_PRECONFIRMATIONS:-true}
+      - PRECONF_LISTEN_ADDR=${PRECONF_LISTEN_ADDR:-:3001}
+      - PRECONF_BUFFER_SIZE=${PRECONF_BUFFER_SIZE:-10000}
+      # Transaction pool settings
+      - MAX_REQUEUE_COUNT=${MAX_REQUEUE_COUNT:-50}
+      # RPC timeouts
+      - NONCE_TIMEOUT_MS=${NONCE_TIMEOUT_MS:-500}
+      # Debug options
+      - DEBUG_REJECTION_REASONS=${DEBUG_REJECTION_REASONS:-true}
+      - STRESS_THRESHOLD_PCT=${STRESS_THRESHOLD_PCT:-80}
+    volumes:
+      - ./genesis/jwt.hex:/config/jwt.hex:ro
+    ports:
+      - "13000:3000"   # RPC for tx submission
+      - "13002:3001"   # Preconfirmation WebSocket
+      - "16060:6060"   # pprof for profiling
+    restart: unless-stopped
+
+  # Load Generator Service (Go)
+  load-generator:
+    build:
+      context: ./load-generator
+      dockerfile: Dockerfile
+    container_name: sequencer-poc-loadgen
+    depends_on:
+      - block-builder
+      - l2-reth
+    environment:
+      - EXECUTION_LAYER=reth
+      - BUILDER_RPC_URL=http://block-builder:3000
+      - L2_RPC_URL=http://block-builder:3000
+      - L2_WS_URL=ws://l2-reth:8546
+      - PRECONF_WS_URL=ws://block-builder:3001/ws/preconfirmations
+      - LISTEN_ADDR=:3001
+      - DATABASE_PATH=/data/loadgen.db
+      - BLOCK_TIME_MS=${BLOCK_TIME_MS:-150}
+    volumes:
+      - loadgen-data:/data
+    ports:
+      - "13001:3001"   # REST API for load test control
+    restart: unless-stopped
+
+  # Dashboard (Next.js static build)
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: sequencer-poc-dashboard
+    depends_on:
+      - l1
+      - l2-reth
+      - block-builder
+    volumes:
+      - hyperlane-config:/usr/share/nginx/html/api/hyperlane:ro
+    ports:
+      - "18000:80"
+    restart: unless-stopped
+
+volumes:
+  l2-data:
+  hyperlane-config:

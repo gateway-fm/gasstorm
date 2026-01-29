@@ -1,0 +1,105 @@
+# gravity-reth execution layer (internal sequencer mode)
+# Use with: docker compose -f docker-compose-base.yaml -f docker-compose-gravity-reth.yaml up
+#
+# Architecture:
+#   load-generator -> gravity-reth:8545 (direct sequencer)
+#
+# Features:
+# - High-performance parallel EVM (Grevm)
+# - Parallel merklization (16-way state root calculation)
+# - Internal block production (no external block builder)
+# - No preconfirmations available
+# - Standard Ethereum (not OP Stack)
+#
+# Note: First build takes 15-25 minutes (Rust compilation from source)
+
+services:
+  # Layer 2 - Gravity Reth (standalone sequencer)
+  l2-gravity-reth:
+    build:
+      context: ./gravity-reth
+      dockerfile: Dockerfile
+    container_name: sequencer-poc-l2
+    depends_on:
+      l1:
+        condition: service_healthy
+    command: [
+      "node",
+      "--chain", "/config/genesis-gravity.json",
+      "--datadir", "/data",
+      # RPC
+      "--http",
+      "--http.addr", "0.0.0.0",
+      "--http.port", "8545",
+      "--http.api", "eth,net,web3,txpool",
+      "--http.corsdomain", "*",
+      # WebSocket
+      "--ws",
+      "--ws.addr", "0.0.0.0",
+      "--ws.port", "8546",
+      "--ws.api", "eth,net,web3",
+      # Performance tuning
+      "--rpc.max-connections", "1000",
+      "--rpc.max-request-size", "100",
+      "--rpc.max-response-size", "200",
+      # MDBX performance
+      "--db.sync-mode", "safe-no-sync",
+      "--db.growth-step", "4GB",
+      # Logging
+      "--log.stdout.format", "terminal",
+      "-vv"
+    ]
+    volumes:
+      - ./genesis:/config:ro
+      - gravity-reth-data:/data
+    ports:
+      - "18546:8545"   # L2 RPC
+      - "18547:8546"   # L2 WebSocket
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 16G
+        reservations:
+          cpus: '4'
+          memory: 8G
+    restart: unless-stopped
+
+  # Load Generator Service (Go)
+  # Sends transactions directly to gravity-reth RPC (no block-builder)
+  load-generator:
+    build:
+      context: ./load-generator
+      dockerfile: Dockerfile
+    container_name: sequencer-poc-loadgen
+    depends_on:
+      - l2-gravity-reth
+    environment:
+      - EXECUTION_LAYER=gravity-reth
+      - BUILDER_RPC_URL=http://l2-gravity-reth:8545
+      - L2_RPC_URL=http://l2-gravity-reth:8545
+      - L2_WS_URL=ws://l2-gravity-reth:8546
+      - PRECONF_WS_URL=  # No preconfirmations in standalone sequencer mode
+      - LISTEN_ADDR=:3001
+      - DATABASE_PATH=/data/loadgen.db
+    volumes:
+      - loadgen-data:/data
+    ports:
+      - "13001:3001"   # REST API for load test control
+    restart: unless-stopped
+
+  # Dashboard (Next.js static build)
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: sequencer-poc-dashboard
+    depends_on:
+      - l1
+      - l2-gravity-reth
+    ports:
+      - "18000:80"
+    restart: unless-stopped
+
+volumes:
+  gravity-reth-data:

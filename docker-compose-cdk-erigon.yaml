@@ -1,0 +1,87 @@
+# cdk-erigon execution layer (internal sequencer mode)
+# Use with: docker compose -f docker-compose-base.yaml -f docker-compose-cdk-erigon.yaml up
+#
+# Architecture:
+#   load-generator -> cdk-erigon:8545 (direct sequencer)
+#
+# Features:
+# - Internal block production (no external block builder)
+# - No preconfirmations available
+# - Polygon CDK compatibility
+
+services:
+  # Layer 2 - CDK-Erigon (sequencer mode)
+  l2-cdk-erigon:
+    image: hermeznetwork/cdk-erigon:20251127001542-3aa1157
+    container_name: sequencer-poc-l2
+    depends_on:
+      l1:
+        condition: service_healthy
+    environment:
+      - CDK_ERIGON_SEQUENCER=1
+    command: [
+      "--config=/config/cdk-erigon.yaml",
+      "--datadir=/data",
+      "--http",
+      "--http.addr=0.0.0.0",
+      "--http.port=8545",
+      "--http.api=eth,net,web3,txpool,zkevm",
+      "--http.corsdomain=*",
+      "--ws",
+      "--ws.addr=0.0.0.0",
+      "--ws.port=8546"
+    ]
+    volumes:
+      - ./config/cdk-erigon:/config:ro
+      - cdk-erigon-data:/data
+    ports:
+      - "18546:8545"   # L2 RPC
+      - "18547:8546"   # L2 WebSocket
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+    restart: unless-stopped
+
+  # Load Generator Service (Go)
+  # Sends transactions directly to cdk-erigon RPC (no block-builder)
+  load-generator:
+    build:
+      context: ./load-generator
+      dockerfile: Dockerfile
+    container_name: sequencer-poc-loadgen
+    depends_on:
+      - l2-cdk-erigon
+    environment:
+      - EXECUTION_LAYER=cdk-erigon
+      - BUILDER_RPC_URL=http://l2-cdk-erigon:8545
+      - L2_RPC_URL=http://l2-cdk-erigon:8545
+      - L2_WS_URL=ws://l2-cdk-erigon:8546
+      - PRECONF_WS_URL=  # No preconfirmations in cdk-erigon mode
+      - LISTEN_ADDR=:3001
+      - DATABASE_PATH=/data/loadgen.db
+    volumes:
+      - loadgen-data:/data
+    ports:
+      - "13001:3001"   # REST API for load test control
+    restart: unless-stopped
+
+  # Dashboard (Next.js static build)
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: sequencer-poc-dashboard
+    depends_on:
+      - l1
+      - l2-cdk-erigon
+    ports:
+      - "18000:80"
+    restart: unless-stopped
+
+volumes:
+  cdk-erigon-data:
