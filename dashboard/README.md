@@ -1,36 +1,198 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Dashboard
 
-## Getting Started
+Next.js web UI for load testing the sequencer.
 
-First, run the development server:
+## Quick Start
 
 ```bash
+# In development mode
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
+# Open in browser
+open http://localhost:18000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Pages
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Load Test Page
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`/load-test/`
 
-## Learn More
+Real-time load testing interface with:
+- **Real-time chart**: MGas/s and TPS over time
+- **Metrics snapshot**: Current, Peak, Total Gas Used
+- **Latency histogram**: Confirmation and preconfirmation latencies
+- **Percentile table**: p50/p75/p90/p95/p99 for latency, MGas/s, TPS
+- **Verification summary**: TX sent/confirmed/failed counts
 
-To learn more about Next.js, take a look at the following resources:
+### Test History Page
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`/load-test/history/`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Historical test results with:
+- **Time series data**: MGas/s, TPS, block fill rate per sample
+- **Summary stats**: Peak MGas/s, total gas used, average TPS
+- **Latency percentiles**: Both confirmation and preconfirmation
+- **Gas metrics per block**: gasUsed, gasLimit, fillRate
 
-## Deploy on Vercel
+### Home Page
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+`/`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Landing page with navigation to load test interface.
+
+## API Integration
+
+The dashboard integrates with the Go load generator:
+
+```typescript
+// src/stores/go-load-test-store.ts
+class GoLoadTestStore {
+  async startTest(config: LoadTestConfig): Promise<void> {
+    const response = await fetch('http://localhost:13001/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config),
+    });
+  }
+
+  async stopTest(): Promise<void> {
+    await fetch('http://localhost:13001/stop', { method: 'POST' });
+  }
+
+  async getStatus(): Promise<LoadTestStatus> {
+    const response = await fetch('http://localhost:13001/status');
+    return response.json();
+  }
+
+  async getHistory(): Promise<TestHistory[]> {
+    const response = await fetch('http://localhost:13001/history');
+    return response.json();
+  }
+}
+```
+
+## TypeScript Types
+
+All API responses use camelCase. Types defined in:
+
+| File | Purpose |
+|------|---------|
+| `src/types/load-test.ts` | Load test configuration and results |
+| `src/types/metrics.ts` | Metrics and percentiles |
+| `src/stores/metrics-store.ts` | Real-time metrics state |
+
+### Core Types
+
+```typescript
+// Load test configuration
+interface LoadTestConfig {
+  pattern: 'constant' | 'burst' | 'poisson';
+  constantRate?: number;
+  durationSec: number;
+  numAccounts?: number;
+  transactionType?: string;
+  txTypeRatios?: Record<string, number>;
+}
+
+// Load test status
+interface LoadTestStatus {
+  running: boolean;
+  tps: number;
+  mgasPerSec: number;
+  totalTxs: number;
+  confirmedTxs: number;
+  failedTxs: number;
+  avgLatencyMs: number;
+}
+
+// Test history summary
+interface TestHistory {
+  id: string;
+  startTime: string;
+  endTime: string;
+  config: LoadTestConfig;
+  summary: {
+    peakTps: number;
+    avgTps: number;
+    peakMgasPerSec: number;
+    totalGasUsed: number;
+    totalTxs: number;
+    successRate: number;
+  };
+  latencyPercentiles: {
+    p50: number;
+    p75: number;
+    p90: number;
+    p95: number;
+    p99: number;
+  };
+  timeSeries: Array<{
+    timestamp: string;
+    tps: number;
+    mgasPerSec: number;
+  }>;
+}
+```
+
+## Real-Time Updates
+
+The dashboard polls for status updates:
+
+```typescript
+// Poll every second
+setInterval(async () => {
+  const status = await store.getStatus();
+  metricsStore.update(status);
+}, 1000);
+```
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Run development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Run tests
+npm run test
+```
+
+## Configuration
+
+Dashboard configuration is in `next.config.ts`:
+
+```typescript
+// next.config.ts
+const nextConfig = {
+  reactStrictMode: true,
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://localhost:13001/:path*',
+      },
+    ];
+  },
+};
+```
+
+## Styling
+
+Uses Tailwind CSS with custom components. See `components.json` for configuration.
+
+## Browser Automation
+
+When testing the dashboard with automation:
+
+1. **Window Size**: Resize to 1200x900 or larger
+2. **Screenshots**: Capture full page for complete metrics
+3. **Before Tests**: Clear localStorage to avoid stale state
+4. **After Actions**: Wait 2-3 seconds for UI updates
+
+See [Architecture](../docs/architecture.md) for system overview and [Configuration](../docs/configuration.md) for service ports.

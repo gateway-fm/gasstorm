@@ -94,9 +94,9 @@ export function parseMetricsMessage(
     currentFillRate: metrics.currentFillRate ?? 0,
   };
 
-  // Build time series for live chart (only during running status)
+  // Build time series for live chart (during running and verifying status)
   let newTimeSeries: ChartTimeSeries | undefined;
-  if (status === "running" && metrics.elapsedMs > 0) {
+  if ((status === "running" || status === "verifying") && metrics.elapsedMs > 0) {
     const timestamp = metrics.elapsedMs / 1000;
     const mgasPerSec = metrics.currentMgasPerSec ?? 0;
     const txPerSec = metrics.currentTps ?? 0;
@@ -184,8 +184,8 @@ export function createWebSocketManager(callbacks: WebSocketCallbacks) {
             batchedUpdate(state);
           }
 
-          // Disconnect when test completes
-          if ((state.status === "completed" || state.status === "error") && metrics.txSent > 0) {
+          // Disconnect when test completes or errors (including init errors where txSent=0)
+          if (state.status === "completed" || state.status === "error") {
             console.log("[LoadTest] Test finished, closing WebSocket");
             disconnect();
             callbacks.stopPolling();

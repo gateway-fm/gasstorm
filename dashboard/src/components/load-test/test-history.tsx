@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { RefreshCw, Star } from "lucide-react";
+import { RefreshCw, Star, GitCompare, X } from "lucide-react";
 import type { TestResult, TimeSeriesPoint, TestRunMetadataUpdate } from "@/types/load-test";
 import { TxLogViewer } from "./tx-log-viewer";
 import { HistoryItemCard, type HistoryItem } from "./history-item-card";
@@ -31,6 +31,8 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
   const [editingNameValue, setEditingNameValue] = useState("");
+  const [compareMode, setCompareMode] = useState(false);
+  const [selectedForCompare, setSelectedForCompare] = useState<string[]>([]);
 
   const fetchHistory = useCallback(async () => {
     setLoading(true);
@@ -160,6 +162,30 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
     setEditingNameValue(currentName || "");
   }, []);
 
+  const toggleCompareSelect = useCallback((testId: string) => {
+    setSelectedForCompare((prev) => {
+      if (prev.includes(testId)) {
+        return prev.filter((id) => id !== testId);
+      }
+      // Only allow selecting up to 2 tests
+      if (prev.length >= 2) {
+        return [...prev.slice(1), testId];
+      }
+      return [...prev, testId];
+    });
+  }, []);
+
+  const exitCompareMode = useCallback(() => {
+    setCompareMode(false);
+    setSelectedForCompare([]);
+  }, []);
+
+  const navigateToCompare = useCallback(() => {
+    if (selectedForCompare.length === 2) {
+      router.push(`/load-test/history/compare?left=${selectedForCompare[0]}&right=${selectedForCompare[1]}`);
+    }
+  }, [router, selectedForCompare]);
+
   useEffect(() => {
     fetchHistory();
   }, [fetchHistory]);
@@ -199,6 +225,9 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
           onViewFullResults={() => router.push(`/load-test/history?id=${result.id}`)}
           onViewTxLogs={() => setTxLogViewerId(result.id)}
           onDelete={() => deleteTest(result.id)}
+          compareMode={compareMode}
+          selectedForCompare={selectedForCompare.includes(result.id)}
+          onToggleCompareSelect={() => toggleCompareSelect(result.id)}
         />
       ))}
     </>
@@ -237,10 +266,29 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
           </CardTitle>
           <div className="flex items-center gap-1">
             <Button
+              variant={compareMode ? "default" : "outline"}
+              size="sm"
+              onClick={() => compareMode ? exitCompareMode() : setCompareMode(true)}
+              className="h-8 gap-1"
+            >
+              {compareMode ? (
+                <>
+                  <X className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Cancel</span>
+                </>
+              ) : (
+                <>
+                  <GitCompare className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Compare</span>
+                </>
+              )}
+            </Button>
+            <Button
               variant={showFavoritesOnly ? "default" : "outline"}
               size="sm"
               onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
               className="h-8 gap-1"
+              disabled={compareMode}
             >
               <Star className={`h-3.5 w-3.5 ${showFavoritesOnly ? "fill-current" : ""}`} />
               <span className="hidden sm:inline">Favorites</span>
@@ -262,6 +310,11 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
           </div>
         </CardHeader>
         <CardContent>
+          {compareMode && (
+            <div className="mb-3 p-2 bg-blue-500/10 border border-blue-500/20 rounded-md text-sm text-blue-400">
+              Select 2 tests to compare. {selectedForCompare.length}/2 selected.
+            </div>
+          )}
           {fullPage ? (
             <div className="space-y-2">
               {renderHistoryList()}
@@ -272,6 +325,18 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
                 {renderHistoryList()}
               </div>
             </ScrollArea>
+          )}
+          {/* Floating Compare button */}
+          {compareMode && selectedForCompare.length === 2 && (
+            <div className="sticky bottom-0 pt-4 pb-2 bg-gradient-to-t from-background via-background to-transparent">
+              <Button
+                className="w-full gap-2"
+                onClick={navigateToCompare}
+              >
+                <GitCompare className="h-4 w-4" />
+                Compare Selected (2)
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>

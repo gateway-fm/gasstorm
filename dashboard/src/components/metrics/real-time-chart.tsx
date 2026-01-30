@@ -14,16 +14,17 @@ import {
 import { useMetricsStore } from "@/stores/metrics-store";
 import { useGoLoadTestStore } from "@/stores/go-load-test-store";
 import { useMemo } from "react";
+import { colors } from "@/lib/colors";
 
-// Gateway chart colors
+// Chart colors from theme
 const COLORS = {
-  primary: "#8950FA",      // Gateway purple
-  secondary: "#A478FC",    // Lighter purple
-  tertiary: "#C4A8FD",     // Even lighter purple
-  success: "#22C55E",      // Green
-  warning: "#EAB308",      // Yellow/Orange
-  grid: "#E2E8F0",         // Light gray for grid
-  axis: "#6B7280",         // Medium gray for axis
+  primary: colors.primary,
+  secondary: colors.primaryLight,
+  tertiary: colors.primaryLighter,
+  success: colors.success,
+  warning: colors.warning,
+  grid: colors.grid,
+  axis: colors.axis,
 };
 
 export function RealTimeChart() {
@@ -36,6 +37,7 @@ export function RealTimeChart() {
     avgFillRate: liveAvgFillRate,
     currentRate: liveTxPerSec,
     peakTps: livePeakTps,
+    status: liveStatus,
   } = useGoLoadTestStore();
 
   // Select data source based on mode
@@ -215,8 +217,8 @@ export function RealTimeChart() {
                 )}
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "#FFFFFF",
-                    border: "1px solid #E2E8F0",
+                    backgroundColor: colors.background,
+                    border: `1px solid ${colors.border}`,
                     borderRadius: "8px",
                   }}
                   labelStyle={{ color: COLORS.axis }}
@@ -260,8 +262,17 @@ export function RealTimeChart() {
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-full flex items-center justify-center text-muted-foreground">
-              No data yet. Start a load test to see real-time metrics.
+            <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
+              {liveStatus === "completed" || liveStatus === "error" ? (
+                <>
+                  <p>Chart data not available for this session.</p>
+                  <p className="text-sm">View detailed results in <a href="/load-test/history" className="text-primary hover:underline">History</a>.</p>
+                </>
+              ) : liveStatus === "initializing" || liveStatus === "running" || liveStatus === "verifying" ? (
+                <p>Collecting metrics...</p>
+              ) : (
+                <p>No data yet. Start a load test to see real-time metrics.</p>
+              )}
             </div>
           )}
         </div>

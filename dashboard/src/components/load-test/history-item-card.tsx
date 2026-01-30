@@ -17,7 +17,10 @@ import {
   ExternalLink,
   Star,
   Pencil,
+  Square,
+  CheckSquare,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   LineChart as RechartsLineChart,
   Line,
@@ -51,6 +54,10 @@ interface HistoryItemCardProps {
   onViewFullResults: () => void;
   onViewTxLogs: () => void;
   onDelete: () => void;
+  // Compare mode props
+  compareMode?: boolean;
+  selectedForCompare?: boolean;
+  onToggleCompareSelect?: () => void;
 }
 
 export function formatDuration(ms: number | undefined | null): string {
@@ -88,26 +95,53 @@ export function HistoryItemCard({
   onViewFullResults,
   onViewTxLogs,
   onDelete,
+  compareMode = false,
+  selectedForCompare = false,
+  onToggleCompareSelect,
 }: HistoryItemCardProps) {
   return (
-    <div className="border rounded-lg p-3 hover:bg-accent/50 transition-colors">
+    <div
+      className={cn(
+        "border rounded-lg p-3 hover:bg-accent/50 transition-colors",
+        selectedForCompare && "border-info bg-info/5"
+      )}
+    >
       <div className="flex items-center justify-between">
-        {/* Star button */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleFavorite();
-          }}
-          className="p-1 hover:bg-accent rounded -ml-1 mr-1"
-        >
-          <Star
-            className={`h-4 w-4 ${
-              result.isFavorite
-                ? "fill-yellow-400 text-yellow-400"
-                : "text-muted-foreground hover:text-yellow-400"
-            }`}
-          />
-        </button>
+        {/* Compare checkbox (when in compare mode) */}
+        {compareMode && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleCompareSelect?.();
+            }}
+            className="p-1 hover:bg-accent rounded -ml-1 mr-1"
+          >
+            {selectedForCompare ? (
+              <CheckSquare className="h-4 w-4 text-info" />
+            ) : (
+              <Square className="h-4 w-4 text-muted-foreground hover:text-info" />
+            )}
+          </button>
+        )}
+
+        {/* Star button (hidden in compare mode) */}
+        {!compareMode && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite();
+            }}
+            className="p-1 hover:bg-accent rounded -ml-1 mr-1"
+          >
+            <Star
+              className={`h-4 w-4 ${
+                result.isFavorite
+                  ? "fill-yellow-400 text-yellow-400"
+                  : "text-muted-foreground hover:text-yellow-400"
+              }`}
+            />
+          </button>
+        )}
 
         {/* Name with edit icon */}
         <div
@@ -159,8 +193,8 @@ export function HistoryItemCard({
             variant="secondary"
             className={`font-mono text-xs ${
               (result as TestRun).executionLayer === "cdk-erigon"
-                ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
-                : "bg-orange-500/10 text-orange-400 border-orange-500/20"
+                ? "bg-primary/10 text-primary border-primary/20"
+                : "bg-warning/10 text-warning border-warning/20"
             }`}
           >
             {(result as TestRun).executionLayer || "reth"}
@@ -178,11 +212,11 @@ export function HistoryItemCard({
             {formatDuration(result.durationMs)}
           </span>
           <span className="flex items-center gap-1 font-mono">
-            <Activity className="h-3 w-3 text-blue-400" />
+            <Activity className="h-3 w-3 text-info" />
             {(result.averageTps ?? 0).toFixed(1)} tx/s
           </span>
           <span className="flex items-center gap-1">
-            <CheckCircle className="h-3 w-3 text-green-400" />
+            <CheckCircle className="h-3 w-3 text-success" />
             {getSuccessRate(result)}%
           </span>
           {expanded ? (
@@ -203,19 +237,21 @@ export function HistoryItemCard({
             </div>
             <div>
               <div className="text-muted-foreground">Confirmed</div>
-              <div className="font-mono text-green-400">
+              <div className="font-mono text-success">
                 {(result.txConfirmed ?? 0).toLocaleString()}
               </div>
             </div>
             <div>
               <div className="text-muted-foreground">Failed</div>
-              <div className="font-mono text-red-400">
+              <div className="font-mono text-destructive">
                 {(result.txFailed ?? 0).toLocaleString()}
               </div>
             </div>
             <div>
               <div className="text-muted-foreground">TX Type</div>
-              <div className="font-mono">{result.transactionType}</div>
+              <div className="font-mono">
+                {result.pattern === "realistic" ? "Mixed" : result.transactionType}
+              </div>
             </div>
           </div>
 
@@ -272,9 +308,9 @@ export function HistoryItemCard({
 
           {/* Latency Stats */}
           {result.preconfLatency && result.preconfLatency.count > 0 && (
-            <div className="flex items-center gap-2 p-2 bg-green-500/10 rounded">
-              <Zap className="h-4 w-4 text-green-400" />
-              <span className="text-green-400">Preconf:</span>
+            <div className="flex items-center gap-2 p-2 bg-success/10 rounded">
+              <Zap className="h-4 w-4 text-success" />
+              <span className="text-success">Preconf:</span>
               <span className="font-mono">
                 p50 {(result.preconfLatency.p50 ?? 0).toFixed(0)}ms
               </span>
@@ -286,9 +322,9 @@ export function HistoryItemCard({
           )}
 
           {result.latency && result.latency.count > 0 && (
-            <div className="flex items-center gap-2 p-2 bg-blue-500/10 rounded">
-              <Clock className="h-4 w-4 text-blue-400" />
-              <span className="text-blue-400">Confirm:</span>
+            <div className="flex items-center gap-2 p-2 bg-info/10 rounded">
+              <Clock className="h-4 w-4 text-info" />
+              <span className="text-info">Confirm:</span>
               <span className="font-mono">
                 p50 {(result.latency.p50 ?? 0).toFixed(0)}ms
               </span>

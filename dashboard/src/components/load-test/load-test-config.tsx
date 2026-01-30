@@ -48,13 +48,13 @@ export function LoadTestConfig() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base font-semibold">Load Test Configuration</CardTitle>
+        <CardTitle className="text-base font-semibold font-mono">Load Test Configuration</CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
         {/* Transaction Type Selection - only show for non-realistic modes */}
         {config?.pattern !== "realistic" && (
           <div className="space-y-2">
-            <Label>Transaction Type</Label>
+            <Label className="font-mono">Transaction Type</Label>
             <Select
               value={config?.transactionType ?? "eth-transfer"}
               onValueChange={(v) => handleTxTypeChange(v as TransactionType)}
@@ -117,7 +117,7 @@ export function LoadTestConfig() {
           {/* Constant Pattern Config */}
           <TabsContent value="constant" className="mt-4 space-y-4">
             <div className="space-y-2">
-              <Label>Rate (tx/s)</Label>
+              <Label className="font-mono">Rate (tx/s)</Label>
               <Input
                 type="text"
                 value={config?.constantRate ?? 100}
@@ -131,7 +131,7 @@ export function LoadTestConfig() {
           <TabsContent value="ramp" className="mt-4 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Start Rate (tx/s)</Label>
+                <Label className="font-mono">Start Rate (tx/s)</Label>
                 <Input
                   type="text"
                   value={config?.rampStart ?? 100}
@@ -140,7 +140,7 @@ export function LoadTestConfig() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>End Rate (tx/s)</Label>
+                <Label className="font-mono">End Rate (tx/s)</Label>
                 <Input
                   type="text"
                   value={config?.rampEnd ?? 5000}
@@ -150,7 +150,7 @@ export function LoadTestConfig() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Steps</Label>
+              <Label className="font-mono">Steps</Label>
               <Input
                 type="text"
                 value={config?.rampSteps ?? 10}
@@ -164,7 +164,7 @@ export function LoadTestConfig() {
           <TabsContent value="spike" className="mt-4 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Baseline Rate (tx/s)</Label>
+                <Label className="font-mono">Baseline Rate (tx/s)</Label>
                 <Input
                   type="text"
                   value={config?.baselineRate ?? 100}
@@ -173,7 +173,7 @@ export function LoadTestConfig() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Spike Rate (tx/s)</Label>
+                <Label className="font-mono">Spike Rate (tx/s)</Label>
                 <Input
                   type="text"
                   value={config?.spikeRate ?? 5000}
@@ -184,7 +184,7 @@ export function LoadTestConfig() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Spike Duration (s)</Label>
+                <Label className="font-mono">Spike Duration (s)</Label>
                 <Input
                   type="text"
                   value={config?.spikeDuration ?? 5}
@@ -193,7 +193,7 @@ export function LoadTestConfig() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Spike Interval (s)</Label>
+                <Label className="font-mono">Spike Interval (s)</Label>
                 <Input
                   type="text"
                   value={config?.spikeInterval ?? 15}
@@ -208,7 +208,7 @@ export function LoadTestConfig() {
           <TabsContent value="adaptive" className="mt-4 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Initial Rate (tx/s)</Label>
+                <Label className="font-mono">Initial Rate (tx/s)</Label>
                 <Input
                   type="text"
                   value={config?.adaptiveInitialRate ?? 100}
@@ -217,7 +217,7 @@ export function LoadTestConfig() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Rate Step (tx/s)</Label>
+                <Label className="font-mono">Rate Step (tx/s)</Label>
                 <Input
                   type="text"
                   value={config?.adaptiveRateStep ?? 100}
@@ -227,7 +227,7 @@ export function LoadTestConfig() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Target Pending TXs</Label>
+              <Label className="font-mono">Target Pending TXs</Label>
               <Input
                 type="text"
                 value={config?.adaptiveTargetPending ?? 1000}
@@ -246,7 +246,7 @@ export function LoadTestConfig() {
         {/* Common Config */}
         <div className="border-t pt-4 space-y-4">
           <div className="space-y-2">
-            <Label>Test Duration (seconds)</Label>
+            <Label className="font-mono">Test Duration (seconds)</Label>
             <Input
               type="text"
               value={config?.duration ?? 60}

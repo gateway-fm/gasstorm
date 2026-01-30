@@ -13,13 +13,43 @@ git commit --no-gpg-sign -m "commit message"
 
 ## Execution Layer Selection
 
-The project supports two execution layer backends, selected via `EXECUTION_LAYER` environment variable:
+The project supports multiple execution layer backends via a **capability-based architecture**. Select via `EXECUTION_LAYER` environment variable.
+
+### Capability-Based Architecture
+
+The load-generator uses capability checks instead of string comparisons:
+
+```go
+// load-generator/internal/execnode/capabilities.go
+type ExecutionLayerCapabilities struct {
+    Name                     string
+    HasExternalBlockBuilder  bool   // true = uses block-builder, false = direct sequencer
+    SupportsPreconfirmations bool   // WebSocket preconf events
+    SupportsBuilderStatusAPI bool   // GET /status endpoint
+    SupportsBlockMetricsWS   bool   // WebSocket /ws/block-metrics
+}
+```
+
+### Supported Execution Layers
+
+| Layer | Block Builder | Preconfirmations | Builder Status | Block Metrics WS |
+|-------|---------------|------------------|----------------|------------------|
+| `reth` / `op-reth` | External | Yes | Yes | Yes |
+| `gravity-reth` | None (direct) | No | No | No |
+| `cdk-erigon` | None (direct) | No | No | No |
 
 ### reth Mode (Default)
 Uses the custom block-builder with op-reth via Engine API. Supports preconfirmations.
 
 ```
 load-generator → block-builder:13000 → op-reth Engine API:8551
+```
+
+### gravity-reth Mode
+High-performance parallel EVM with Grevm. Direct sequencer mode.
+
+```
+load-generator → gravity-reth:8545 (direct sequencer)
 ```
 
 ### cdk-erigon Mode
@@ -29,13 +59,25 @@ Uses Polygon's cdk-erigon as a standalone sequencer. Block-builder is bypassed.
 load-generator → cdk-erigon:8545 (direct sequencer)
 ```
 
-| Aspect | reth Mode | cdk-erigon Mode |
-|--------|-----------|-----------------|
-| Block Building | External (block-builder) | Internal (sequencer) |
-| TX Submission | block-builder:13000 | cdk-erigon:8545 |
-| Preconfirmations | Yes (WebSocket) | No |
-| Engine API | Required | Not used |
-| Services | l2-reth, block-builder | l2-cdk-erigon |
+### Adding a New Execution Layer
+
+1. Add capability function in `load-generator/internal/execnode/registry.go`:
+   ```go
+   func NewNodeCapabilities() *ExecutionLayerCapabilities {
+       return &ExecutionLayerCapabilities{
+           Name:                     "new-node",
+           HasExternalBlockBuilder:  false,  // or true if uses block-builder
+           SupportsPreconfirmations: false,
+           SupportsBuilderStatusAPI: false,
+           SupportsBlockMetricsWS:   false,
+       }
+   }
+   ```
+2. Register in `DefaultRegistry()`
+3. Create `docker-compose-new-node.yaml`
+4. Add Makefile target (optional)
+
+**No changes needed to:** load-generator logic, dashboard code, API handlers
 
 ## Prover Selection
 
@@ -196,8 +238,11 @@ go build ./...
 | File | Purpose |
 |------|---------|
 | `cmd/loadgen/main.go` | Main entry, worker management |
+| `internal/execnode/capabilities.go` | Execution layer capability definitions |
+| `internal/execnode/registry.go` | Registry of built-in execution layers |
 | `internal/account/account.go` | Nonce reservation pattern (ReserveNonce/Commit/Rollback) |
 | `internal/account/manager.go` | Account initialization and funding |
+| `internal/config/config.go` | Config loading with capability resolution |
 | `internal/rpc/client.go` | RPC client with nonce fetching |
 | `internal/metrics/collector.go` | Latency and throughput tracking |
 | `internal/storage/models.go` | Database models (MUST have json tags!) |

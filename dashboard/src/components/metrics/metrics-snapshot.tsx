@@ -21,9 +21,9 @@ function getBlockTimeColor(ms: number, targetMs: number): string {
 
   const deviation = Math.abs(ms - targetMs) / targetMs;
 
-  if (deviation <= 0.2) return "text-green-400";  // Within 20%
-  if (deviation <= 0.5) return "text-yellow-400"; // Within 50%
-  return "text-red-400";                           // More than 50% off
+  if (deviation <= 0.2) return "text-success";  // Within 20%
+  if (deviation <= 0.5) return "text-warning"; // Within 50%
+  return "text-destructive";                    // More than 50% off
 }
 
 // Format gas price - show more precision for very low values
@@ -88,19 +88,19 @@ export function MetricsSnapshot() {
       label: showMgasLabel ? (isHistoricalMode ? "Avg Mgas/s" : "Current Mgas/s") : "Avg tx/s",
       value: showMgasMetrics ? avgMgasPerSec.toFixed(2) : snapshot.currentTxPerSec.toFixed(1),
       unit: showMgasMetrics ? "Mgas/s" : "tx/s",
-      color: showMgasMetrics ? "text-blue-400" : "text-purple-400",
+      color: showMgasMetrics ? "text-info" : "text-primary",
     },
     {
       label: showMgasLabel ? "Peak Mgas/s" : "Peak tx/s",
       value: showMgasMetrics ? peakMgasPerSec.toFixed(2) : snapshot.peakTxPerSec.toFixed(1),
       unit: showMgasMetrics ? "Mgas/s" : "tx/s",
-      color: "text-green-400",
+      color: "text-success",
     },
     {
       label: showMgasLabel ? (isHistoricalMode ? "Avg tx/s" : "Current tx/s") : "Confirmed",
       value: showMgasMetrics ? snapshot.currentTxPerSec.toFixed(1) : snapshot.totalTransactions.toLocaleString(),
       unit: showMgasMetrics ? "tx/s" : "txs",
-      color: "text-purple-400",
+      color: "text-primary",
     },
     {
       label: showMgasLabel ? "Peak tx/s" : "Success Rate",
@@ -108,7 +108,7 @@ export function MetricsSnapshot() {
         ? snapshot.peakTxPerSec.toFixed(1)
         : snapshot.totalTransactions > 0 ? "100%" : "-",
       unit: showMgasMetrics ? "tx/s" : "",
-      color: showMgasMetrics ? "text-purple-400" : "text-green-400",
+      color: showMgasMetrics ? "text-primary" : "text-success",
     },
     {
       label: "Block Time",
@@ -126,7 +126,7 @@ export function MetricsSnapshot() {
       label: "Avg Fill Rate",
       value: showMgasMetrics ? formatPercent(avgFillRate) : "N/A",
       unit: "",
-      color: showMgasMetrics ? "text-orange-400" : "text-muted-foreground",
+      color: showMgasMetrics ? "text-warning" : "text-muted-foreground",
     },
     {
       label: "Blocks",
@@ -138,32 +138,32 @@ export function MetricsSnapshot() {
       label: "Base Fee",
       value: formatGasPrice(isHistoricalMode ? snapshot.baseFeeGwei ?? 0 : latestBaseFeeGwei),
       unit: (isHistoricalMode ? (snapshot.baseFeeGwei ?? 0) > 0 : latestBaseFeeGwei > 0) ? "gwei" : "",
-      color: (isHistoricalMode ? (snapshot.baseFeeGwei ?? 0) : latestBaseFeeGwei) > 1.5 ? "text-red-400" : ((isHistoricalMode ? (snapshot.baseFeeGwei ?? 0) : latestBaseFeeGwei) > 1.0 ? "text-yellow-400" : "text-green-400"),
+      color: (isHistoricalMode ? (snapshot.baseFeeGwei ?? 0) : latestBaseFeeGwei) > 1.5 ? "text-destructive" : ((isHistoricalMode ? (snapshot.baseFeeGwei ?? 0) : latestBaseFeeGwei) > 1.0 ? "text-warning" : "text-success"),
     },
     {
       label: "Gas Price",
       value: formatGasPrice(isHistoricalMode ? snapshot.gasPriceGwei ?? 0 : latestGasPriceGwei),
       unit: (isHistoricalMode ? (snapshot.gasPriceGwei ?? 0) > 0 : latestGasPriceGwei > 0) ? "gwei" : "",
-      color: (isHistoricalMode ? (snapshot.gasPriceGwei ?? 0) : latestGasPriceGwei) > 2.0 ? "text-red-400" : ((isHistoricalMode ? (snapshot.gasPriceGwei ?? 0) : latestGasPriceGwei) > 1.5 ? "text-yellow-400" : "text-green-400"),
+      color: (isHistoricalMode ? (snapshot.gasPriceGwei ?? 0) : latestGasPriceGwei) > 2.0 ? "text-destructive" : ((isHistoricalMode ? (snapshot.gasPriceGwei ?? 0) : latestGasPriceGwei) > 1.5 ? "text-warning" : "text-success"),
     },
     {
       label: "Total Gas",
       value: showMgasMetrics ? formatGas(totalGasUsed) : "N/A",
       unit: "",
-      color: "text-cyan-400",
+      color: "text-info",
     },
     {
       label: "Total Txs",
       value: totalTxs.toLocaleString(),
       unit: "",
-      color: "text-amber-400",
+      color: "text-warning",
     },
   ];
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base font-semibold">
+        <CardTitle className="text-base font-semibold font-mono">
           {isHistoricalMode ? "Historical Metrics" : (hasBlockMetrics ? "Live Metrics" : "Test Metrics")}
         </CardTitle>
       </CardHeader>
@@ -171,7 +171,7 @@ export function MetricsSnapshot() {
         <div className="grid grid-cols-3 gap-3">
           {metrics.map((metric) => (
             <div key={metric.label} className="rounded-lg border p-3">
-              <p className="text-xs text-muted-foreground">{metric.label}</p>
+              <p className="text-xs text-muted-foreground font-mono">{metric.label}</p>
               <p className={`text-xl font-bold font-mono ${metric.color}`}>
                 {metric.value}
                 {metric.unit && (

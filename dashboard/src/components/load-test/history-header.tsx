@@ -301,7 +301,9 @@ export function HistoryHeader({ testRun, onBack }: HistoryHeaderProps) {
           {/* Transaction Type */}
           <div className="flex justify-between items-center">
             <span className="text-muted-foreground">Transaction Type</span>
-            <span className="font-mono text-xs">{getTxTypeLabel(transactionType)}</span>
+            <span className="font-mono text-xs">
+              {pattern === "realistic" ? "Mixed" : getTxTypeLabel(transactionType)}
+            </span>
           </div>
 
           {/* Pattern-specific config */}

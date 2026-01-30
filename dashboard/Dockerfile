@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 # Stage 1: Build
 FROM node:20-alpine AS builder
 
@@ -6,14 +8,16 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+# Install dependencies with cache mount
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
 
 # Copy source files
 COPY . .
 
-# Build the application
-RUN npm run build
+# Build the application with cache mount for Next.js
+RUN --mount=type=cache,target=/app/.next/cache \
+    npm run build
 
 # Stage 2: Production
 FROM nginx:alpine

@@ -12,38 +12,33 @@ import {
   Cell,
 } from "recharts";
 import { useGoLoadTestStore } from "@/stores/go-load-test-store";
+import { colors, chartColors } from "@/lib/colors";
 
-// Gateway chart colors
+// Chart colors from theme
 const CHART_COLORS = {
-  grid: "#E2E8F0",
-  axis: "#6B7280",
+  grid: colors.grid,
+  axis: colors.axis,
 };
 
 // Pending latency uses Gateway purple gradient
 const PENDING_BUCKET_COLORS = [
-  "#8950FA", // Gateway primary
-  "#A478FC", // Lighter purple
-  "#C4A8FD", // Even lighter
-  "#EAB308", // Warning
-  "#EF4444", // Error
+  ...chartColors.primary,
+  colors.warning,
+  colors.destructive,
 ];
 
 // Preconf latency uses green gradient
 const PRECONF_BUCKET_COLORS = [
-  "#22C55E", // Success green
-  "#4ADE80", // Lighter green
-  "#86EFAC", // Even lighter
-  "#EAB308", // Warning
-  "#EF4444", // Error
+  ...chartColors.success,
+  colors.warning,
+  colors.destructive,
 ];
 
 // Confirmation latency uses purple gradient (different shades)
 const CONFIRM_BUCKET_COLORS = [
-  "#6B3DD4", // Darker purple
-  "#8950FA", // Gateway primary
-  "#A478FC", // Lighter purple
-  "#EAB308", // Warning
-  "#EF4444", // Error
+  ...chartColors.confirmation,
+  colors.warning,
+  colors.destructive,
 ];
 
 interface LatencyCardProps {
@@ -56,11 +51,11 @@ interface LatencyCardProps {
     p99: number;
     buckets?: { label: string; count: number }[];
   } | null;
-  colors: string[];
+  barColors: string[];
   emptyMessage: string;
 }
 
-function LatencyCard({ title, stats, colors, emptyMessage }: LatencyCardProps) {
+function LatencyCard({ title, stats, barColors, emptyMessage }: LatencyCardProps) {
   const histogramData = stats?.buckets?.map((bucket) => ({
     name: bucket.label,
     count: bucket.count,
@@ -113,8 +108,8 @@ function LatencyCard({ title, stats, colors, emptyMessage }: LatencyCardProps) {
                 <YAxis stroke={CHART_COLORS.axis} fontSize={9} tickLine={false} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "#FFFFFF",
-                    border: "1px solid #E2E8F0",
+                    backgroundColor: colors.background,
+                    border: `1px solid ${colors.border}`,
                     borderRadius: "8px",
                   }}
                   labelStyle={{ color: CHART_COLORS.axis }}
@@ -122,7 +117,7 @@ function LatencyCard({ title, stats, colors, emptyMessage }: LatencyCardProps) {
                 />
                 <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                   {histogramData.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                    <Cell key={`cell-${index}`} fill={barColors[index % barColors.length]} />
                   ))}
                 </Bar>
               </BarChart>
@@ -156,19 +151,19 @@ export function LatencyHistogram() {
       <LatencyCard
         title="Pending Latency"
         stats={pendingLatencyStats}
-        colors={PENDING_BUCKET_COLORS}
+        barColors={PENDING_BUCKET_COLORS}
         emptyMessage="Waiting for pending events..."
       />
       <LatencyCard
         title="Preconfirmation Latency"
         stats={preconfLatencyStats}
-        colors={PRECONF_BUCKET_COLORS}
+        barColors={PRECONF_BUCKET_COLORS}
         emptyMessage="Waiting for preconfirmations..."
       />
       <LatencyCard
         title="Confirmation Latency"
         stats={latencyStats}
-        colors={CONFIRM_BUCKET_COLORS}
+        barColors={CONFIRM_BUCKET_COLORS}
         emptyMessage="Waiting for confirmations..."
       />
     </div>
