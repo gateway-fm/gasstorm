@@ -46,6 +46,13 @@ export function LoadTestRunner() {
     fundingTxsTotal,
     contractsDeployed,
     contractsTotal,
+    // Verification progress
+    verifyPhase,
+    verifyProgress,
+    blocksToVerify,
+    blocksVerified,
+    receiptsToSample,
+    receiptsSampled,
   } = useGoLoadTestStore();
 
   const isAdaptiveMode = config?.pattern === "adaptive";
@@ -182,8 +189,30 @@ export function LoadTestRunner() {
               <p className="text-sm font-medium text-primary">Verifying Results</p>
             </div>
             <p className="text-sm text-muted-foreground">
-              Test finished. Verifying on-chain results...
+              {verifyProgress || "Test finished. Verifying on-chain results..."}
             </p>
+
+            {/* Tip ordering verification progress */}
+            {verifyPhase === "tip_ordering" && blocksToVerify > 0 && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Checking tip ordering...</span>
+                  <span className="font-mono">{blocksVerified} / {blocksToVerify}</span>
+                </div>
+                <Progress value={blocksToVerify > 0 ? (blocksVerified / blocksToVerify) * 100 : 0} className="h-1" />
+              </div>
+            )}
+
+            {/* Receipt sampling progress */}
+            {verifyPhase === "receipts" && receiptsToSample > 0 && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Sampling receipts...</span>
+                  <span className="font-mono">{receiptsSampled} / {receiptsToSample}</span>
+                </div>
+                <Progress value={receiptsToSample > 0 ? (receiptsSampled / receiptsToSample) * 100 : 0} className="h-1" />
+              </div>
+            )}
           </div>
         )}
 

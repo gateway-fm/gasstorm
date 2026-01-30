@@ -1,5 +1,11 @@
-export { BaseNode } from "./base-node";
+export { BaseNode, BaseNodeWithLogs, colorSchemes } from "./base-node";
+export type { ColorSchemeKey } from "./base-node";
 export { LoadGeneratorNode } from "./load-generator-node";
 export { BlockBuilderNode } from "./block-builder-node";
 export { ExecutionNode } from "./execution-node";
 export { L1Node } from "./l1-node";
+export { BridgeRelayerNode } from "./bridge-relayer-node";
+export { BridgeUINode } from "./bridge-ui-node";
+export { MetricRow, MetricSection } from "./metric-row";
+export { LogPanel, generateDemoLogs } from "./log-panel";
+export type { LogEntry } from "./log-panel";

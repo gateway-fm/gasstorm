@@ -162,6 +162,13 @@ export type InitPhase =
   | "deploying_contracts"
   | "starting_workers";
 
+// Verification phases during post-test verification
+export type VerifyPhase =
+  | ""
+  | "tx_count"
+  | "tip_ordering"
+  | "receipts";
+
 export interface LoadTestState {
   status: LoadTestStatus;
   config: LoadTestConfig | null;

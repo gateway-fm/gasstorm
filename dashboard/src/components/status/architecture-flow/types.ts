@@ -43,17 +43,35 @@ export interface L1NodeData extends BaseNodeData {
   blockNumber: number;
 }
 
+// Bridge Relayer node data
+export interface BridgeRelayerNodeData extends BaseNodeData {
+  pendingMessages: number;
+  messagesRelayed: number;
+  lastRelayTime?: string;
+  isOnline: boolean;
+}
+
+// Bridge UI node data
+export interface BridgeUINodeData extends BaseNodeData {
+  activeTransfers: number;
+  port: number;
+}
+
 // Typed nodes using xyflow Node type
 export type LoadGeneratorNode = Node<LoadGeneratorNodeData, "loadGenerator">;
 export type BlockBuilderNode = Node<BlockBuilderNodeData, "blockBuilder">;
 export type ExecutionNode = Node<ExecutionNodeData, "execution">;
 export type L1Node = Node<L1NodeData, "l1">;
+export type BridgeRelayerNode = Node<BridgeRelayerNodeData, "bridgeRelayer">;
+export type BridgeUINode = Node<BridgeUINodeData, "bridgeUI">;
 
 export type ArchitectureNode =
   | LoadGeneratorNode
   | BlockBuilderNode
   | ExecutionNode
-  | L1Node;
+  | L1Node
+  | BridgeRelayerNode
+  | BridgeUINode;
 
 // Edge data for animation state
 export interface AnimatedEdgeData extends Record<string, unknown> {

@@ -64,6 +64,13 @@ export function parseMetricsMessage(
     fundingTxsTotal: metrics.fundingTxsTotal ?? 0,
     contractsDeployed: metrics.contractsDeployed ?? 0,
     contractsTotal: metrics.contractsTotal ?? 0,
+    // Verification progress
+    verifyPhase: metrics.verifyPhase ?? "",
+    verifyProgress: metrics.verifyProgress ?? "",
+    blocksToVerify: metrics.blocksToVerify ?? 0,
+    blocksVerified: metrics.blocksVerified ?? 0,
+    receiptsToSample: metrics.receiptsToSample ?? 0,
+    receiptsSampled: metrics.receiptsSampled ?? 0,
     // Preconfirmation stage counters
     txPendingCount: metrics.txPending ?? 0,
     txPreconfirmedCount: metrics.txPreconfirmed ?? 0,
@@ -94,9 +101,9 @@ export function parseMetricsMessage(
     currentFillRate: metrics.currentFillRate ?? 0,
   };
 
-  // Build time series for live chart (during running and verifying status)
+  // Build time series for live chart (ONLY during running - stop immediately when verifying/completed)
   let newTimeSeries: ChartTimeSeries | undefined;
-  if ((status === "running" || status === "verifying") && metrics.elapsedMs > 0) {
+  if (status === "running" && metrics.elapsedMs > 0) {
     const timestamp = metrics.elapsedMs / 1000;
     const mgasPerSec = metrics.currentMgasPerSec ?? 0;
     const txPerSec = metrics.currentTps ?? 0;

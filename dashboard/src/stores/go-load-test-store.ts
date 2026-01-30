@@ -7,6 +7,7 @@ import { create } from "zustand";
 import type { LoadTestConfig, LoadTestStatus } from "@/types/load-test";
 import { DEFAULT_LOAD_TEST_CONFIG, DEFAULT_REALISTIC_CONFIG } from "@/types/load-test";
 import { useMetricsStore } from "./metrics-store";
+import { useChainStore } from "./chain-store";
 import {
   fetchLoadGenAPI,
   type GoLoadTestMetrics,
@@ -187,6 +188,7 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()((set, get) => {
       }
 
       wsManager.disconnect();
+      useMetricsStore.getState().setHistoricalMode(true);
       set({ status: "completed" });
     },
 
@@ -195,6 +197,7 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()((set, get) => {
         await fetchLoadGenAPI("/reset", { method: "POST" });
         wsManager.disconnect();
         useMetricsStore.getState().reset();
+        useChainStore.getState().clearLogs();
         set(getResetState());
       } catch (error) {
         console.error("Failed to reset:", error);

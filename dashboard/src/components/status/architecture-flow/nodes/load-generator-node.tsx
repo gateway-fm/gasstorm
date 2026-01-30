@@ -2,7 +2,10 @@
 
 import { memo } from "react";
 import type { NodeProps } from "@xyflow/react";
+import { Handle, Position } from "@xyflow/react";
+import { cn } from "@/lib/utils";
 import { BaseNode } from "./base-node";
+import { MetricRow, MetricSection } from "./metric-row";
 import type { LoadGeneratorNode as LoadGeneratorNodeType } from "../types";
 
 export const LoadGeneratorNode = memo(function LoadGeneratorNode({
@@ -15,32 +18,39 @@ export const LoadGeneratorNode = memo(function LoadGeneratorNode({
       label={label}
       status={status}
       colorScheme="loadGenerator"
-      showTargetHandle={false}
+      subtitle={isRunning ? "Active" : "Idle"}
+      width={160}
     >
-      <div className="flex items-center justify-between">
-        <span className="text-muted-foreground">TPS:</span>
-        <span className="font-mono font-medium text-foreground">
-          {tps.toFixed(0)}
-        </span>
-      </div>
-      <div className="flex items-center justify-between">
-        <span className="text-muted-foreground">Sent:</span>
-        <span className="font-mono font-medium text-foreground">
-          {txSent.toLocaleString()}
-        </span>
-      </div>
-      <div className="flex items-center justify-between">
-        <span className="text-muted-foreground">Pending:</span>
-        <span className="font-mono font-medium text-foreground">
-          {txPending.toLocaleString()}
-        </span>
-      </div>
+      <MetricSection>
+        <MetricRow
+          label="TPS"
+          value={tps.toFixed(0)}
+          highlight={isRunning && tps > 0}
+        />
+        <MetricRow label="Sent" value={txSent.toLocaleString()} />
+        <MetricRow label="Pending" value={txPending.toLocaleString()} />
+      </MetricSection>
+
       {isRunning && (
-        <div className="mt-1 flex items-center gap-1 text-[10px] text-green-500">
-          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
-          Running
+        <div className="flex items-center gap-1.5 pt-1 border-t border-white/5">
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+          </span>
+          <span className="text-[9px] font-medium text-green-400">Running</span>
         </div>
       )}
+
+      {/* Output port */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        className={cn(
+          "!h-3 !w-3 !rounded-full !border-2",
+          "!border-violet-400 !bg-violet-500/80",
+          "!-right-1.5"
+        )}
+      />
     </BaseNode>
   );
 });

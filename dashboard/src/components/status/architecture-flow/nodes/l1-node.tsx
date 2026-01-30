@@ -3,7 +3,9 @@
 import { memo } from "react";
 import type { NodeProps } from "@xyflow/react";
 import { Handle, Position } from "@xyflow/react";
+import { cn } from "@/lib/utils";
 import { BaseNode } from "./base-node";
+import { MetricRow, MetricSection } from "./metric-row";
 import type { L1Node as L1NodeType } from "../types";
 
 export const L1Node = memo(function L1Node({
@@ -16,24 +18,39 @@ export const L1Node = memo(function L1Node({
       label={label}
       status={status}
       colorScheme="l1"
-      showSourceHandle={false}
-      showTargetHandle={false}
+      subtitle="Anvil :8545"
+      width={140}
     >
-      <div className="flex items-center justify-between">
-        <span className="text-muted-foreground">Block:</span>
-        <span className="font-mono font-medium text-foreground">
-          #{blockNumber.toLocaleString()}
-        </span>
-      </div>
-      <div className="mt-1 text-[10px] text-muted-foreground/70">
-        Anvil (local)
-      </div>
+      <MetricSection title="L1">
+        <MetricRow
+          label="Block"
+          value={`#${blockNumber.toLocaleString()}`}
+          highlight
+        />
+      </MetricSection>
 
-      {/* Custom handle at the top for the L2 → L1 edge */}
+      {/* Input port - Settlement from L2 (BOTTOM - receives from execution) */}
       <Handle
+        id="settlement-input"
         type="target"
-        position={Position.Top}
-        className="!h-2 !w-2 !border-2 !border-background !bg-muted-foreground"
+        position={Position.Bottom}
+        className={cn(
+          "!h-2.5 !w-2.5 !rounded-full !border-2",
+          "!border-cyan-400/50 !bg-cyan-500/50",
+          "!-bottom-1"
+        )}
+      />
+
+      {/* Output port - Bridge to Relayer (RIGHT) */}
+      <Handle
+        id="bridge-output"
+        type="source"
+        position={Position.Right}
+        className={cn(
+          "!h-3 !w-3 !rounded-full !border-2",
+          "!border-orange-400 !bg-orange-500/80",
+          "!-right-1.5"
+        )}
       />
     </BaseNode>
   );

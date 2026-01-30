@@ -8,10 +8,20 @@ interface BuilderStatus {
   pendingTxCount: number;
 }
 
+interface BridgeStatus {
+  relayerOnline: boolean;
+  pendingMessages: number;
+  messagesRelayed: number;
+  lastRelayTime: string | null;
+  uiOnline: boolean;
+  activeTransfers: number;
+}
+
 interface ChainState {
   l1: ChainStatus;
   l2: ChainStatus;
   builder: BuilderStatus;
+  bridge: BridgeStatus;
   accountL1Balance: bigint;
   accountL2Balance: bigint;
   logs: LogEntry[];
@@ -23,6 +33,7 @@ interface ChainActions {
   setL1Status: (status: Partial<ChainStatus>) => void;
   setL2Status: (status: Partial<ChainStatus>) => void;
   setBuilderStatus: (status: Partial<BuilderStatus>) => void;
+  setBridgeStatus: (status: Partial<BridgeStatus>) => void;
   setAccountBalances: (l1?: bigint, l2?: bigint) => void;
   setLastL1Block: (block: number) => void;
   setLastL2Block: (block: number) => void;
@@ -45,11 +56,21 @@ const initialBuilderStatus: BuilderStatus = {
   pendingTxCount: 0,
 };
 
+const initialBridgeStatus: BridgeStatus = {
+  relayerOnline: false,
+  pendingMessages: 0,
+  messagesRelayed: 0,
+  lastRelayTime: null,
+  uiOnline: false,
+  activeTransfers: 0,
+};
+
 export const useChainStore = create<ChainStore>((set) => ({
   // State
   l1: { ...initialChainStatus },
   l2: { ...initialChainStatus },
   builder: { ...initialBuilderStatus },
+  bridge: { ...initialBridgeStatus },
   accountL1Balance: 0n,
   accountL2Balance: 0n,
   logs: [
@@ -77,6 +98,11 @@ export const useChainStore = create<ChainStore>((set) => ({
   setBuilderStatus: (status) =>
     set((state) => ({
       builder: { ...state.builder, ...status },
+    })),
+
+  setBridgeStatus: (status) =>
+    set((state) => ({
+      bridge: { ...state.bridge, ...status },
     })),
 
   setAccountBalances: (l1, l2) =>

@@ -67,13 +67,11 @@ export function RealTimeChart() {
     (isHistoricalMode && (snapshot.currentMgasPerSec > 0 || snapshot.peakMgasPerSec > 0));
 
   const chartData = useMemo(() => {
-    // For historical mode, show all data points (they're already aggregated)
-    // For live mode, show more points since we have 200ms samples
-    const maxPoints = isHistoricalMode ? 300 : 300; // More points for smoother live chart
+    // Maximum points to display on chart
+    const maxDisplayPoints = 300;
     const totalPoints = timeSeries.timestamps.length;
 
-    // Sample interval: for live mode, show every Nth point to fit maxPoints
-    const sampleInterval = Math.max(1, Math.floor(totalPoints / maxPoints));
+    if (totalPoints === 0) return [];
 
     // Filter out initial zero-value points that create jumps
     let startIndex = 0;
@@ -87,22 +85,27 @@ export function RealTimeChart() {
     }
 
     // Use the first non-zero point as base for relative time
-    const baseTimestamp = totalPoints > startIndex
-      ? timeSeries.timestamps[startIndex]
-      : 0;
+    const baseTimestamp = timeSeries.timestamps[startIndex] ?? 0;
 
-    // Sample every Nth point from recent data
-    const sampledData: { time: string; mgasPerSec: number; txPerSec: number; fillRate: number }[] = [];
+    // Determine the window of data to display:
+    // - If we have fewer points than maxDisplayPoints, show all
+    // - Otherwise, show the most recent maxDisplayPoints (sliding window)
+    const availablePoints = totalPoints - startIndex;
+    const windowStart = availablePoints <= maxDisplayPoints
+      ? startIndex
+      : totalPoints - maxDisplayPoints;
 
-    for (let i = totalPoints - 1; i >= startIndex && sampledData.length < maxPoints; i -= sampleInterval) {
-      // Show relative time for both live and historical (e.g., "0:05", "0:10")
-      // Live mode now uses elapsed seconds from Go load generator
+    // Build chart data from the window - NO resampling, just a sliding window
+    // This ensures historical data never changes once displayed
+    const chartPoints: { time: string; mgasPerSec: number; txPerSec: number; fillRate: number }[] = [];
+
+    for (let i = windowStart; i < totalPoints; i++) {
       const relativeSeconds = Math.round(timeSeries.timestamps[i] - baseTimestamp);
       const minutes = Math.floor(relativeSeconds / 60);
       const seconds = relativeSeconds % 60;
       const timeLabel = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
-      sampledData.unshift({
+      chartPoints.push({
         time: timeLabel,
         mgasPerSec: timeSeries.mgasPerSec[i] ?? 0,
         txPerSec: timeSeries.txPerSec[i] ?? 0,
@@ -110,8 +113,8 @@ export function RealTimeChart() {
       });
     }
 
-    return sampledData;
-  }, [timeSeries, isHistoricalMode]);
+    return chartPoints;
+  }, [timeSeries]);
 
   return (
     <Card className="col-span-2">

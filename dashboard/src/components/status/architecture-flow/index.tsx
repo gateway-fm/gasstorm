@@ -6,6 +6,7 @@ import {
   ReactFlowProvider,
   Background,
   BackgroundVariant,
+  Controls,
   type NodeTypes,
   type EdgeTypes,
 } from "@xyflow/react";
@@ -18,53 +19,55 @@ import {
   BlockBuilderNode,
   ExecutionNode,
   L1Node,
+  BridgeRelayerNode,
+  BridgeUINode,
 } from "./nodes";
 import { AnimatedEdge } from "./edges";
 import { MobileArchitectureView } from "./mobile-view";
 
-// Register custom node types
 const nodeTypes: NodeTypes = {
   loadGenerator: LoadGeneratorNode,
   blockBuilder: BlockBuilderNode,
   execution: ExecutionNode,
   l1: L1Node,
+  bridgeRelayer: BridgeRelayerNode,
+  bridgeUI: BridgeUINode,
 };
 
-// Register custom edge types
 const edgeTypes: EdgeTypes = {
   animated: AnimatedEdge,
 };
 
-// Fit view options
 const fitViewOptions = {
-  padding: 0.2,
-  minZoom: 0.5,
-  maxZoom: 1.5,
+  padding: 0.1,
+  minZoom: 0.8,
+  maxZoom: 1.2,
 };
 
 function ArchitectureFlowInner() {
   const { nodes, edges, config } = useTopology();
 
-  // Prevent any interaction callbacks
   const onNodesChange = useCallback(() => {}, []);
   const onEdgesChange = useCallback(() => {}, []);
-
-  // Calculate canvas height based on layout
-  const canvasHeight = config.hasBlockBuilder ? 320 : 320;
 
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold">Architecture</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base font-semibold">System Architecture</CardTitle>
+          <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-medium">
+            {config.name}
+          </span>
+        </div>
       </CardHeader>
       <CardContent className="p-0">
-        {/* Mobile: Simplified status cards view */}
+        {/* Mobile view */}
         <div className="sm:hidden">
           <MobileArchitectureView config={config} />
         </div>
 
-        {/* Desktop: Full React Flow diagram */}
-        <div className="hidden sm:block" style={{ height: canvasHeight }}>
+        {/* Desktop diagram */}
+        <div className="hidden sm:block h-[520px]">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -74,23 +77,28 @@ function ArchitectureFlowInner() {
             onEdgesChange={onEdgesChange}
             fitView
             fitViewOptions={fitViewOptions}
-            // Disable all interactions
             nodesDraggable={false}
             nodesConnectable={false}
             elementsSelectable={false}
-            panOnDrag={false}
-            zoomOnScroll={false}
-            zoomOnPinch={false}
+            panOnDrag={true}
+            zoomOnScroll={true}
+            zoomOnPinch={true}
             zoomOnDoubleClick={false}
-            preventScrolling={false}
-            // Hide minimap and controls
+            preventScrolling={true}
+            minZoom={0.5}
+            maxZoom={1.5}
             proOptions={{ hideAttribution: true }}
           >
             <Background
               variant={BackgroundVariant.Dots}
-              gap={16}
+              gap={20}
               size={1}
               className="!bg-background"
+              color="hsl(var(--muted-foreground) / 0.1)"
+            />
+            <Controls
+              showInteractive={false}
+              className="!bg-card/90 !border-border/30 !shadow-md [&>button]:!bg-card [&>button]:!border-border/30 [&>button:hover]:!bg-muted"
             />
           </ReactFlow>
         </div>
@@ -100,25 +108,26 @@ function ArchitectureFlowInner() {
 }
 
 export function ArchitectureFlow() {
-  // Use state to prevent hydration mismatch - React Flow needs client-side rendering
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // During SSR or initial hydration, show a placeholder
   if (!mounted) {
     return (
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold">Architecture</CardTitle>
+          <CardTitle className="text-base font-semibold">System Architecture</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="hidden sm:block h-[320px] flex items-center justify-center text-muted-foreground">
-            Loading diagram...
+          <div className="hidden sm:flex h-[520px] items-center justify-center text-muted-foreground">
+            <div className="flex flex-col items-center gap-2">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-primary" />
+              <span className="text-xs">Loading...</span>
+            </div>
           </div>
-          <div className="sm:hidden p-4 text-center text-muted-foreground">
+          <div className="sm:hidden p-4 text-center text-muted-foreground text-sm">
             Loading...
           </div>
         </CardContent>
