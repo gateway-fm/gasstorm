@@ -11,7 +11,7 @@ import type { ExecutionNode as ExecutionNodeType } from "../types";
 export const ExecutionNode = memo(function ExecutionNode({
   data,
 }: NodeProps<ExecutionNodeType>) {
-  const { label, status, blockNumber, chainId, type } = data;
+  const { label, status, blockNumber, chainId } = data;
 
   return (
     <BaseNode

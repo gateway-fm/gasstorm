@@ -85,52 +85,52 @@ export function MetricsSnapshot() {
 
   const metrics = [
     {
-      label: showMgasLabel ? (isHistoricalMode ? "Avg Mgas/s" : "Current Mgas/s") : "Avg tx/s",
-      value: showMgasMetrics ? avgMgasPerSec.toFixed(2) : snapshot.currentTxPerSec.toFixed(1),
+      label: isHistoricalMode ? "Avg" : "Now",
+      value: showMgasMetrics ? avgMgasPerSec.toFixed(1) : snapshot.currentTxPerSec.toFixed(1),
       unit: showMgasMetrics ? "Mgas/s" : "tx/s",
       color: showMgasMetrics ? "text-info" : "text-primary",
     },
     {
-      label: showMgasLabel ? "Peak Mgas/s" : "Peak tx/s",
-      value: showMgasMetrics ? peakMgasPerSec.toFixed(2) : snapshot.peakTxPerSec.toFixed(1),
+      label: "Peak",
+      value: showMgasMetrics ? peakMgasPerSec.toFixed(1) : snapshot.peakTxPerSec.toFixed(1),
       unit: showMgasMetrics ? "Mgas/s" : "tx/s",
       color: "text-success",
     },
     {
-      label: showMgasLabel ? (isHistoricalMode ? "Avg tx/s" : "Current tx/s") : "Confirmed",
-      value: showMgasMetrics ? snapshot.currentTxPerSec.toFixed(1) : snapshot.totalTransactions.toLocaleString(),
-      unit: showMgasMetrics ? "tx/s" : "txs",
+      label: isHistoricalMode ? "Avg TPS" : "TPS",
+      value: showMgasMetrics ? snapshot.currentTxPerSec.toFixed(0) : snapshot.totalTransactions.toLocaleString(),
+      unit: showMgasMetrics ? "" : "txs",
       color: "text-primary",
     },
     {
-      label: showMgasLabel ? "Peak tx/s" : "Success Rate",
+      label: "Peak TPS",
       value: showMgasMetrics
-        ? snapshot.peakTxPerSec.toFixed(1)
+        ? snapshot.peakTxPerSec.toFixed(0)
         : snapshot.totalTransactions > 0 ? "100%" : "-",
-      unit: showMgasMetrics ? "tx/s" : "",
+      unit: "",
       color: showMgasMetrics ? "text-primary" : "text-success",
     },
     {
-      label: "Block Time",
-      value: (blockMetrics.length > 0 || snapshot.currentBlockTimeMs > 0) ? formatBlockTime(snapshot.currentBlockTimeMs) : "N/A",
+      label: "Block",
+      value: (blockMetrics.length > 0 || snapshot.currentBlockTimeMs > 0) ? formatBlockTime(snapshot.currentBlockTimeMs) : "—",
       unit: (blockMetrics.length > 0 || snapshot.currentBlockTimeMs > 0) && snapshot.currentBlockTimeMs > 0 && snapshot.currentBlockTimeMs < 1000 ? "ms" : "",
       color: (blockMetrics.length > 0 || snapshot.currentBlockTimeMs > 0) ? getBlockTimeColor(snapshot.currentBlockTimeMs, targetBlockTimeMs) : "text-muted-foreground",
     },
     {
-      label: "Avg Block Time",
-      value: (blockMetrics.length > 0 || snapshot.avgBlockTimeMs > 0) ? formatBlockTime(snapshot.avgBlockTimeMs) : "N/A",
+      label: "Avg Block",
+      value: (blockMetrics.length > 0 || snapshot.avgBlockTimeMs > 0) ? formatBlockTime(snapshot.avgBlockTimeMs) : "—",
       unit: (blockMetrics.length > 0 || snapshot.avgBlockTimeMs > 0) && snapshot.avgBlockTimeMs > 0 && snapshot.avgBlockTimeMs < 1000 ? "ms" : "",
       color: (blockMetrics.length > 0 || snapshot.avgBlockTimeMs > 0) ? getBlockTimeColor(snapshot.avgBlockTimeMs, targetBlockTimeMs) : "text-muted-foreground",
     },
     {
-      label: "Avg Fill Rate",
-      value: showMgasMetrics ? formatPercent(avgFillRate) : "N/A",
+      label: "Fill",
+      value: showMgasMetrics ? formatPercent(avgFillRate) : "—",
       unit: "",
       color: showMgasMetrics ? "text-warning" : "text-muted-foreground",
     },
     {
       label: "Blocks",
-      value: showMgasMetrics ? blocksProduced.toString() : "N/A",
+      value: showMgasMetrics ? blocksProduced.toString() : "—",
       unit: "",
       color: "text-muted-foreground",
     },
@@ -148,7 +148,7 @@ export function MetricsSnapshot() {
     },
     {
       label: "Total Gas",
-      value: showMgasMetrics ? formatGas(totalGasUsed) : "N/A",
+      value: showMgasMetrics ? formatGas(totalGasUsed) : "—",
       unit: "",
       color: "text-info",
     },
@@ -168,32 +168,19 @@ export function MetricsSnapshot() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-2">
           {metrics.map((metric) => (
-            <div key={metric.label} className="rounded-lg border p-3">
-              <p className="text-xs text-muted-foreground font-mono">{metric.label}</p>
-              <p className={`text-xl font-bold font-mono ${metric.color}`}>
+            <div key={metric.label} className="rounded-lg border p-2 min-w-0 overflow-hidden">
+              <p className="text-[10px] text-muted-foreground font-mono truncate">{metric.label}</p>
+              <p className={`text-base font-bold font-mono ${metric.color} truncate`}>
                 {metric.value}
-                {metric.unit && (
-                  <span className="text-xs font-normal text-muted-foreground ml-1">
-                    {metric.unit}
-                  </span>
-                )}
               </p>
+              {metric.unit && (
+                <p className="text-[10px] text-muted-foreground font-mono truncate">{metric.unit}</p>
+              )}
             </div>
           ))}
         </div>
-        {hasBlockMetrics && snapshot.minBlockTimeMs > 0 && (
-          <div className="mt-3 pt-3 border-t">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Block Time (min/max)</span>
-              <span className="font-mono">
-                {formatBlockTime(snapshot.minBlockTimeMs)} / {formatBlockTime(snapshot.maxBlockTimeMs)}
-                {snapshot.minBlockTimeMs < 1000 && <span className="text-xs text-muted-foreground ml-1">ms</span>}
-              </span>
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

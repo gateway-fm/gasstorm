@@ -18,8 +18,8 @@ import { colors } from "@/lib/colors";
 
 // Chart colors from theme
 const COLORS = {
-  primary: colors.primary,
-  secondary: colors.primaryLight,
+  mgas: colors.info,           // Blue for MGas/s (matches text-info in metrics)
+  tps: colors.primary,         // Purple for tx/s (matches text-primary)
   tertiary: colors.primaryLighter,
   success: colors.success,
   warning: colors.warning,
@@ -95,8 +95,22 @@ export function RealTimeChart() {
       ? startIndex
       : totalPoints - maxDisplayPoints;
 
-    // Build chart data from the window - NO resampling, just a sliding window
-    // This ensures historical data never changes once displayed
+    // Apply moving average smoothing to reduce zigzag noise
+    // Window size of 5 smooths out high-frequency noise while preserving trends
+    const smoothingWindow = 5;
+
+    const smooth = (arr: number[], idx: number): number => {
+      const half = Math.floor(smoothingWindow / 2);
+      let sum = 0;
+      let count = 0;
+      for (let j = Math.max(0, idx - half); j <= Math.min(arr.length - 1, idx + half); j++) {
+        sum += arr[j] ?? 0;
+        count++;
+      }
+      return count > 0 ? sum / count : 0;
+    };
+
+    // Build chart data from the window with smoothing applied
     const chartPoints: { time: string; mgasPerSec: number; txPerSec: number; fillRate: number }[] = [];
 
     for (let i = windowStart; i < totalPoints; i++) {
@@ -107,9 +121,9 @@ export function RealTimeChart() {
 
       chartPoints.push({
         time: timeLabel,
-        mgasPerSec: timeSeries.mgasPerSec[i] ?? 0,
-        txPerSec: timeSeries.txPerSec[i] ?? 0,
-        fillRate: timeSeries.fillRate[i] ?? 0,
+        mgasPerSec: smooth(timeSeries.mgasPerSec, i),
+        txPerSec: smooth(timeSeries.txPerSec, i),
+        fillRate: smooth(timeSeries.fillRate, i),
       });
     }
 
@@ -129,7 +143,7 @@ export function RealTimeChart() {
             <>
               <div>
                 <span className="text-muted-foreground">{isHistoricalMode ? "Avg: " : "Current: "}</span>
-                <span className="font-mono font-semibold" style={{ color: COLORS.primary }}>
+                <span className="font-mono font-semibold" style={{ color: COLORS.mgas }}>
                   {snapshot.currentMgasPerSec.toFixed(2)} Mgas/s
                 </span>
               </div>
@@ -150,7 +164,7 @@ export function RealTimeChart() {
             <>
               <div>
                 <span className="text-muted-foreground">Avg: </span>
-                <span className="font-mono font-semibold" style={{ color: COLORS.secondary }}>
+                <span className="font-mono font-semibold" style={{ color: COLORS.tps }}>
                   {snapshot.currentTxPerSec.toFixed(1)} tx/s
                 </span>
               </div>
@@ -180,41 +194,41 @@ export function RealTimeChart() {
                   <>
                     <YAxis
                       yAxisId="left"
-                      stroke={COLORS.primary}
+                      stroke={COLORS.mgas}
                       fontSize={10}
                       tickLine={false}
                       label={{
                         value: "Mgas/s",
                         angle: -90,
                         position: "insideLeft",
-                        style: { fill: COLORS.primary, fontSize: 10 },
+                        style: { fill: COLORS.mgas, fontSize: 10 },
                       }}
                     />
                     <YAxis
                       yAxisId="right"
                       orientation="right"
-                      stroke={COLORS.secondary}
+                      stroke={COLORS.tps}
                       fontSize={10}
                       tickLine={false}
                       label={{
                         value: "tx/s",
                         angle: 90,
                         position: "insideRight",
-                        style: { fill: COLORS.secondary, fontSize: 10 },
+                        style: { fill: COLORS.tps, fontSize: 10 },
                       }}
                     />
                   </>
                 ) : (
                   <YAxis
                     yAxisId="left"
-                    stroke={COLORS.secondary}
+                    stroke={COLORS.tps}
                     fontSize={10}
                     tickLine={false}
                     label={{
                       value: "tx/s",
                       angle: -90,
                       position: "insideLeft",
-                      style: { fill: COLORS.secondary, fontSize: 10 },
+                      style: { fill: COLORS.tps, fontSize: 10 },
                     }}
                   />
                 )}
@@ -234,7 +248,7 @@ export function RealTimeChart() {
                       type="monotone"
                       dataKey="mgasPerSec"
                       name="Mgas/s"
-                      stroke={COLORS.primary}
+                      stroke={COLORS.mgas}
                       strokeWidth={2}
                       dot={false}
                       activeDot={{ r: 4 }}
@@ -257,7 +271,7 @@ export function RealTimeChart() {
                   type="monotone"
                   dataKey="txPerSec"
                   name="tx/s"
-                  stroke={COLORS.secondary}
+                  stroke={COLORS.tps}
                   strokeWidth={2}
                   dot={false}
                   activeDot={{ r: 4 }}

@@ -192,6 +192,28 @@ export function LoadTestRunner() {
               {verifyProgress || "Test finished. Verifying on-chain results..."}
             </p>
 
+            {/* On-chain metrics fetching progress */}
+            {verifyPhase === "on_chain_metrics" && blocksToVerify > 0 && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Fetching on-chain metrics...</span>
+                  <span className="font-mono">{blocksVerified} / {blocksToVerify}</span>
+                </div>
+                <Progress value={blocksToVerify > 0 ? (blocksVerified / blocksToVerify) * 100 : 0} className="h-1" />
+              </div>
+            )}
+
+            {/* Incremental aggregation progress */}
+            {verifyPhase === "aggregating" && blocksToVerify > 0 && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Aggregating snapshots...</span>
+                  <span className="font-mono">{blocksVerified} / {blocksToVerify}</span>
+                </div>
+                <Progress value={blocksToVerify > 0 ? (blocksVerified / blocksToVerify) * 100 : 0} className="h-1" />
+              </div>
+            )}
+
             {/* Tip ordering verification progress */}
             {verifyPhase === "tip_ordering" && blocksToVerify > 0 && (
               <div className="space-y-1">

@@ -22,7 +22,7 @@ const demoLogs: LogEntry[] = [
 export const BlockBuilderNode = memo(function BlockBuilderNode({
   data,
 }: NodeProps<BlockBuilderNodeType>) {
-  const { label, status, pendingTxCount, blockTimeMs, blocksBuilt } = data;
+  const { label, status, pendingTxCount, blockTimeMs } = data;
   const [logsExpanded, setLogsExpanded] = useState(false);
 
   const toggleLogs = useCallback((e: React.MouseEvent) => {

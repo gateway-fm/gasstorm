@@ -1,4 +1,4 @@
-.PHONY: run run-reth run-cdk-erigon run-metal stop restart logs status clean clean-metal build test test-block-builder test-load-generator test-dashboard test-tx bench-block-builder bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-builder dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help
+.PHONY: run run-reth run-cdk-erigon run-metal run-hyperlane stop restart logs status clean clean-metal build test test-block-builder test-load-generator test-dashboard test-tx bench-block-builder bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-builder dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help
 
 # =============================================================================
 # Configuration: Source .env file if it exists
@@ -58,6 +58,10 @@ run:
 
 # Start with Hyperlane bridge enabled
 run-with-bridge:
+	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
+
+# Alias for run-with-bridge (includes Hyperlane)
+run-hyperlane:
 	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
 
 # Start with op-reth (block-builder + Engine API)

@@ -165,6 +165,8 @@ export type InitPhase =
 // Verification phases during post-test verification
 export type VerifyPhase =
   | ""
+  | "on_chain_metrics"
+  | "aggregating"
   | "tx_count"
   | "tip_ordering"
   | "receipts";
