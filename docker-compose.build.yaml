@@ -1,0 +1,20 @@
+# Build overlay - builds block-builder and load-generator from local sibling repos
+#
+# Usage: make run-build
+# Or manually: docker compose -f docker-compose.yml -f docker-compose.build.yaml --profile reth up --build -d
+
+services:
+  block-builder:
+    build:
+      context: ../blockbuilder-standalone
+      dockerfile: Dockerfile
+
+  load-generator:
+    build:
+      context: ../loadgenerator
+      dockerfile: Dockerfile
+
+  load-generator-cdk:
+    build:
+      context: ../loadgenerator
+      dockerfile: Dockerfile

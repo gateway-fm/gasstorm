@@ -1,4 +1,4 @@
-.PHONY: run run-reth run-cdk-erigon run-metal run-hyperlane stop restart logs status clean clean-metal build test test-load-generator test-dashboard test-tx bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help pull-blockbuilder pull-loadgenerator
+.PHONY: run run-build run-reth run-cdk-erigon run-metal run-hyperlane stop restart logs status clean clean-metal build test test-load-generator test-dashboard test-tx bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help pull-blockbuilder pull-loadgenerator
 
 # =============================================================================
 # Configuration: Source .env file if it exists
@@ -50,11 +50,15 @@ POLYCLI_FUND_AMOUNT ?= 10000000000000000000
 # Default Configuration (uses .env or inline defaults)
 # =============================================================================
 
-# Start the system (builds if needed) - uses .env configuration and EXECUTION_LAYER
+# Start the system (pulls images) - uses .env configuration and EXECUTION_LAYER
 # Note: Bridge profile excluded by default (saves ~3GB and 2-3min build time)
 # Use 'make run-with-bridge' if you need Hyperlane bridging
 run:
-	docker compose --profile $(COMPOSE_PROFILE) up --build -d
+	docker compose --profile $(COMPOSE_PROFILE) up -d
+
+# Build from local sibling repos (../blockbuilder-standalone, ../loadgenerator) and run
+run-build:
+	docker compose -f docker-compose.yml -f docker-compose.build.yaml --profile $(COMPOSE_PROFILE) up --build -d
 
 # Start with Hyperlane bridge enabled
 run-with-bridge:
@@ -642,7 +646,8 @@ help:
 	@echo "Available commands:"
 	@echo ""
 	@echo "  Execution Layer (choose one):"
-	@echo "    make run              - Start with EXECUTION_LAYER from .env (default: reth)"
+	@echo "    make run              - Start with images from DockerHub (default: reth)"
+	@echo "    make run-build        - Build from local repos and start"
 	@echo "    make run-reth         - Start with op-reth (block-builder + Engine API)"
 	@echo "    make run-cdk-erigon   - Start with cdk-erigon (standalone sequencer)"
 	@echo "    make run-gravity-reth - Start with gravity-reth (high-perf parallel EVM)"

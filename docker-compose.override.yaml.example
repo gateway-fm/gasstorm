@@ -1,33 +1,26 @@
-# Local Development Override
+# Local Development Override (optional)
 #
-# Copy this file to docker-compose.override.yaml to build block-builder and/or
-# load-generator from local source instead of pulling from DockerHub.
+# For building from local repos, prefer using: make run-build
+# This file is only needed for custom overrides beyond what docker-compose.build.yaml provides.
 #
 # Usage:
 #   cp docker-compose.override.yaml.example docker-compose.override.yaml
-#   docker compose up --build -d
+#   # Edit as needed
+#   docker compose up -d
 #
 # The override file is automatically merged with docker-compose.yml
 # See: https://docs.docker.com/compose/extends/
 
 services:
-  # Uncomment to build block-builder from local sibling repo
-  block-builder:
-    image: gatewayfm/blockbuilder:local
-    build:
-      context: ../blockbuilder-standalone
-      dockerfile: Dockerfile
-
-  # Uncomment to build load-generator from local sibling repo
-  load-generator:
-    image: gatewayfm/loadgenerator:local
-    build:
-      context: ../loadgenerator
-      dockerfile: Dockerfile
-
-  # Uncomment for cdk-erigon mode load-generator override
-  # load-generator-cdk:
-  #   image: gatewayfm/loadgenerator:local
+  # Example: override block-builder with custom build args
+  # block-builder:
   #   build:
-  #     context: ../loadgenerator
+  #     context: ../blockbuilder-standalone
   #     dockerfile: Dockerfile
+  #     args:
+  #       - BUILD_VERSION=dev
+
+  # Example: override load-generator environment
+  # load-generator:
+  #   environment:
+  #     - DEBUG=true
