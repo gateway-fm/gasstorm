@@ -11,6 +11,30 @@ When committing, use `--no-gpg-sign` to avoid GPG timeout issues:
 git commit --no-gpg-sign -m "commit message"
 ```
 
+## External Dependencies
+
+Both the block-builder and load-generator are maintained in separate repositories and pulled as Docker images:
+
+| Component | Image | Source |
+|-----------|-------|--------|
+| block-builder | `gatewayfm/blockbuilder` | [github.com/gateway-fm/blockbuilder](https://github.com/gateway-fm/blockbuilder) |
+| load-generator | `gatewayfm/loadgenerator` | [github.com/gateway-fm/loadgenerator](https://github.com/gateway-fm/loadgenerator) |
+
+To use specific versions:
+```bash
+BLOCKBUILDER_VERSION=v1.0.0 make run-reth
+LOADGENERATOR_VERSION=v1.0.0 make run-reth
+```
+
+For local development with sibling repos:
+```bash
+cp docker-compose.override.yaml.example docker-compose.override.yaml
+# Edit paths if needed, then:
+docker compose up --build -d
+```
+
+Dev mode (`make dev`) expects the loadgenerator repo at `../loadgenerator`.
+
 ## Execution Layer Selection
 
 The project supports multiple execution layer backends via a **capability-based architecture**. Select via `EXECUTION_LAYER` environment variable.
@@ -20,7 +44,7 @@ The project supports multiple execution layer backends via a **capability-based 
 The load-generator uses capability checks instead of string comparisons:
 
 ```go
-// load-generator/internal/execnode/capabilities.go
+// github.com/gateway-fm/loadgenerator/internal/execnode/capabilities.go
 type ExecutionLayerCapabilities struct {
     Name                     string
     HasExternalBlockBuilder  bool   // true = uses block-builder, false = direct sequencer
@@ -61,7 +85,7 @@ load-generator → cdk-erigon:8545 (direct sequencer)
 
 ### Adding a New Execution Layer
 
-1. Add capability function in `load-generator/internal/execnode/registry.go`:
+1. Add capability function in the loadgenerator repo (`internal/execnode/registry.go`):
    ```go
    func NewNodeCapabilities() *ExecutionLayerCapabilities {
        return &ExecutionLayerCapabilities{
@@ -115,7 +139,7 @@ make run-zisk
                              │ HTTP: eth_sendRawTransaction
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         Block Builder                               │
+│                    Block Builder (Docker image)                     │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────────┐ │
 │  │ TX Queue │→ │ TX Pool  │→ │ Filter   │→ │ Engine API (op-reth) │ │
 │  │ (100k)   │  │ (sharded)│  │ (nonces) │  │ FCU + GetPayload     │ │
@@ -173,7 +197,7 @@ open http://localhost:18000/load-test/
 # Stop services
 make stop
 
-# Development mode (local load-generator)
+# Development mode (local load-generator and dashboard)
 make dev              # for reth
 make dev-cdk-erigon   # for cdk-erigon
 ```
@@ -202,6 +226,8 @@ go build ./...
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `EXECUTION_LAYER` | reth | Execution layer: `reth` or `cdk-erigon` |
+| `BLOCKBUILDER_VERSION` | latest | Block builder Docker image tag |
+| `LOADGENERATOR_VERSION` | latest | Load generator Docker image tag |
 | `BLOCK_TIME_MS` | 1000 | Block interval in milliseconds (reth only) |
 | `GAS_LIMIT` | 1000000000 | Block gas limit (1 gigagas) |
 | `MAX_TXS_PER_BLOCK` | 25000 | Maximum transactions per block (reth only) |
@@ -223,32 +249,9 @@ go build ./...
 
 ## Key Files
 
-### Block Builder (`block-builder/`)
-| File | Purpose |
-|------|---------|
-| `builder.go` | Main BlockBuilder struct and StartBlockProduction |
-| `pipeline.go` | Pipelined block production (overlap mode) |
-| `internal/builder/builder.go` | Core block building logic |
-| `internal/txpool/nonce_cache.go` | Unified nonce cache (LRU, RPC, freshness) |
-| `internal/txpool/filter.go` | TX filtering and ordering |
-| `internal/preconf/hub.go` | WebSocket preconf event broadcasting |
-| `internal/engine/client.go` | Engine API client (FCU, GetPayload) |
+### Load Generator (external: [github.com/gateway-fm/loadgenerator](https://github.com/gateway-fm/loadgenerator))
 
-### Load Generator (`load-generator/`)
-| File | Purpose |
-|------|---------|
-| `cmd/loadgen/main.go` | Main entry, worker management |
-| `internal/execnode/capabilities.go` | Execution layer capability definitions |
-| `internal/execnode/registry.go` | Registry of built-in execution layers |
-| `internal/account/account.go` | Nonce reservation pattern (ReserveNonce/Commit/Rollback) |
-| `internal/account/manager.go` | Account initialization and funding |
-| `internal/config/config.go` | Config loading with capability resolution |
-| `internal/rpc/client.go` | RPC client with nonce fetching |
-| `internal/metrics/collector.go` | Latency and throughput tracking |
-| `internal/storage/models.go` | Database models (MUST have json tags!) |
-| `internal/storage/sqlite.go` | SQLite persistence |
-| `internal/transport/http.go` | HTTP API handlers |
-| `pkg/types/types.go` | Public API types |
+See the loadgenerator repo's CLAUDE.md for its key files table.
 
 ### Dashboard (`dashboard/`)
 | File | Purpose |
@@ -260,55 +263,20 @@ go build ./...
 | `src/types/load-test.ts` | TypeScript type definitions |
 | `src/types/metrics.ts` | Metrics type definitions |
 
-## Internal Architecture
+## Block Builder API
 
-### Ethereum Nonce Fundamentals
+The block-builder (external Docker image) exposes these endpoints:
 
-**What is a nonce?** A sequential counter per account starting at 0. Each outbound transaction increments it by 1. It uniquely identifies transactions from an address.
+### HTTP (Port 13000)
+- `POST /` - JSON-RPC endpoint for `eth_sendRawTransaction`
+- `GET /status` - Builder status and metrics
+- `GET /eth_getPendingNonce?address=0x...` - Get pending nonce for address
 
-**Nonce Rules:**
-1. **Sequential**: Nonce N can't be mined until nonces 0 through N-1 are mined
-2. **No gaps**: If you send nonce 5 before 4, nonce 5 waits in mempool
-3. **No reuse**: Same nonce = replacement (RBF), requires higher gas price (10% bump)
-4. **Immutable after mining**: Once mined, nonce is consumed forever
+### WebSocket (Port 13002)
+- `/ws/preconfirmations` - Preconfirmation events stream
+- `/ws/block-metrics` - Block production metrics stream
 
-**Common Pitfalls:**
-- **Stuck transactions**: Low-fee TX blocks all subsequent TXs from that account
-- **Nonce gaps**: Dropped TX leaves gap, all higher nonces stuck until gap filled
-- **Race conditions**: Two systems querying nonce can get different values
-- **Cache staleness**: Using old nonce values causes rejection or gaps
-
-### Nonce Management (Unified NonceCache)
-
-The block builder uses a **single unified NonceCache** (`internal/txpool/nonce_cache.go`) for all nonce tracking:
-
-```go
-// Used by builder.go, producer.go, and filter.go
-type NonceCache struct {
-    entries     map[common.Address]*nonceCacheEntry
-    l2Client    *l2client.Client    // For RPC lookups
-    lruList     *list.List          // LRU eviction for memory bounds
-    maxAccounts int                 // Memory limit
-    maxCacheAge time.Duration       // Freshness tracking
-    nonceGroup  singleflight.Group  // Coalesces concurrent RPC calls
-}
-```
-
-**Key Features:**
-- **LRU eviction**: Bounds memory by evicting least-recently-used entries
-- **Freshness tracking**: `GetFresh()` forces RPC lookup if cache is stale
-- **Singleflight**: Concurrent lookups for same address share one RPC call
-- **SetIfHigher semantics**: Prevents stale writes from overwriting newer data
-
-**Nonce Lifecycle:**
-1. TX arrives: nonce extracted from RLP during light parse
-2. Filtering: compare TX nonce to expected (cache or RPC lookup)
-3. Classification: executable (match) | future (gap) | dropped (too low)
-4. Block inclusion: Engine API accepts/rejects
-5. Commit: Update cache ONLY for confirmed-included TXs
-6. Recovery: On stuck state, refresh cache from chain
-
-### Load Generator Nonce Management
+## Load Generator Nonce Management
 
 The load generator uses a **reservation pattern** for high-throughput nonce management:
 
@@ -332,7 +300,7 @@ queued := sender.SendAsync(ctx, txData, func(err error) {
 - **Commit in callback**: Never commit before async send completes
 - **Reactive sync**: Resync only on circuit breaker open (not periodic)
 
-**Nonce Fetch Strategy** (`internal/rpc/client.go`):
+**Nonce Fetch Strategy** (loadgenerator `internal/rpc/client.go`):
 1. First tries `eth_getPendingNonce` (block builder's view)
 2. Falls back to `eth_getTransactionCount("pending")` to include mempool
 
@@ -341,65 +309,24 @@ queued := sender.SendAsync(ctx, txData, func(err error) {
 - Triggers `resyncAllNonces()` to fetch fresh nonces from builder
 - Rate is reduced to 10 TPS until recovery
 
-**Rollback Limitation:**
-- Rollback only works for the most recent nonce (prevents out-of-order rollback chaos)
-- Middle nonce failures create gaps that are recovered via circuit breaker resync
-
-### When to Modify What
-
-| Task | File(s) to Change |
-|------|-------------------|
-| Change nonce caching/lookup | `internal/txpool/nonce_cache.go` |
-| Change nonce filtering logic | `internal/txpool/filter.go` |
-| Add new block production mode | `builder.go` or new file in root |
-| Change preconfirmation events | `internal/preconf/hub.go` |
-| Modify Engine API calls | `internal/engine/client.go` |
-
-### Transaction Lifecycle
-
-```
-1. TX arrives via HTTP → QueueTransaction() in builder.go
-2. Parsed and added to txQueue channel (100k buffer)
-3. Block production loop drains txQueue → pendingTxs slice
-4. Filter.FilterExecutable() sorts by nonce, identifies:
-   - Executable: nonce matches expected → include in block
-   - Future: nonce > expected → re-queue for later
-   - Dropped: nonce < expected → already executed
-5. BuildBlock() sends to Engine API
-6. On success: nonceMap updated, preconf events emitted
-```
-
-### Glossary
-
-| Term | Definition |
-|------|------------|
-| **Preconfirmation** | Promise that TX will be included (before actual block confirmation) |
-| **Inflight nonce** | Nonce assigned to block being built, not yet confirmed by reth |
-| **FCU** | forkchoiceUpdated - Engine API call to set chain head and request new payload |
-| **GetPayload** | Engine API call to retrieve built block after FCU |
-| **Deposit TX** | L1→L2 system transaction, must be first in every block |
-| **RBF** | Replace-by-fee, requires 10% gas price bump to replace pending TX |
-
 ## Testing
 
 ### Unit Tests
 ```bash
-make test                    # All tests with race detector
-make test-block-builder      # Block builder only
-make test-load-generator     # Load generator only
+make test                    # Dashboard lint
+cd ../loadgenerator && make test  # Load generator tests (external repo)
 ```
 
 ### Integration Tests
 ```bash
-make test-contract           # API contract tests (no stack needed)
-make test-e2e                # E2E tests (requires running stack)
+make test-contract           # API contract tests (requires ../loadgenerator)
+make test-e2e                # E2E tests (requires running stack + ../loadgenerator)
 make test-integration        # Full integration suite (starts/stops stack)
 ```
 
 ### Benchmarks
 ```bash
-make bench-block-builder     # Block builder benchmarks
-make bench-load-generator    # Load generator benchmarks
+cd ../loadgenerator && make bench  # Load generator benchmarks (external repo)
 ```
 
 ## Common Issues
@@ -407,7 +334,7 @@ make bench-load-generator    # Load generator benchmarks
 ### Pipeline Gets Stuck
 - **Symptom**: Blocks stop being produced, pending count grows
 - **Cause**: Engine API returned SYNCING, builder didn't recover
-- **Fix**: Restart the stack, or implement SYNCING recovery in pipeline.go
+- **Fix**: Restart the stack with `make stop && make run-reth`
 
 ### Low Throughput (< 100 TPS)
 - Check Engine API latency in logs
@@ -423,6 +350,16 @@ make bench-load-generator    # Load generator benchmarks
 - Go structs without `json:"fieldName"` tags serialize as PascalCase
 - TypeScript expects camelCase
 - Always add json tags to storage/models.go structs
+
+## Glossary
+
+| Term | Definition |
+|------|------------|
+| **Preconfirmation** | Promise that TX will be included (before actual block confirmation) |
+| **FCU** | forkchoiceUpdated - Engine API call to set chain head and request new payload |
+| **GetPayload** | Engine API call to retrieve built block after FCU |
+| **Deposit TX** | L1→L2 system transaction, must be first in every block |
+| **RBF** | Replace-by-fee, requires 10% gas price bump to replace pending TX |
 
 ## Browser Automation Testing
 

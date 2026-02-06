@@ -1,4 +1,4 @@
-.PHONY: run run-reth run-cdk-erigon run-metal run-hyperlane stop restart logs status clean clean-metal build test test-block-builder test-load-generator test-dashboard test-tx bench-block-builder bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-builder dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help
+.PHONY: run run-reth run-cdk-erigon run-metal run-hyperlane stop restart logs status clean clean-metal build test test-load-generator test-dashboard test-tx bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help pull-blockbuilder pull-loadgenerator
 
 # =============================================================================
 # Configuration: Source .env file if it exists
@@ -170,27 +170,21 @@ build:
 # =============================================================================
 
 # Run all tests with race detector
-test: test-block-builder test-load-generator test-dashboard
+test: test-dashboard
 
-# Test block-builder (Go)
-test-block-builder:
-	cd block-builder && go test -race -v ./...
-
-# Test load-generator (Go)
+# Test load-generator (external repo: github.com/gateway-fm/loadgenerator)
 test-load-generator:
-	cd load-generator && go test -race -v ./...
+	@echo "Load generator is now an external repo: github.com/gateway-fm/loadgenerator"
+	@echo "Run tests there: cd ../loadgenerator && make test"
 
 # Test dashboard (Next.js - lint only for now)
 test-dashboard:
 	cd dashboard && npm run lint
 
-# Run benchmarks for block-builder
-bench-block-builder:
-	cd block-builder && go test -bench=. -benchmem ./...
-
-# Run benchmarks for load-generator
+# Run benchmarks for load-generator (external repo)
 bench-load-generator:
-	cd load-generator && go test -bench=. -benchmem ./...
+	@echo "Load generator is now an external repo: github.com/gateway-fm/loadgenerator"
+	@echo "Run benchmarks there: cd ../loadgenerator && make bench"
 
 # Install git hooks (pre-commit runs full test suite)
 setup-hooks:
@@ -199,22 +193,22 @@ setup-hooks:
 	@cp scripts/hooks/pre-commit .git/hooks/pre-commit
 	@chmod +x .git/hooks/pre-commit
 	@echo "Pre-commit hook installed successfully!"
-	@echo "  - Runs: block-builder tests, load-generator tests, dashboard lint"
+	@echo "  - Runs: dashboard lint"
 	@echo "  - To skip: git commit --no-verify"
 
 # =============================================================================
 # Integration Tests
 # =============================================================================
 
-# Run API contract tests (no stack needed)
+# Run API contract tests (no stack needed) - requires sibling loadgenerator repo
 test-contract:
 	@echo "Running API contract tests..."
-	cd load-generator && go test -v -race ./internal/contract/...
+	cd ../loadgenerator && go test -v -race ./internal/contract/...
 
-# Run E2E integration tests (requires running stack)
+# Run E2E integration tests (requires running stack) - requires sibling loadgenerator repo
 test-e2e:
 	@echo "Running E2E integration tests (stack must be running)..."
-	cd load-generator && \
+	cd ../loadgenerator && \
 	BUILDER_RPC_URL=http://localhost:13000 \
 	LOADGEN_API_URL=http://localhost:13001 \
 	L2_RPC_URL=http://localhost:13000 \
@@ -432,33 +426,16 @@ polycli-help:
 # Local Development (HMR)
 # =============================================================================
 
-# Start just the blockchain infrastructure in Docker
+# Start just the blockchain infrastructure in Docker (L1 + L2 + block-builder)
 dev-infra:
-	docker compose up -d l1 l2-reth
-	@echo "Waiting for L1 and L2 to be ready..."
-	@sleep 3
+	docker compose --profile reth up -d l1 l2-reth block-builder
+	@echo "Waiting for L1, L2, and block-builder to be ready..."
+	@sleep 5
 	@echo "Infrastructure ready. L1: localhost:18545, L2 (via block-builder): localhost:13000"
 
-# Run block-builder locally (requires dev-infra)
-dev-builder:
-	cd block-builder && \
-	ENGINE_RPC_URL=http://localhost:18551 \
-	L2_RPC_URL=http://localhost:13000 \
-	JWT_SECRET_PATH=../genesis/jwt.hex \
-	SEQUENCER_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
-	LISTEN_ADDR=:13000 \
-	PRECONF_LISTEN_ADDR=:13002 \
-	BLOCK_TIME_MS=$${BLOCK_TIME_MS:-1000} \
-	SKIP_EMPTY_BLOCKS=$${SKIP_EMPTY_BLOCKS:-false} \
-	GAS_LIMIT=$${GAS_LIMIT:-1000000000} \
-	MAX_TXS_PER_BLOCK=$${MAX_TXS_PER_BLOCK:-25000} \
-	TX_ORDERING=$${TX_ORDERING:-fifo} \
-	ENABLE_PRECONFIRMATIONS=$${ENABLE_PRECONFIRMATIONS:-true} \
-	go run .
-
-# Run load-generator locally (requires dev-infra and dev-builder)
+# Run load-generator locally (requires dev-infra and sibling loadgenerator repo)
 dev-loadgen:
-	cd load-generator && \
+	cd ../loadgenerator && \
 	BUILDER_RPC_URL=http://localhost:13000 \
 	L2_RPC_URL=http://localhost:13000 \
 	PRECONF_WS_URL=ws://localhost:13002/ws/preconfirmations \
@@ -472,10 +449,21 @@ dev-dashboard:
 
 # Stop dev infrastructure
 dev-stop:
-	docker compose --profile reth --profile cdk-erigon stop l1 l2-reth l2-cdk-erigon 2>/dev/null || true
+	docker compose --profile reth --profile cdk-erigon stop l1 l2-reth l2-cdk-erigon block-builder 2>/dev/null || true
 	@echo "Dev infrastructure stopped"
 
+# Pull latest block-builder image from DockerHub
+pull-blockbuilder:
+	docker pull gatewayfm/blockbuilder:latest
+	@echo "Pulled gatewayfm/blockbuilder:latest"
+
+# Pull latest load-generator image from DockerHub
+pull-loadgenerator:
+	docker pull gatewayfm/loadgenerator:latest
+	@echo "Pulled gatewayfm/loadgenerator:latest"
+
 # CDK-Erigon dev mode: Start cdk-erigon in Docker, run load-generator and dashboard locally
+# Requires sibling loadgenerator repo at ../loadgenerator
 dev-cdk-erigon:
 	@echo "=== Starting CDK-Erigon Development Mode ==="
 	@echo "Killing any processes on ports 3000, 13001..."
@@ -497,7 +485,7 @@ dev-cdk-erigon:
 		}; \
 		trap cleanup INT TERM; \
 		\
-		( cd load-generator && \
+		( cd ../loadgenerator && \
 		  EXECUTION_LAYER=cdk-erigon \
 		  BUILDER_RPC_URL=http://localhost:18546 \
 		  L2_RPC_URL=http://localhost:18546 \
@@ -526,50 +514,32 @@ dev-cdk-erigon:
 		wait \
 	'
 
-# Full local dev: run all services with cleanup on Ctrl+C
+# Full local dev: run load-generator and dashboard locally, infrastructure in Docker
+# Requires sibling loadgenerator repo at ../loadgenerator
 dev:
 	@echo "=== Starting Local Development Mode ==="
-	@echo "Killing any processes on ports 3000, 13000, 13001, 13002..."
+	@echo "Killing any processes on ports 3000, 13001..."
 	@-lsof -ti :3000 | xargs kill -9 2>/dev/null || true
-	@-lsof -ti :13000 | xargs kill -9 2>/dev/null || true
 	@-lsof -ti :13001 | xargs kill -9 2>/dev/null || true
-	@-lsof -ti :13002 | xargs kill -9 2>/dev/null || true
 	@if [ -f .env ]; then echo "Loading .env file..."; set -a; . ./.env; set +a; fi
-	@docker compose up -d l1 l2-reth
-	@echo "Waiting for L1/L2..."
-	@sleep 3
+	@docker compose --profile reth up -d l1 l2-reth block-builder
+	@echo "Waiting for L1/L2/block-builder..."
+	@sleep 5
 	@echo "Starting services... (Ctrl+C to stop all)"
 	@bash -c '\
 		if [ -f .env ]; then set -a; . ./.env; set +a; fi; \
 		cleanup() { \
 			echo ""; \
 			echo "Shutting down..."; \
-			kill $$BUILDER_PID $$LOADGEN_PID $$DASHBOARD_PID 2>/dev/null; \
-			wait $$BUILDER_PID $$LOADGEN_PID $$DASHBOARD_PID 2>/dev/null; \
-			docker compose stop l1 l2-reth; \
+			kill $$LOADGEN_PID $$DASHBOARD_PID 2>/dev/null; \
+			wait $$LOADGEN_PID $$DASHBOARD_PID 2>/dev/null; \
+			docker compose --profile reth stop l1 l2-reth block-builder; \
 			echo "Done."; \
 			exit 0; \
 		}; \
 		trap cleanup INT TERM; \
 		\
-		( cd block-builder && \
-		  ENGINE_RPC_URL=http://localhost:18551 \
-		  L2_RPC_URL=http://localhost:18546 \
-		  JWT_SECRET_PATH=../genesis/jwt.hex \
-		  SEQUENCER_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 \
-		  LISTEN_ADDR=:13000 \
-		  PRECONF_LISTEN_ADDR=:13002 \
-		  BLOCK_TIME_MS=$${BLOCK_TIME_MS:-1000} \
-		  SKIP_EMPTY_BLOCKS=$${SKIP_EMPTY_BLOCKS:-false} \
-		  GAS_LIMIT=$${GAS_LIMIT:-1000000000} \
-		  MAX_TXS_PER_BLOCK=$${MAX_TXS_PER_BLOCK:-25000} \
-		  TX_ORDERING=$${TX_ORDERING:-fifo} \
-		  ENABLE_PRECONFIRMATIONS=$${ENABLE_PRECONFIRMATIONS:-true} \
-		  go run . 2>&1 | sed "s/^/[builder] /" ) & \
-		BUILDER_PID=$$!; \
-		sleep 2; \
-		\
-		( cd load-generator && \
+		( cd ../loadgenerator && \
 		  BUILDER_RPC_URL=http://localhost:13000 \
 		  L2_RPC_URL=http://localhost:18546 \
 		  PRECONF_WS_URL=ws://localhost:13002/ws/preconfirmations \
@@ -585,7 +555,7 @@ dev:
 		echo ""; \
 		echo "=== All services running ==="; \
 		echo "  Dashboard:      http://localhost:3000"; \
-		echo "  Block Builder:  http://localhost:13000"; \
+		echo "  Block Builder:  http://localhost:13000 (Docker)"; \
 		echo "  Load Generator: http://localhost:13001"; \
 		echo ""; \
 		echo "Press Ctrl+C to stop all services"; \
@@ -698,10 +668,8 @@ help:
 	@echo ""
 	@echo "  Testing:"
 	@echo "    make test             - Run all tests (with race detector)"
-	@echo "    make test-block-builder  - Test block-builder only"
 	@echo "    make test-load-generator - Test load-generator only"
 	@echo "    make test-dashboard      - Lint dashboard"
-	@echo "    make bench-block-builder - Run block-builder benchmarks"
 	@echo "    make bench-load-generator - Run load-generator benchmarks"
 	@echo "    make test-tx          - Send a test transaction"
 	@echo "    make balance          - Check test account balance"
@@ -724,13 +692,18 @@ help:
 	@echo "    make prover-help      - Full prover options"
 	@echo ""
 	@echo "  Local Development (HMR):"
-	@echo "    make dev              - Run all services locally (op-reth mode)"
+	@echo "    make dev              - Run load-generator and dashboard locally (op-reth mode)"
 	@echo "    make dev-cdk-erigon   - Run with cdk-erigon in Docker, rest locally"
-	@echo "    make dev-infra        - Start only L1/L2 in Docker"
-	@echo "    make dev-builder      - Run only block-builder locally"
+	@echo "    make dev-infra        - Start L1/L2/block-builder in Docker"
 	@echo "    make dev-loadgen      - Run only load-generator locally"
 	@echo "    make dev-dashboard    - Run only dashboard with HMR"
 	@echo "    make dev-stop         - Stop dev infrastructure"
+	@echo ""
+	@echo "  External Images:"
+	@echo "    make pull-blockbuilder   - Pull latest block-builder image from DockerHub"
+	@echo "    make pull-loadgenerator  - Pull latest load-generator image from DockerHub"
+	@echo "    BLOCKBUILDER_VERSION=v1.0.0 make run     - Use specific block-builder version"
+	@echo "    LOADGENERATOR_VERSION=v1.0.0 make run    - Use specific load-generator version"
 	@echo ""
 	@echo "  Polycli Load Testing:"
 	@echo "    make polycli-install  - Install polycli via go install"

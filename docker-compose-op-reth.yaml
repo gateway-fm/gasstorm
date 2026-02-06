@@ -77,10 +77,10 @@ services:
     restart: unless-stopped
 
   # Block Builder Service (Go)
+  # Image from DockerHub: gatewayfm/blockbuilder
+  # Override with BLOCKBUILDER_VERSION env var or docker-compose.override.yaml for local builds
   block-builder:
-    build:
-      context: ./block-builder
-      dockerfile: Dockerfile
+    image: gatewayfm/blockbuilder:${BLOCKBUILDER_VERSION:-latest}
     container_name: sequencer-poc-builder
     depends_on:
       - l2-reth
@@ -119,10 +119,9 @@ services:
     restart: unless-stopped
 
   # Load Generator Service (Go)
+  # Image from DockerHub: gatewayfm/loadgenerator
   load-generator:
-    build:
-      context: ./load-generator
-      dockerfile: Dockerfile
+    image: gatewayfm/loadgenerator:${LOADGENERATOR_VERSION:-latest}
     container_name: sequencer-poc-loadgen
     depends_on:
       - block-builder
@@ -160,4 +159,5 @@ services:
 
 volumes:
   l2-data:
+  loadgen-data:
   hyperlane-config:

@@ -317,7 +317,7 @@ ws.onmessage = (event) => {
 | Component | Path |
 |-----------|------|
 | Block Builder Core | `block-builder/main.go` |
-| Load Generator | `load-generator/main.go` |
+| Load Generator | `loadgenerator:main.go` |
 | Dashboard WebSocket Hook | `dashboard/src/hooks/use-websocket.ts` |
 | Transaction Builder | `dashboard/src/lib/transaction-builder.ts` |
 | Docker Compose | `docker-compose.yml` |

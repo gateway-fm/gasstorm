@@ -13,9 +13,6 @@
 block-builder/block-builder
 block-builder/block-builder-pure
 block-builder/block-builder.test
-load-generator/loadgen
-load-generator/load-generator
-load-generator/loadgen.test
 *.test
 
 # Go workspace
@@ -53,6 +50,7 @@ yarn-error.log*
 
 # Docker
 .docker/
+docker-compose.override.yaml
 
 # IDE / Editor
 .vscode/

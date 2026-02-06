@@ -1,5 +1,5 @@
 #!/bin/bash
-# Pre-commit hook: runs full test suite before allowing commits
+# Pre-commit hook: runs test suite before allowing commits
 # Install: make setup-hooks
 
 set -e
@@ -24,18 +24,6 @@ print_status() {
 
 # Get the project root (where .git is)
 PROJECT_ROOT=$(git rev-parse --show-toplevel)
-cd "$PROJECT_ROOT"
-
-echo ""
-echo "=== Block Builder Tests ==="
-cd block-builder && go test -race ./... > /dev/null 2>&1
-print_status $? "block-builder tests"
-cd "$PROJECT_ROOT"
-
-echo ""
-echo "=== Load Generator Tests ==="
-cd load-generator && go test -race ./... > /dev/null 2>&1
-print_status $? "load-generator tests"
 cd "$PROJECT_ROOT"
 
 echo ""

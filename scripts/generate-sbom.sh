@@ -21,7 +21,7 @@ if command -v syft &> /dev/null; then
 
     # Generate SBOM for load-generator
     echo "  - load-generator..."
-    syft dir:./load-generator -o cyclonedx-json > "$OUTPUT_DIR/load-generator.sbom.json"
+    syft dir:../loadgenerator -o cyclonedx-json > "$OUTPUT_DIR/load-generator.sbom.json"
 
     # Generate SBOM for zisk-prover
     echo "  - zisk-prover..."
@@ -116,7 +116,7 @@ else
     }
 
     generate_go_sbom "block-builder" "./block-builder"
-    generate_go_sbom "load-generator" "./load-generator"
+    generate_go_sbom "load-generator" "../loadgenerator"
     generate_go_sbom "zisk-prover" "./zisk-prover"
     generate_npm_sbom "dashboard" "./dashboard"
     generate_npm_sbom "bridge-ui" "./bridge-ui"

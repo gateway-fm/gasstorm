@@ -135,8 +135,8 @@ make stop
 | [Architecture](./docs/architecture.md) | Deep dive: nonce management, transaction lifecycle |
 | [Configuration](./docs/configuration.md) | Env vars, Makefile targets, docker profiles |
 | [Execution Layers](./docs/execution-layers.md) | reth/cdk-erigon/gravity-reth comparison |
-| [Block Builder](./block-builder/README.md) | Pipeline, nonce cache, Engine API |
-| [Load Generator](./load-generator/README.md) | TX types, patterns, API reference |
+| [Block Builder](https://github.com/gateway-fm/blockbuilder) | Pipeline, nonce cache, Engine API (external repo) |
+| [Load Generator](https://github.com/gateway-fm/loadgenerator) | TX types, patterns, API reference (external repo) |
 | [Dashboard](./dashboard/README.md) | Pages, metrics, TypeScript types |
 
 ## Performance

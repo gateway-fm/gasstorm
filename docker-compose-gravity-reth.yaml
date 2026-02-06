@@ -67,10 +67,9 @@ services:
 
   # Load Generator Service (Go)
   # Sends transactions directly to gravity-reth RPC (no block-builder)
+  # Image from DockerHub: gatewayfm/loadgenerator
   load-generator:
-    build:
-      context: ./load-generator
-      dockerfile: Dockerfile
+    image: gatewayfm/loadgenerator:${LOADGENERATOR_VERSION:-latest}
     container_name: sequencer-poc-loadgen
     depends_on:
       - l2-gravity-reth

@@ -163,10 +163,10 @@ services:
     restart: unless-stopped
 
   # Block Builder Service (Go) - only used with op-reth (profile: reth)
+  # Image from DockerHub: gatewayfm/blockbuilder
+  # Override with BLOCKBUILDER_VERSION env var or docker-compose.override.yaml for local builds
   block-builder:
-    build:
-      context: ./block-builder
-      dockerfile: Dockerfile
+    image: gatewayfm/blockbuilder:${BLOCKBUILDER_VERSION:-latest}
     container_name: sequencer-poc-builder
     profiles: ["reth"]
     depends_on:
@@ -230,10 +230,10 @@ services:
     restart: unless-stopped
 
   # Load Generator Service (Go) - for op-reth mode (profile: reth)
+  # Image from DockerHub: gatewayfm/loadgenerator
+  # Override with docker-compose.override.yaml for local builds
   load-generator:
-    build:
-      context: ./load-generator
-      dockerfile: Dockerfile
+    image: gatewayfm/loadgenerator:${LOADGENERATOR_VERSION:-latest}
     container_name: sequencer-poc-loadgen
     profiles: ["reth"]
     depends_on:
@@ -257,9 +257,7 @@ services:
   # Load Generator Service (Go) - for cdk-erigon mode (profile: cdk-erigon)
   # Sends transactions directly to cdk-erigon RPC (no block-builder)
   load-generator-cdk:
-    build:
-      context: ./load-generator
-      dockerfile: Dockerfile
+    image: gatewayfm/loadgenerator:${LOADGENERATOR_VERSION:-latest}
     container_name: sequencer-poc-loadgen
     profiles: ["cdk-erigon"]
     depends_on:

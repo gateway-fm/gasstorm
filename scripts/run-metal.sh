@@ -281,7 +281,7 @@ main() {
     log_info "Starting load-generator..."
 
     (
-        cd "$PROJECT_DIR/load-generator"
+        cd "$PROJECT_DIR/../loadgenerator"
         EXECUTION_LAYER="reth" \
         BUILDER_RPC_URL="http://localhost:$BUILDER_PORT" \
         L2_RPC_URL="http://localhost:$RETH_HTTP_PORT" \

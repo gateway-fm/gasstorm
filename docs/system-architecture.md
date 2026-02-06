@@ -235,7 +235,7 @@ load-generator → cdk-erigon:8545 (direct sequencer)
 
 ### Adding a New Execution Layer
 
-1. Add capability function in `load-generator/internal/execnode/registry.go`
+1. Add capability function in `loadgenerator:internal/execnode/registry.go`
 2. Register in `DefaultRegistry()`
 3. Create `docker-compose-new-node.yaml`
 4. Add Makefile target (optional)
@@ -366,8 +366,8 @@ Events: `pending` → `preconfirmed` → `confirmed` | `dropped` | `requeued` | 
 | Add new block production mode | `block-builder/builder.go` or new file in root |
 | Change preconfirmation events | `block-builder/internal/preconf/hub.go` |
 | Modify Engine API calls | `block-builder/internal/engine/client.go` |
-| Add new execution layer | `load-generator/internal/execnode/registry.go` |
-| Change load generator TX types | `load-generator/internal/txbuilder/builder.go` |
+| Add new execution layer | `loadgenerator:internal/execnode/registry.go` |
+| Change load generator TX types | `loadgenerator:internal/txbuilder/builder.go` |
 | Modify dashboard UI | `dashboard/src/app/load-test/page.tsx` |
 
 ## Glossary

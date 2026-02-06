@@ -75,7 +75,7 @@ EXECUTION_LAYER=gravity-reth make run-gravity-reth
 The load-generator uses capability checks instead of string comparisons:
 
 ```go
-// load-generator/internal/execnode/capabilities.go
+// loadgenerator:internal/execnode/capabilities.go
 type ExecutionLayerCapabilities struct {
     Name                     string
     HasExternalBlockBuilder  bool   // true = uses block-builder, false = direct sequencer
@@ -128,7 +128,7 @@ func NewGravityRethCapabilities() *ExecutionLayerCapabilities {
 
 ## Adding a New Execution Layer
 
-1. Add capability function in `load-generator/internal/execnode/registry.go`:
+1. Add capability function in `loadgenerator:internal/execnode/registry.go`:
 
 ```go
 func NewNodeCapabilities() *ExecutionLayerCapabilities {

@@ -264,7 +264,7 @@ Preconfirmations are promises that a transaction will be included in a future bl
 | Add new block production mode | `block-builder/builder.go` |
 | Change preconfirmation events | `block-builder/internal/preconf/hub.go` |
 | Modify Engine API calls | `block-builder/internal/engine/client.go` |
-| Add transaction type | `load-generator/internal/txbuilder/` |
-| Change load patterns | `load-generator/internal/pipeline/` |
+| Add transaction type | `loadgenerator:internal/txbuilder/` |
+| Change load patterns | `loadgenerator:internal/pipeline/` |
 
 See [Configuration](./configuration.md) for env vars and [Execution Layers](./execution-layers.md) for mode comparison.

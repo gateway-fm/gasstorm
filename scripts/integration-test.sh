@@ -61,7 +61,7 @@ wait_for_service() {
 
 run_api_contract_tests() {
     log_info "Running API contract tests..."
-    cd "$PROJECT_DIR/load-generator"
+    cd "$PROJECT_DIR/../loadgenerator"
 
     if go test -v -race -run "TestStorageModels|TestPublicTypes|TestJSONSerialization" ./internal/contract/...; then
         log_info "API contract tests PASSED"
@@ -74,7 +74,7 @@ run_api_contract_tests() {
 
 run_e2e_tests() {
     log_info "Running E2E integration tests..."
-    cd "$PROJECT_DIR/load-generator"
+    cd "$PROJECT_DIR/../loadgenerator"
 
     export BUILDER_RPC_URL="http://localhost:13000"
     export LOADGEN_API_URL="http://localhost:13001"

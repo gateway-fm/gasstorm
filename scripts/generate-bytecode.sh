@@ -6,13 +6,13 @@
 # This script:
 # 1. Compiles local Solidity contracts (WETH9, MockUSDC) using Foundry
 # 2. Extracts Uniswap V3 bytecodes from npm packages
-# 3. Generates load-generator/internal/uniswapv3/bytecode_generated.go
+# 3. Generates ../loadgenerator/internal/uniswapv3/bytecode_generated.go
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
-OUT_FILE="$ROOT_DIR/load-generator/internal/uniswapv3/bytecode_generated.go"
+OUT_FILE="$ROOT_DIR/../loadgenerator/internal/uniswapv3/bytecode_generated.go"
 NPM_DIR="$ROOT_DIR"
 
 cd "$ROOT_DIR"
