@@ -195,7 +195,7 @@ services:
       - PRECONF_LISTEN_ADDR=${PRECONF_LISTEN_ADDR:-:3001}
       - PRECONF_BUFFER_SIZE=${PRECONF_BUFFER_SIZE:-10000}
       # Transaction pool settings
-      - MAX_REQUEUE_COUNT=${MAX_REQUEUE_COUNT:-50}
+      - MAX_REQUEUE_COUNT=${MAX_REQUEUE_COUNT:-15}
       # RPC timeouts
       - NONCE_TIMEOUT_MS=${NONCE_TIMEOUT_MS:-500}
       # Debug options
