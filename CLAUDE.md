@@ -119,7 +119,23 @@ go build ./...
 | block-builder | 13002 | Preconfirmation WebSocket |
 | op-reth | 18545 (HTTP), 18546 (WS) | L2 execution layer |
 | load-generator | 13001 | Load test API |
-| dashboard | 18000 | Web UI for testing |
+| dashboard | 18000 (Docker) / 3000 (Metal) | Web UI for testing |
+
+### Metal Mode (Bare Metal)
+
+Runs all components natively (no Docker). Eliminates VM-layer I/O overhead on macOS.
+
+```bash
+make run-metal      # Build binaries + start all services
+make stop-metal     # Stop via PID files
+make restart-metal  # Stop + start
+make clean-metal    # Remove data/metal/
+```
+
+- Requires: op-reth, Go, Node.js, sibling repos (`../blockbuilder`, `../loadgenerator`)
+- Sources `.env` at startup (same config as Docker mode)
+- Writes PID files to `data/metal/pids/`, logs to `data/metal/logs/`
+- MCP tools auto-detect Metal vs Docker mode
 
 ## Configuration (Environment Variables)
 

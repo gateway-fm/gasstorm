@@ -6,6 +6,13 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Source .env if it exists (match Makefile behavior)
+if [ -f "$PROJECT_DIR/.env" ]; then
+    set -a
+    . "$PROJECT_DIR/.env"
+    set +a
+fi
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -53,12 +60,36 @@ check_prereqs() {
         missing=1
     fi
 
+    # Check for Anvil (L1)
+    if command -v anvil >/dev/null 2>&1; then
+        log_success "Found anvil: $(which anvil)"
+    else
+        log_error "anvil not found (needed for L1)"
+        echo "Install foundry from https://getfoundry.sh/"
+        missing=1
+    fi
+
     # Check for Node.js
     if command -v node >/dev/null 2>&1; then
         log_success "Found node: $(node --version)"
     else
         log_error "node not found"
         echo "Install Node.js from https://nodejs.org/"
+        missing=1
+    fi
+
+    # Check for sibling repos
+    if [ -d "$PROJECT_DIR/../blockbuilder" ]; then
+        log_success "Found blockbuilder repo: $PROJECT_DIR/../blockbuilder"
+    else
+        log_error "blockbuilder repo not found at $PROJECT_DIR/../blockbuilder"
+        missing=1
+    fi
+
+    if [ -d "$PROJECT_DIR/../loadgenerator" ]; then
+        log_success "Found loadgenerator repo: $PROJECT_DIR/../loadgenerator"
+    else
+        log_error "loadgenerator repo not found at $PROJECT_DIR/../loadgenerator"
         missing=1
     fi
 
@@ -98,7 +129,13 @@ MAX_TXS_PER_BLOCK="${MAX_TXS_PER_BLOCK:-50000}"
 TX_ORDERING="${TX_ORDERING:-fifo}"
 ENABLE_PRECONFIRMATIONS="${ENABLE_PRECONFIRMATIONS:-true}"
 
+# Block builder settings
+MAX_REQUEUE_COUNT="${MAX_REQUEUE_COUNT:-15}"
+NONCE_TIMEOUT_MS="${NONCE_TIMEOUT_MS:-500}"
+PRECONF_BUFFER_SIZE="${PRECONF_BUFFER_SIZE:-10000}"
+
 # Ports - matching Docker external ports for dashboard compatibility
+L1_PORT=18545
 RETH_HTTP_PORT=18546
 RETH_WS_PORT=18547
 RETH_ENGINE_PORT=18551
@@ -108,6 +145,7 @@ LOADGEN_PORT=13001
 DASHBOARD_PORT=3000
 
 # PIDs for cleanup
+L1_PID=""
 RETH_PID=""
 BUILDER_PID=""
 LOADGEN_PID=""
@@ -143,6 +181,14 @@ cleanup() {
         sleep 2
     fi
 
+    if [ -n "$L1_PID" ] && kill -0 "$L1_PID" 2>/dev/null; then
+        log_info "Stopping L1 anvil (PID $L1_PID)..."
+        kill "$L1_PID" 2>/dev/null || true
+    fi
+
+    # Clean up PID files
+    rm -f "$DATA_DIR/pids/"*.pid 2>/dev/null || true
+
     # Wait for all processes
     wait 2>/dev/null || true
 
@@ -167,6 +213,56 @@ kill_port() {
 }
 
 # =============================================================================
+# PID File Management
+# =============================================================================
+
+write_pid() {
+    local name=$1
+    local pid=$2
+    echo "$pid" > "$DATA_DIR/pids/${name}.pid"
+}
+
+# =============================================================================
+# Health Check
+# =============================================================================
+
+wait_for_http() {
+    local url=$1
+    local name=$2
+    local timeout=${3:-30}
+    local elapsed=0
+
+    log_info "Waiting for $name to be ready ($url)..."
+    while [ $elapsed -lt $timeout ]; do
+        if curl -sf "$url" >/dev/null 2>&1; then
+            log_success "$name is ready (${elapsed}s)"
+            return 0
+        fi
+        sleep 1
+        elapsed=$((elapsed + 1))
+    done
+    log_error "$name did not respond within ${timeout}s"
+    return 1
+}
+
+# =============================================================================
+# Build Binaries
+# =============================================================================
+
+build_binaries() {
+    local bin_dir="$DATA_DIR/bin"
+    mkdir -p "$bin_dir"
+
+    log_info "Building block-builder binary..."
+    (cd "$PROJECT_DIR/../blockbuilder" && go build -o "$bin_dir/blockbuilder" .)
+    log_success "Built $bin_dir/blockbuilder"
+
+    log_info "Building load-generator binary..."
+    (cd "$PROJECT_DIR/../loadgenerator" && go build -o "$bin_dir/loadgen" ./cmd/loadgen)
+    log_success "Built $bin_dir/loadgen"
+}
+
+# =============================================================================
 # Main
 # =============================================================================
 
@@ -181,6 +277,7 @@ main() {
 
     # Kill any conflicting processes
     log_info "Clearing ports..."
+    kill_port $L1_PORT
     kill_port $RETH_HTTP_PORT
     kill_port $RETH_WS_PORT
     kill_port $RETH_ENGINE_PORT
@@ -189,10 +286,33 @@ main() {
     kill_port $LOADGEN_PORT
     kill_port $DASHBOARD_PORT
 
-    # Create data directory
-    log_info "Creating data directory: $DATA_DIR"
+    # Create data directories
+    log_info "Creating data directories: $DATA_DIR"
     mkdir -p "$DATA_DIR/reth"
     mkdir -p "$DATA_DIR/loadgen"
+    mkdir -p "$DATA_DIR/pids"
+    mkdir -p "$DATA_DIR/logs"
+    mkdir -p "$DATA_DIR/bin"
+
+    # Build Go binaries
+    build_binaries
+
+    # =========================================================================
+    # Start L1 (Anvil)
+    # =========================================================================
+    log_info "Starting L1 (Anvil)..."
+
+    anvil \
+        --host 127.0.0.1 \
+        --port $L1_PORT \
+        --block-time 12 \
+        --silent \
+        2>&1 | tee "$DATA_DIR/logs/l1.log" | sed 's/^/[l1] /' &
+    L1_PID=$!
+    write_pid "l1" "$L1_PID"
+
+    log_info "L1 Anvil started (PID $L1_PID)"
+    sleep 1
 
     # =========================================================================
     # Start op-reth
@@ -205,12 +325,12 @@ main() {
         --http \
         --http.addr 127.0.0.1 \
         --http.port $RETH_HTTP_PORT \
-        --http.api eth,net,web3 \
+        --http.api eth,net,web3,debug \
         --http.corsdomain "*" \
         --ws \
         --ws.addr 127.0.0.1 \
         --ws.port $RETH_WS_PORT \
-        --ws.api eth,net,web3 \
+        --ws.api eth,net,web3,debug \
         --authrpc.addr 127.0.0.1 \
         --authrpc.port $RETH_ENGINE_PORT \
         --authrpc.jwtsecret "$PROJECT_DIR/genesis/jwt.hex" \
@@ -219,24 +339,30 @@ main() {
         --txpool.basefee-max-count 1 \
         --txpool.queued-max-count 1 \
         --txpool.max-account-slots 1 \
+        --db.sync-mode safe-no-sync \
+        --db.growth-step 4GB \
+        --db.max-readers 512 \
+        --engine.multiproof-chunking \
+        --engine.multiproof-chunk-size 100 \
         --rpc.max-connections 1000 \
         --rpc.max-request-size 100 \
         --rpc.max-response-size 200 \
+        --rpc.max-tracing-requests 50 \
         --log.stdout.format terminal \
         -vv \
-        2>&1 | sed 's/^/[reth] /' &
+        2>&1 | tee "$DATA_DIR/logs/reth.log" | sed 's/^/[reth] /' &
     RETH_PID=$!
+    write_pid "reth" "$RETH_PID"
 
     log_info "op-reth started (PID $RETH_PID)"
 
-    # Wait for reth to be ready
-    log_info "Waiting for op-reth to initialize..."
-    sleep 5
-
-    # Check if reth is still running
-    if ! kill -0 "$RETH_PID" 2>/dev/null; then
-        log_error "op-reth failed to start. Check logs above."
-        exit 1
+    # Health check: wait for reth HTTP to respond
+    if ! wait_for_http "http://localhost:$RETH_HTTP_PORT" "op-reth" 30; then
+        if ! kill -0 "$RETH_PID" 2>/dev/null; then
+            log_error "op-reth failed to start. Check logs above."
+            exit 1
+        fi
+        log_warn "op-reth HTTP not yet responsive, continuing anyway..."
     fi
 
     # =========================================================================
@@ -244,35 +370,40 @@ main() {
     # =========================================================================
     log_info "Starting block-builder..."
 
-    (
-        cd "$PROJECT_DIR/../blockbuilder"
-        ENGINE_RPC_URL="http://localhost:$RETH_ENGINE_PORT" \
-        L2_RPC_URL="http://localhost:$RETH_HTTP_PORT" \
-        JWT_SECRET_PATH="$PROJECT_DIR/genesis/jwt.hex" \
-        SEQUENCER_ADDRESS="0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" \
-        LISTEN_ADDR=":$BUILDER_PORT" \
-        PRECONF_LISTEN_ADDR=":$BUILDER_PRECONF_PORT" \
-        BLOCK_TIME_MS="$BLOCK_TIME_MS" \
-        SKIP_EMPTY_BLOCKS="$SKIP_EMPTY_BLOCKS" \
-        GAS_LIMIT="$GAS_LIMIT" \
-        MAX_TXS_PER_BLOCK="$MAX_TXS_PER_BLOCK" \
-        TX_ORDERING="$TX_ORDERING" \
-        ENABLE_PRECONFIRMATIONS="$ENABLE_PRECONFIRMATIONS" \
-        INCLUDE_DEPOSIT_TX="false" \
-        DEBUG_REJECTION_REASONS="true" \
-        STRESS_THRESHOLD_PCT="80" \
-        go run . 2>&1 | sed 's/^/[builder] /'
-    ) &
+    ENGINE_RPC_URL="http://localhost:$RETH_ENGINE_PORT" \
+    L2_RPC_URL="http://localhost:$RETH_HTTP_PORT" \
+    JWT_SECRET_PATH="$PROJECT_DIR/genesis/jwt.hex" \
+    SEQUENCER_ADDRESS="0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266" \
+    LISTEN_ADDR=":$BUILDER_PORT" \
+    PRECONF_LISTEN_ADDR=":$BUILDER_PRECONF_PORT" \
+    BLOCK_TIME_MS="$BLOCK_TIME_MS" \
+    SKIP_EMPTY_BLOCKS="$SKIP_EMPTY_BLOCKS" \
+    GAS_LIMIT="$GAS_LIMIT" \
+    MAX_TXS_PER_BLOCK="$MAX_TXS_PER_BLOCK" \
+    TX_ORDERING="$TX_ORDERING" \
+    ENABLE_PRECONFIRMATIONS="$ENABLE_PRECONFIRMATIONS" \
+    INCLUDE_DEPOSIT_TX="true" \
+    L1_RPC_URL="http://localhost:$L1_PORT" \
+    DEBUG_REJECTION_REASONS="true" \
+    STRESS_THRESHOLD_PCT="80" \
+    MAX_REQUEUE_COUNT="$MAX_REQUEUE_COUNT" \
+    NONCE_TIMEOUT_MS="$NONCE_TIMEOUT_MS" \
+    PRECONF_BUFFER_SIZE="$PRECONF_BUFFER_SIZE" \
+    "$DATA_DIR/bin/blockbuilder" \
+        2>&1 | tee "$DATA_DIR/logs/blockbuilder.log" | sed 's/^/[builder] /' &
     BUILDER_PID=$!
+    write_pid "blockbuilder" "$BUILDER_PID"
 
     log_info "block-builder started (PID $BUILDER_PID)"
-    sleep 3
 
-    # Check if builder is still running
-    if ! kill -0 "$BUILDER_PID" 2>/dev/null; then
-        log_error "block-builder failed to start. Check logs above."
-        cleanup
-        exit 1
+    # Wait for builder to be ready
+    if ! wait_for_http "http://localhost:$BUILDER_PORT/status" "block-builder" 15; then
+        if ! kill -0 "$BUILDER_PID" 2>/dev/null; then
+            log_error "block-builder failed to start. Check logs above."
+            cleanup
+            exit 1
+        fi
+        log_warn "block-builder /status not yet responsive, continuing anyway..."
     fi
 
     # =========================================================================
@@ -280,19 +411,18 @@ main() {
     # =========================================================================
     log_info "Starting load-generator..."
 
-    (
-        cd "$PROJECT_DIR/../loadgenerator"
-        EXECUTION_LAYER="reth" \
-        BUILDER_RPC_URL="http://localhost:$BUILDER_PORT" \
-        L2_RPC_URL="http://localhost:$RETH_HTTP_PORT" \
-        L2_WS_URL="ws://localhost:$RETH_WS_PORT" \
-        PRECONF_WS_URL="ws://localhost:$BUILDER_PRECONF_PORT/ws/preconfirmations" \
-        LISTEN_ADDR=":$LOADGEN_PORT" \
-        DATABASE_PATH="$DATA_DIR/loadgen/loadgen.db" \
-        BLOCK_TIME_MS="$BLOCK_TIME_MS" \
-        go run ./cmd/loadgen 2>&1 | sed 's/^/[loadgen] /'
-    ) &
+    EXECUTION_LAYER="reth" \
+    BUILDER_RPC_URL="http://localhost:$BUILDER_PORT" \
+    L2_RPC_URL="http://localhost:$RETH_HTTP_PORT" \
+    L2_WS_URL="ws://localhost:$RETH_WS_PORT" \
+    PRECONF_WS_URL="ws://localhost:$BUILDER_PRECONF_PORT/ws/preconfirmations" \
+    LISTEN_ADDR=":$LOADGEN_PORT" \
+    DATABASE_PATH="$DATA_DIR/loadgen/loadgen.db" \
+    BLOCK_TIME_MS="$BLOCK_TIME_MS" \
+    "$DATA_DIR/bin/loadgen" \
+        2>&1 | tee "$DATA_DIR/logs/loadgen.log" | sed 's/^/[loadgen] /' &
     LOADGEN_PID=$!
+    write_pid "loadgen" "$LOADGEN_PID"
 
     log_info "load-generator started (PID $LOADGEN_PID)"
     sleep 2
@@ -304,9 +434,10 @@ main() {
 
     (
         cd "$PROJECT_DIR/dashboard"
-        npm run dev 2>&1 | sed 's/^/[dashboard] /'
+        npm run dev 2>&1 | tee "$DATA_DIR/logs/dashboard.log" | sed 's/^/[dashboard] /'
     ) &
     DASHBOARD_PID=$!
+    write_pid "dashboard" "$DASHBOARD_PID"
 
     log_info "dashboard started (PID $DASHBOARD_PID)"
 
@@ -319,6 +450,7 @@ main() {
     echo "=============================================="
     echo ""
     echo "  Services:"
+    echo "    L1 Anvil:         http://localhost:$L1_PORT"
     echo "    op-reth HTTP:     http://localhost:$RETH_HTTP_PORT"
     echo "    op-reth WS:       ws://localhost:$RETH_WS_PORT"
     echo "    op-reth Engine:   http://localhost:$RETH_ENGINE_PORT"
@@ -332,10 +464,13 @@ main() {
     echo "    GAS_LIMIT=$GAS_LIMIT"
     echo "    MAX_TXS_PER_BLOCK=$MAX_TXS_PER_BLOCK"
     echo "    ENABLE_PRECONFIRMATIONS=$ENABLE_PRECONFIRMATIONS"
+    echo "    MAX_REQUEUE_COUNT=$MAX_REQUEUE_COUNT"
     echo ""
     echo "  Data directory: $DATA_DIR"
+    echo "  Log files:      $DATA_DIR/logs/"
+    echo "  PID files:      $DATA_DIR/pids/"
     echo ""
-    echo "  Press Ctrl+C to stop all services"
+    echo "  Stop with: make stop-metal (or Ctrl+C)"
     echo ""
 
     # Wait for any process to exit

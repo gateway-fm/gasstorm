@@ -1,4 +1,4 @@
-.PHONY: run run-build run-reth run-cdk-erigon run-metal run-hyperlane stop restart logs status clean clean-metal build test test-load-generator test-dashboard test-tx bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help pull-blockbuilder pull-loadgenerator
+.PHONY: run run-build run-reth run-cdk-erigon run-metal stop-metal restart-metal run-hyperlane stop restart logs status clean clean-metal build test test-load-generator test-dashboard test-tx bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help pull-blockbuilder pull-loadgenerator mcp-server mcp-build site-dev site-build
 
 # =============================================================================
 # Configuration: Source .env file if it exists
@@ -43,11 +43,11 @@ endif
 # Start the system (pulls images) - uses .env configuration and EXECUTION_LAYER
 # Note: Bridge profile excluded by default (saves ~3GB and 2-3min build time)
 # Use 'make run-with-bridge' if you need Hyperlane bridging
-run:
+run: mcp-build
 	docker compose --profile $(COMPOSE_PROFILE) up -d
 
 # Build from local sibling repos (../blockbuilder, ../loadgenerator) and run
-run-build:
+run-build: mcp-build
 	docker compose -f docker-compose.yml -f docker-compose.build.yaml --profile $(COMPOSE_PROFILE) up --build -d
 
 # Start with op-reth (block-builder + Engine API)
@@ -59,9 +59,29 @@ run-attached:
 	docker compose --profile $(COMPOSE_PROFILE) up --build
 
 # Start in native "Metal" mode (no Docker, maximum performance)
-# Requires: op-reth, go, node installed locally
+# Requires: op-reth, go, node installed locally, sibling repos (../blockbuilder, ../loadgenerator)
 run-metal:
 	./scripts/run-metal.sh
+
+# Stop metal mode services
+stop-metal:
+	./scripts/stop-metal.sh
+
+# Restart metal mode (stop + start)
+restart-metal: stop-metal run-metal
+
+# =============================================================================
+# MCP Server (AI-native stack management)
+# =============================================================================
+
+# Build the MCP server binary
+mcp-build:
+	cd mcp && go build -o mcp .
+
+# Run MCP server over stdio (for direct use; AI tools auto-discover via .mcp.json)
+mcp-server: mcp-build
+	BUILDER_URL=http://localhost:13000 LOADGEN_URL=http://localhost:13001 GASSTORM_DIR=$(CURDIR) \
+		./mcp/mcp
 
 # =============================================================================
 # Performance Profiles (uses current EXECUTION_LAYER)
@@ -658,6 +678,18 @@ polycli-help:
 	@echo "Example: make polycli-eoa POLYCLI_TPS=500 POLYCLI_DURATION=60"
 
 # #############################################################################
+# Documentation Site
+# #############################################################################
+
+# Run docs site in development mode
+site-dev:
+	cd site && npm run dev
+
+# Build docs site for production (static export to site/out/)
+site-build:
+	cd site && npm run build
+
+# #############################################################################
 # Help
 # #############################################################################
 
@@ -672,6 +704,8 @@ help:
 	@echo "    make run-build        - Build from local repos and start"
 	@echo "    make run-reth         - Start with op-reth (block-builder + Engine API)"
 	@echo "    make run-metal        - Native mode (no Docker, maximum performance)"
+	@echo "    make stop-metal       - Stop metal mode services"
+	@echo "    make restart-metal    - Restart metal mode services"
 	@echo "    make run-attached     - Start system with logs"
 	@echo ""
 	@echo "  Lifecycle:"
@@ -705,6 +739,11 @@ help:
 	@echo "    make dev-loadgen      - Run only load-generator locally"
 	@echo "    make dev-dashboard    - Run only dashboard with HMR"
 	@echo "    make dev-stop         - Stop dev infrastructure"
+	@echo ""
+	@echo "  MCP Server (AI):"
+	@echo "    make mcp-server       - Run MCP server over stdio"
+	@echo "    make mcp-build        - Build MCP server binary"
+	@echo "    (auto-discovered by Claude Code via .mcp.json)"
 	@echo ""
 	@echo "  External Images:"
 	@echo "    make pull-blockbuilder   - Pull latest block-builder image from DockerHub"

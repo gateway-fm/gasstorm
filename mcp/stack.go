@@ -8,13 +8,16 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// registerStackTools registers Docker Compose stack management tools.
+// registerStackTools registers Docker Compose and Metal mode stack management tools.
 func registerStackTools(s *server.MCPServer, gasstormDir string) {
 	registerStackStatus(s, gasstormDir)
 	registerStackUp(s, gasstormDir)
@@ -25,17 +28,88 @@ func registerStackTools(s *server.MCPServer, gasstormDir string) {
 	registerStackConfigSet(s, gasstormDir)
 }
 
+// metalPidDir returns the path to the metal mode PID directory.
+func metalPidDir(dir string) string {
+	return filepath.Join(dir, "data", "metal", "pids")
+}
+
+// metalLogDir returns the path to the metal mode log directory.
+func metalLogDir(dir string) string {
+	return filepath.Join(dir, "data", "metal", "logs")
+}
+
+// metalServices lists all metal mode services and their PID file names.
+var metalServices = []string{"l1", "reth", "blockbuilder", "loadgen", "dashboard"}
+
+// isMetalMode checks if the stack is running in metal mode by looking for
+// a live reth process tracked via PID file.
+func isMetalMode(dir string) bool {
+	pidFile := filepath.Join(metalPidDir(dir), "reth.pid")
+	data, err := os.ReadFile(pidFile)
+	if err != nil {
+		return false
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil {
+		return false
+	}
+	// Check if process is alive (signal 0 doesn't kill, just checks)
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	return proc.Signal(syscall.Signal(0)) == nil
+}
+
+// metalServiceStatus returns status info for a single metal mode service.
+func metalServiceStatus(dir, svc string) string {
+	pidFile := filepath.Join(metalPidDir(dir), svc+".pid")
+	data, err := os.ReadFile(pidFile)
+	if err != nil {
+		return fmt.Sprintf("%-15s stopped (no PID file)", svc)
+	}
+	pidStr := strings.TrimSpace(string(data))
+	pid, err := strconv.Atoi(pidStr)
+	if err != nil {
+		return fmt.Sprintf("%-15s stopped (invalid PID)", svc)
+	}
+	proc, err := os.FindProcess(pid)
+	if err != nil || proc.Signal(syscall.Signal(0)) != nil {
+		return fmt.Sprintf("%-15s stopped (PID %d not running)", svc, pid)
+	}
+
+	// Get uptime via ps
+	cmd := exec.Command("ps", "-o", "etime=", "-p", pidStr)
+	out, err := cmd.Output()
+	uptime := "unknown"
+	if err == nil {
+		uptime = strings.TrimSpace(string(out))
+	}
+	return fmt.Sprintf("%-15s running  PID %-8d uptime %s", svc, pid, uptime)
+}
+
 func registerStackStatus(s *server.MCPServer, dir string) {
 	tool := mcp.NewTool("stack_status",
-		mcp.WithDescription("Show Docker Compose service states and ports for the GasStorm stack."),
+		mcp.WithDescription("Show service states and ports for the GasStorm stack (auto-detects Docker or Metal mode)."),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if isMetalMode(dir) {
+			lines := []string{
+				sectionf("Stack Status (Metal Mode)"),
+				"",
+			}
+			for _, svc := range metalServices {
+				lines = append(lines, metalServiceStatus(dir, svc))
+			}
+			return mcp.NewToolResultText(strings.Join(lines, "\n")), nil
+		}
+
 		out, err := runCompose(dir, "ps", "--format", "table")
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("stack_status failed: %v\n\nIs Docker running?", err)), nil
 		}
 		return mcp.NewToolResultText(joinLines(
-			sectionf("Stack Status"),
+			sectionf("Stack Status (Docker)"),
 			out,
 		)), nil
 	})
@@ -47,15 +121,33 @@ func registerStackUp(s *server.MCPServer, dir string) {
 		mcp.WithString("profile",
 			mcp.Description("Docker Compose profile: reth (default), cdk-erigon, gravity-reth"),
 		),
+		mcp.WithBoolean("metal",
+			mcp.Description("Start in Metal mode (no Docker). Requires op-reth, Go, Node.js, and sibling repos."),
+		),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if req.GetBool("metal", false) {
+			out, err := runScript(dir, "scripts/run-metal.sh")
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Metal mode start failed: %v\n%s\n\nUse `make run-metal` for interactive mode.", err, out)), nil
+			}
+			return mcp.NewToolResultText(joinLines(
+				sectionf("Stack Started (Metal Mode)"),
+				out,
+			)), nil
+		}
+
+		if isMetalMode(dir) {
+			return mcp.NewToolResultError("Stack is running in Metal mode. Use stack_down first, or use `make stop-metal` to stop."), nil
+		}
+
 		profile := req.GetString("profile", "reth")
 		out, err := runCompose(dir, "--profile", profile, "up", "-d")
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("stack_up failed: %v\n%s", err, out)), nil
 		}
 		return mcp.NewToolResultText(joinLines(
-			sectionf("Stack Started"),
+			sectionf("Stack Started (Docker)"),
 			kvf("Profile", profile),
 			"",
 			out,
@@ -65,12 +157,23 @@ func registerStackUp(s *server.MCPServer, dir string) {
 
 func registerStackDown(s *server.MCPServer, dir string) {
 	tool := mcp.NewTool("stack_down",
-		mcp.WithDescription("Stop the GasStorm stack. MUTATING."),
+		mcp.WithDescription("Stop the GasStorm stack (auto-detects Docker or Metal mode). MUTATING."),
 		mcp.WithBoolean("volumes",
-			mcp.Description("Also remove volumes (default: false)"),
+			mcp.Description("Also remove volumes (Docker mode only, default: false)"),
 		),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if isMetalMode(dir) {
+			out, err := runScript(dir, "scripts/stop-metal.sh")
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Metal stop failed: %v\n%s", err, out)), nil
+			}
+			return mcp.NewToolResultText(joinLines(
+				sectionf("Stack Stopped (Metal Mode)"),
+				out,
+			)), nil
+		}
+
 		args := []string{"down"}
 		if req.GetBool("volumes", false) {
 			args = append(args, "-v")
@@ -80,7 +183,7 @@ func registerStackDown(s *server.MCPServer, dir string) {
 			return mcp.NewToolResultError(fmt.Sprintf("stack_down failed: %v\n%s", err, out)), nil
 		}
 		return mcp.NewToolResultText(joinLines(
-			sectionf("Stack Stopped"),
+			sectionf("Stack Stopped (Docker)"),
 			out,
 		)), nil
 	})
@@ -88,12 +191,30 @@ func registerStackDown(s *server.MCPServer, dir string) {
 
 func registerStackRestart(s *server.MCPServer, dir string) {
 	tool := mcp.NewTool("stack_restart",
-		mcp.WithDescription("Restart a specific service or all services. MUTATING."),
+		mcp.WithDescription("Restart a specific service or all services (auto-detects Docker or Metal mode). MUTATING."),
 		mcp.WithString("service",
 			mcp.Description("Service name to restart (e.g., block-builder, load-generator). If empty, restarts all."),
 		),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if isMetalMode(dir) {
+			// Metal mode: stop then start
+			stopOut, err := runScript(dir, "scripts/stop-metal.sh")
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Metal stop failed: %v\n%s", err, stopOut)), nil
+			}
+			startOut, err := runScript(dir, "scripts/run-metal.sh")
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Metal start failed: %v\n%s", err, startOut)), nil
+			}
+			return mcp.NewToolResultText(joinLines(
+				sectionf("Stack Restarted (Metal Mode)"),
+				stopOut,
+				"",
+				startOut,
+			)), nil
+		}
+
 		svc := req.GetString("service", "")
 		args := []string{"restart"}
 		if svc != "" {
@@ -108,7 +229,7 @@ func registerStackRestart(s *server.MCPServer, dir string) {
 			target = svc
 		}
 		return mcp.NewToolResultText(joinLines(
-			sectionf("Stack Restarted"),
+			sectionf("Stack Restarted (Docker)"),
 			kvf("Service", target),
 			"",
 			out,
@@ -118,10 +239,10 @@ func registerStackRestart(s *server.MCPServer, dir string) {
 
 func registerStackLogs(s *server.MCPServer, dir string) {
 	tool := mcp.NewTool("stack_logs",
-		mcp.WithDescription("Get recent logs for a service."),
+		mcp.WithDescription("Get recent logs for a service (auto-detects Docker or Metal mode)."),
 		mcp.WithString("service",
 			mcp.Required(),
-			mcp.Description("Service name (e.g., block-builder, load-generator, l2-reth)"),
+			mcp.Description("Service name (e.g., reth, blockbuilder, loadgen, dashboard, block-builder, load-generator, l2-reth)"),
 		),
 		mcp.WithNumber("lines",
 			mcp.Description("Number of lines to tail (default: 50)"),
@@ -133,6 +254,34 @@ func registerStackLogs(s *server.MCPServer, dir string) {
 			return mcp.NewToolResultError("service is required"), nil
 		}
 		lines := req.GetInt("lines", 50)
+
+		if isMetalMode(dir) {
+			logFile := metalLogFile(dir, svc)
+			if logFile == "" {
+				return mcp.NewToolResultError(fmt.Sprintf("Unknown metal service: %s\nAvailable: reth, blockbuilder, loadgen, dashboard", svc)), nil
+			}
+
+			data, err := os.ReadFile(logFile)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("Cannot read log file %s: %v", logFile, err)), nil
+			}
+
+			// Tail the last N lines
+			allLines := strings.Split(string(data), "\n")
+			start := len(allLines) - lines
+			if start < 0 {
+				start = 0
+			}
+			tail := strings.Join(allLines[start:], "\n")
+
+			return mcp.NewToolResultText(joinLines(
+				sectionf("Logs: "+svc+" (Metal Mode)"),
+				kvf("File", logFile),
+				"",
+				tail,
+			)), nil
+		}
+
 		out, err := runCompose(dir, "logs", "--tail", fmt.Sprintf("%d", lines), "--no-color", svc)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("stack_logs failed: %v\n%s", err, out)), nil
@@ -142,6 +291,31 @@ func registerStackLogs(s *server.MCPServer, dir string) {
 			out,
 		)), nil
 	})
+}
+
+// metalLogFile maps a service name to its metal mode log file.
+// Accepts both metal names (reth, blockbuilder) and Docker names (l2-reth, block-builder).
+func metalLogFile(dir, svc string) string {
+	logDir := metalLogDir(dir)
+	// Map Docker-style service names to metal log file names
+	nameMap := map[string]string{
+		"l1":             "l1.log",
+		"anvil":          "l1.log",
+		"reth":           "reth.log",
+		"l2-reth":        "reth.log",
+		"op-reth":        "reth.log",
+		"blockbuilder":   "blockbuilder.log",
+		"block-builder":  "blockbuilder.log",
+		"builder":        "blockbuilder.log",
+		"loadgen":        "loadgen.log",
+		"load-generator": "loadgen.log",
+		"loadgenerator":  "loadgen.log",
+		"dashboard":      "dashboard.log",
+	}
+	if fname, ok := nameMap[svc]; ok {
+		return filepath.Join(logDir, fname)
+	}
+	return ""
 }
 
 func registerStackConfig(s *server.MCPServer, dir string) {
@@ -155,16 +329,21 @@ func registerStackConfig(s *server.MCPServer, dir string) {
 			return mcp.NewToolResultError(fmt.Sprintf("Cannot read .env: %v\n\nCopy .env.example to .env first.", err)), nil
 		}
 
-		lines := sectionf("Stack Configuration") + "\n"
+		mode := "Docker"
+		if isMetalMode(dir) {
+			mode = "Metal"
+		}
+
+		cfgLines := sectionf("Stack Configuration ("+mode+" Mode)") + "\n"
 		scanner := bufio.NewScanner(bytes.NewReader(data))
 		for scanner.Scan() {
 			line := strings.TrimSpace(scanner.Text())
 			if line == "" || strings.HasPrefix(line, "#") {
 				continue
 			}
-			lines += kvf(strings.SplitN(line, "=", 2)[0], strings.SplitN(line, "=", 2)[1]) + "\n"
+			cfgLines += kvf(strings.SplitN(line, "=", 2)[0], strings.SplitN(line, "=", 2)[1]) + "\n"
 		}
-		return mcp.NewToolResultText(lines), nil
+		return mcp.NewToolResultText(cfgLines), nil
 	})
 }
 
@@ -232,6 +411,26 @@ func registerStackConfigSet(s *server.MCPServer, dir string) {
 func runCompose(dir string, args ...string) (string, error) {
 	cmdArgs := append([]string{"compose"}, args...)
 	cmd := exec.Command("docker", cmdArgs...)
+	cmd.Dir = dir
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	output := stdout.String()
+	if output == "" {
+		output = stderr.String()
+	}
+	return strings.TrimSpace(output), err
+}
+
+// runScript runs a shell script in the gasstorm directory with a timeout.
+func runScript(dir, script string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "bash", script)
 	cmd.Dir = dir
 
 	var stdout, stderr bytes.Buffer

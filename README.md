@@ -96,6 +96,30 @@ EXECUTION_LAYER=cdk-erigon   # Standalone sequencer
 
 See [Configuration Reference](./docs/configuration.md) for the complete list of environment variables, Makefile targets, and Docker Compose profiles.
 
+## Metal Mode (Bare Metal)
+
+Run all components natively on the host machine with no Docker overhead. Eliminates the ~2-3x I/O penalty from Docker-on-Mac's VM layer, unlocking higher TPS for performance testing.
+
+**Prerequisites:** op-reth (or reth), Go, Node.js, and sibling repos (`../blockbuilder`, `../loadgenerator`)
+
+```bash
+# Start (builds Go binaries, starts all 4 services)
+make run-metal
+
+# Stop
+make stop-metal
+
+# Restart
+make restart-metal
+
+# Clean data
+make clean-metal
+```
+
+Services use the same ports as Docker mode (dashboard: 3000, builder: 13000, loadgen: 13001, reth: 18546). Configuration is read from `.env` just like Docker mode.
+
+Metal mode writes PID files to `data/metal/pids/` and logs to `data/metal/logs/`. The MCP tools (`stack_status`, `stack_logs`, etc.) auto-detect which mode is active.
+
 ## Development
 
 ```bash
