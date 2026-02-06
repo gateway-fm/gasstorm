@@ -70,6 +70,7 @@ Thumbs.db
 
 # Test artifacts
 coverage/
+test-results/
 *.prof
 *.cpu
 *.mem
@@ -95,3 +96,8 @@ data/
 
 # Test contracts at root
 Test.sol
+
+# One-off scripts and analysis docs
+screenshot*.js
+screenshot*.mjs
+gap-analysis.md
