@@ -285,7 +285,7 @@ services:
       context: .
       dockerfile: ./hyperlane-init/Dockerfile
     container_name: sequencer-poc-hyperlane-init
-    profiles: ["bridge", "reth"]
+    profiles: ["bridge"]
     depends_on:
       l1:
         condition: service_healthy
@@ -307,7 +307,7 @@ services:
   hyperlane-relayer:
     image: gcr.io/abacus-labs-dev/hyperlane-agent:agents-v1.3.0
     container_name: sequencer-poc-relayer
-    profiles: ["bridge", "reth"]
+    profiles: ["bridge"]
     depends_on:
       l1:
         condition: service_healthy

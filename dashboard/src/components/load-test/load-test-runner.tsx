@@ -10,13 +10,13 @@ import { formatDuration } from "@/lib/statistics";
 import { cn } from "@/lib/utils";
 
 const statusColors: Record<string, string> = {
-  idle: "bg-muted",
-  initializing: "bg-yellow-600",
-  running: "bg-green-600",
-  paused: "bg-yellow-600",
-  verifying: "bg-purple-600",
-  completed: "bg-blue-600",
-  error: "bg-red-600",
+  idle: "bg-muted text-muted-foreground",
+  initializing: "bg-warning text-warning-foreground",
+  running: "bg-success text-success-foreground",
+  paused: "bg-warning text-warning-foreground",
+  verifying: "bg-primary text-primary-foreground",
+  completed: "bg-info text-info-foreground",
+  error: "bg-destructive text-destructive-foreground",
 };
 
 export function LoadTestRunner() {
@@ -46,20 +46,28 @@ export function LoadTestRunner() {
     fundingTxsTotal,
     contractsDeployed,
     contractsTotal,
+    // Verification progress
+    verifyPhase,
+    verifyProgress,
+    blocksToVerify,
+    blocksVerified,
+    receiptsToSample,
+    receiptsSampled,
   } = useGoLoadTestStore();
 
   const isAdaptiveMode = config?.pattern === "adaptive";
 
   // Use durationSec from Go load generator when running, fallback to config
   const duration = durationSec > 0 ? durationSec : (config?.duration ?? 60);
-  const progress = duration > 0 ? (elapsedTime / duration) * 100 : 0;
+  // Clamp progress to 100% max to handle tests that run longer than configured
+  const progress = duration > 0 ? Math.min((elapsedTime / duration) * 100, 100) : 0;
   const remainingTime = Math.max(0, duration - elapsedTime);
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-base font-semibold">Load Test Runner</CardTitle>
-        <Badge className={cn(statusColors[status], "capitalize")}>
+        <CardTitle className="text-base font-semibold font-mono">Load Test Runner</CardTitle>
+        <Badge className={cn(statusColors[status], "capitalize border-0")}>
           {status}
         </Badge>
       </CardHeader>
@@ -82,7 +90,7 @@ export function LoadTestRunner() {
         {/* Current Rate */}
         <div className="grid grid-cols-2 gap-4">
           <div className="rounded-lg border p-3">
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground font-mono">
               Current TPS
             </p>
             <p className="text-2xl font-bold font-mono">
@@ -90,21 +98,21 @@ export function LoadTestRunner() {
             </p>
             {targetTps > 0 && (
               <p className="text-xs text-muted-foreground mt-1">
-                Target: <span className="text-blue-400 font-mono">{targetTps.toLocaleString()}</span> tx/s
+                Target: <span className="text-info font-mono">{targetTps.toLocaleString()}</span> tx/s
               </p>
             )}
             {isAdaptiveMode && peakTps > 0 && (
               <p className="text-xs text-muted-foreground mt-1">
-                Peak: <span className="text-purple-400 font-mono">{peakTps.toLocaleString()}</span> tx/s
+                Peak: <span className="text-primary font-mono">{peakTps.toLocaleString()}</span> tx/s
               </p>
             )}
           </div>
           <div className="rounded-lg border p-3">
-            <p className="text-xs text-muted-foreground">TX Sent</p>
+            <p className="text-xs text-muted-foreground font-mono">TX Sent</p>
             <p className="text-2xl font-bold font-mono">{txSentCount.toLocaleString()}</p>
             {averageTps > 0 && (
               <p className="text-xs text-muted-foreground mt-1">
-                Avg: <span className="text-green-400 font-mono">{averageTps.toFixed(0)}</span> tx/s
+                Avg: <span className="text-success font-mono">{averageTps.toFixed(0)}</span> tx/s
               </p>
             )}
           </div>
@@ -113,27 +121,27 @@ export function LoadTestRunner() {
         {/* TX Stats */}
         <div className="grid grid-cols-3 gap-2 text-center">
           <div className="rounded-lg bg-muted p-2">
-            <p className="text-xs text-muted-foreground">Pending</p>
+            <p className="text-xs text-muted-foreground font-mono">Pending</p>
             <p className="font-mono font-semibold">
               {Math.max(0, txSentCount - txConfirmedCount - txFailedCount)}
             </p>
           </div>
-          <div className="rounded-lg bg-green-500/10 p-2">
-            <p className="text-xs text-muted-foreground">Confirmed</p>
-            <p className="font-mono font-semibold text-green-500">{txConfirmedCount.toLocaleString()}</p>
+          <div className="rounded-lg bg-success/10 p-2">
+            <p className="text-xs text-muted-foreground font-mono">Confirmed</p>
+            <p className="font-mono font-semibold text-success">{txConfirmedCount.toLocaleString()}</p>
           </div>
-          <div className="rounded-lg bg-red-500/10 p-2">
-            <p className="text-xs text-muted-foreground">Failed</p>
-            <p className="font-mono font-semibold text-red-500">{txFailedCount.toLocaleString()}</p>
+          <div className="rounded-lg bg-destructive/10 p-2">
+            <p className="text-xs text-muted-foreground font-mono">Failed</p>
+            <p className="font-mono font-semibold text-destructive">{txFailedCount.toLocaleString()}</p>
           </div>
         </div>
 
         {/* Initialization Progress */}
         {status === "initializing" && (
-          <div className="rounded-lg bg-yellow-500/10 border border-yellow-500/20 p-3 space-y-2">
+          <div className="rounded-lg bg-warning/10 border border-warning/20 p-3 space-y-2">
             <div className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-yellow-500" />
-              <p className="text-sm font-medium text-yellow-500">Initializing Test</p>
+              <Loader2 className="h-4 w-4 animate-spin text-warning" />
+              <p className="text-sm font-medium text-warning">Initializing Test</p>
             </div>
             <p className="text-sm text-muted-foreground">{initProgress || "Starting..."}</p>
 
@@ -175,21 +183,65 @@ export function LoadTestRunner() {
 
         {/* Verification Progress */}
         {status === "verifying" && (
-          <div className="rounded-lg bg-purple-500/10 border border-purple-500/20 p-3 space-y-2">
+          <div className="rounded-lg bg-primary/10 border border-primary/20 p-3 space-y-2">
             <div className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-purple-500" />
-              <p className="text-sm font-medium text-purple-500">Verifying Results</p>
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              <p className="text-sm font-medium text-primary">Verifying Results</p>
             </div>
             <p className="text-sm text-muted-foreground">
-              Test finished. Verifying on-chain results...
+              {verifyProgress || "Test finished. Verifying on-chain results..."}
             </p>
+
+            {/* On-chain metrics fetching progress */}
+            {verifyPhase === "on_chain_metrics" && blocksToVerify > 0 && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Fetching on-chain metrics...</span>
+                  <span className="font-mono">{blocksVerified} / {blocksToVerify}</span>
+                </div>
+                <Progress value={blocksToVerify > 0 ? (blocksVerified / blocksToVerify) * 100 : 0} className="h-1" />
+              </div>
+            )}
+
+            {/* Incremental aggregation progress */}
+            {verifyPhase === "aggregating" && blocksToVerify > 0 && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Aggregating snapshots...</span>
+                  <span className="font-mono">{blocksVerified} / {blocksToVerify}</span>
+                </div>
+                <Progress value={blocksToVerify > 0 ? (blocksVerified / blocksToVerify) * 100 : 0} className="h-1" />
+              </div>
+            )}
+
+            {/* Tip ordering verification progress */}
+            {verifyPhase === "tip_ordering" && blocksToVerify > 0 && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Checking tip ordering...</span>
+                  <span className="font-mono">{blocksVerified} / {blocksToVerify}</span>
+                </div>
+                <Progress value={blocksToVerify > 0 ? (blocksVerified / blocksToVerify) * 100 : 0} className="h-1" />
+              </div>
+            )}
+
+            {/* Receipt sampling progress */}
+            {verifyPhase === "receipts" && receiptsToSample > 0 && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Sampling receipts...</span>
+                  <span className="font-mono">{receiptsSampled} / {receiptsToSample}</span>
+                </div>
+                <Progress value={receiptsToSample > 0 ? (receiptsSampled / receiptsToSample) * 100 : 0} className="h-1" />
+              </div>
+            )}
           </div>
         )}
 
         {/* Error Display */}
         {error && (
-          <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3">
-            <p className="text-sm text-red-500">{error}</p>
+          <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3">
+            <p className="text-sm text-destructive">{error}</p>
           </div>
         )}
 

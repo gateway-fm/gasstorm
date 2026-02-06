@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 # Bridge UI Dockerfile
 # Multi-stage build for Hyperlane Warp UI
 
@@ -5,11 +7,12 @@ FROM node:20-alpine AS base
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies with cache mount
 FROM base AS deps
 COPY package.json pnpm-lock.yaml ./
 COPY patches/ ./patches/
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
 
 # Build the application
 FROM base AS builder
@@ -22,8 +25,9 @@ ARG NEXT_PUBLIC_RPC_OVERRIDES
 ENV NEXT_PUBLIC_WALLET_CONNECT_ID=${NEXT_PUBLIC_WALLET_CONNECT_ID}
 ENV NEXT_PUBLIC_RPC_OVERRIDES=${NEXT_PUBLIC_RPC_OVERRIDES}
 
-# Build Next.js app
-RUN pnpm build
+# Build Next.js app with cache mount
+RUN --mount=type=cache,target=/app/.next/cache \
+    pnpm build
 
 # Production image
 FROM base AS runner

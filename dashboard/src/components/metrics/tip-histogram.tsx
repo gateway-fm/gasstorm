@@ -12,30 +12,22 @@ import {
   Cell,
 } from "recharts";
 import { useGoLoadTestStore } from "@/stores/go-load-test-store";
+import { colors, chartColors } from "@/lib/colors";
 
-// Gateway chart colors
+// Chart colors from theme
 const CHART_COLORS = {
-  grid: "#E2E8F0",
-  axis: "#6B7280",
+  grid: colors.grid,
+  axis: colors.axis,
 };
 
 // Tip distribution colors - green to red gradient
-const TIP_COLORS = [
-  "#22C55E", // lowest tips - green (success)
-  "#4ADE80", // lighter green
-  "#86EFAC", // even lighter
-  "#EAB308", // yellow (warning)
-  "#F97316", // orange
-  "#EF4444", // red (destructive)
-  "#DC2626", // darker red
-  "#B91C1C", // highest tips - dark red
-];
+const TIP_COLORS = chartColors.tipGradient;
 
 export function TipHistogram() {
   const { tipHistogram, config, status } = useGoLoadTestStore();
 
-  // Only show for realistic mode
-  if (config?.pattern !== "realistic") {
+  // Only show for realistic and adaptive-realistic modes
+  if (config?.pattern !== "realistic" && config?.pattern !== "adaptive-realistic") {
     return null;
   }
 
@@ -82,8 +74,8 @@ export function TipHistogram() {
                 <YAxis stroke={CHART_COLORS.axis} fontSize={10} tickLine={false} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "#FFFFFF",
-                    border: "1px solid #E2E8F0",
+                    backgroundColor: colors.background,
+                    border: `1px solid ${colors.border}`,
                     borderRadius: "8px",
                   }}
                   labelStyle={{ color: CHART_COLORS.axis }}

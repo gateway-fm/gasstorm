@@ -1,4 +1,4 @@
-.PHONY: run run-reth run-cdk-erigon run-metal stop restart logs status clean clean-metal build test test-block-builder test-load-generator test-dashboard test-tx bench-block-builder bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-builder dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help
+.PHONY: run run-reth run-cdk-erigon run-metal run-hyperlane stop restart logs status clean clean-metal build test test-block-builder test-load-generator test-dashboard test-tx bench-block-builder bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-builder dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help
 
 # =============================================================================
 # Configuration: Source .env file if it exists
@@ -51,17 +51,26 @@ POLYCLI_FUND_AMOUNT ?= 10000000000000000000
 # =============================================================================
 
 # Start the system (builds if needed) - uses .env configuration and EXECUTION_LAYER
-# Includes bridge profile for Hyperlane UI
+# Note: Bridge profile excluded by default (saves ~3GB and 2-3min build time)
+# Use 'make run-with-bridge' if you need Hyperlane bridging
 run:
+	docker compose --profile $(COMPOSE_PROFILE) up --build -d
+
+# Start with Hyperlane bridge enabled
+run-with-bridge:
+	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
+
+# Alias for run-with-bridge (includes Hyperlane)
+run-hyperlane:
 	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
 
 # Start with op-reth (block-builder + Engine API)
 run-reth:
-	docker compose --profile reth --profile bridge up --build -d
+	docker compose --profile reth up --build -d
 
 # Start with cdk-erigon (standalone sequencer)
 run-cdk-erigon:
-	docker compose --profile cdk-erigon --profile bridge up --build -d
+	docker compose --profile cdk-erigon up --build -d
 
 # Start with gravity-reth (high-performance parallel EVM, standalone sequencer)
 # First build takes 15-25 minutes (Rust compilation from source)
@@ -80,7 +89,7 @@ clean-metal:
 
 # Start with logs attached
 run-attached:
-	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build
+	docker compose --profile $(COMPOSE_PROFILE) up --build
 
 # =============================================================================
 # Performance Profiles (uses current EXECUTION_LAYER)
@@ -91,14 +100,14 @@ run-high-throughput:
 	GAS_LIMIT=1000000000 \
 	MAX_TXS_PER_BLOCK=25000 \
 	BLOCK_TIME_MS=100 \
-	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
+	docker compose --profile $(COMPOSE_PROFILE) up --build -d
 
 # Fast confirmations: 150M gas, 50ms blocks
 run-fast-confirm:
 	GAS_LIMIT=150000000 \
 	MAX_TXS_PER_BLOCK=7000 \
 	BLOCK_TIME_MS=50 \
-	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
+	docker compose --profile $(COMPOSE_PROFILE) up --build -d
 
 # Preconfirmations enabled: 1 gigagas, 100ms blocks
 run-with-preconf:
@@ -106,7 +115,7 @@ run-with-preconf:
 	MAX_TXS_PER_BLOCK=25000 \
 	BLOCK_TIME_MS=100 \
 	ENABLE_PRECONFIRMATIONS=true \
-	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
+	docker compose --profile $(COMPOSE_PROFILE) up --build -d
 
 # Conservative: Smaller blocks, longer intervals (for stability testing)
 run-conservative:
@@ -114,7 +123,7 @@ run-conservative:
 	MAX_TXS_PER_BLOCK=1000 \
 	BLOCK_TIME_MS=2000 \
 	SKIP_EMPTY_BLOCKS=false \
-	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
+	docker compose --profile $(COMPOSE_PROFILE) up --build -d
 
 # Flashblocks-style: 500ms blocks with preconfirmations
 run-flashblocks:
@@ -122,7 +131,7 @@ run-flashblocks:
 	MAX_TXS_PER_BLOCK=25000 \
 	BLOCK_TIME_MS=500 \
 	ENABLE_PRECONFIRMATIONS=true \
-	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
+	docker compose --profile $(COMPOSE_PROFILE) up --build -d
 
 # Stop all services (stops all profiles)
 stop:
@@ -131,7 +140,7 @@ stop:
 
 # Restart all services
 restart:
-	docker compose --profile reth --profile cdk-erigon --profile bridge down && docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
+	docker compose --profile reth --profile cdk-erigon --profile bridge down && docker compose --profile $(COMPOSE_PROFILE) up --build -d
 
 # View logs (follow mode)
 logs:
@@ -668,6 +677,7 @@ help:
 	@echo "    make run-cdk-erigon   - Start with cdk-erigon (standalone sequencer)"
 	@echo "    make run-gravity-reth - Start with gravity-reth (high-perf parallel EVM)"
 	@echo "    make run-metal        - Native mode (no Docker, maximum performance)"
+	@echo "    make run-with-bridge  - Start with Hyperlane bridge enabled"
 	@echo ""
 	@echo "  Basic:"
 	@echo "    make run-attached     - Start system with logs"

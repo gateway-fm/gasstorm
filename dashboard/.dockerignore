@@ -1,13 +1,15 @@
-# Dependencies (will be installed in container)
+# Dependencies (installed in container)
 node_modules/
 
-# Build outputs (will be rebuilt in container)
+# Build outputs (rebuilt in container)
 .next/
 out/
+dist/
 
 # Cache files
 *.tsbuildinfo
 .eslintcache
+.turbo/
 
 # IDE/Editor files
 .vscode/
@@ -20,9 +22,22 @@ out/
 .git/
 .gitignore
 
-# Development files
+# Documentation
 *.md
+LICENSE
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Development files
 legacy/
 
 # Test files
 test-*.mjs
+*.test.ts
+*.test.tsx
+*.spec.ts
+__tests__/
+coverage/

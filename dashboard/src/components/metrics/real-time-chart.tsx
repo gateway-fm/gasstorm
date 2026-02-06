@@ -14,16 +14,17 @@ import {
 import { useMetricsStore } from "@/stores/metrics-store";
 import { useGoLoadTestStore } from "@/stores/go-load-test-store";
 import { useMemo } from "react";
+import { colors } from "@/lib/colors";
 
-// Gateway chart colors
+// Chart colors from theme
 const COLORS = {
-  primary: "#8950FA",      // Gateway purple
-  secondary: "#A478FC",    // Lighter purple
-  tertiary: "#C4A8FD",     // Even lighter purple
-  success: "#22C55E",      // Green
-  warning: "#EAB308",      // Yellow/Orange
-  grid: "#E2E8F0",         // Light gray for grid
-  axis: "#6B7280",         // Medium gray for axis
+  mgas: colors.info,           // Blue for MGas/s (matches text-info in metrics)
+  tps: colors.primary,         // Purple for tx/s (matches text-primary)
+  tertiary: colors.primaryLighter,
+  success: colors.success,
+  warning: colors.warning,
+  grid: colors.grid,
+  axis: colors.axis,
 };
 
 export function RealTimeChart() {
@@ -36,6 +37,7 @@ export function RealTimeChart() {
     avgFillRate: liveAvgFillRate,
     currentRate: liveTxPerSec,
     peakTps: livePeakTps,
+    status: liveStatus,
   } = useGoLoadTestStore();
 
   // Select data source based on mode
@@ -65,13 +67,11 @@ export function RealTimeChart() {
     (isHistoricalMode && (snapshot.currentMgasPerSec > 0 || snapshot.peakMgasPerSec > 0));
 
   const chartData = useMemo(() => {
-    // For historical mode, show all data points (they're already aggregated)
-    // For live mode, show more points since we have 200ms samples
-    const maxPoints = isHistoricalMode ? 300 : 300; // More points for smoother live chart
+    // Maximum points to display on chart
+    const maxDisplayPoints = 300;
     const totalPoints = timeSeries.timestamps.length;
 
-    // Sample interval: for live mode, show every Nth point to fit maxPoints
-    const sampleInterval = Math.max(1, Math.floor(totalPoints / maxPoints));
+    if (totalPoints === 0) return [];
 
     // Filter out initial zero-value points that create jumps
     let startIndex = 0;
@@ -85,31 +85,50 @@ export function RealTimeChart() {
     }
 
     // Use the first non-zero point as base for relative time
-    const baseTimestamp = totalPoints > startIndex
-      ? timeSeries.timestamps[startIndex]
-      : 0;
+    const baseTimestamp = timeSeries.timestamps[startIndex] ?? 0;
 
-    // Sample every Nth point from recent data
-    const sampledData: { time: string; mgasPerSec: number; txPerSec: number; fillRate: number }[] = [];
+    // Determine the window of data to display:
+    // - If we have fewer points than maxDisplayPoints, show all
+    // - Otherwise, show the most recent maxDisplayPoints (sliding window)
+    const availablePoints = totalPoints - startIndex;
+    const windowStart = availablePoints <= maxDisplayPoints
+      ? startIndex
+      : totalPoints - maxDisplayPoints;
 
-    for (let i = totalPoints - 1; i >= startIndex && sampledData.length < maxPoints; i -= sampleInterval) {
-      // Show relative time for both live and historical (e.g., "0:05", "0:10")
-      // Live mode now uses elapsed seconds from Go load generator
+    // Apply moving average smoothing to reduce zigzag noise
+    // Window size of 5 smooths out high-frequency noise while preserving trends
+    const smoothingWindow = 5;
+
+    const smooth = (arr: number[], idx: number): number => {
+      const half = Math.floor(smoothingWindow / 2);
+      let sum = 0;
+      let count = 0;
+      for (let j = Math.max(0, idx - half); j <= Math.min(arr.length - 1, idx + half); j++) {
+        sum += arr[j] ?? 0;
+        count++;
+      }
+      return count > 0 ? sum / count : 0;
+    };
+
+    // Build chart data from the window with smoothing applied
+    const chartPoints: { time: string; mgasPerSec: number; txPerSec: number; fillRate: number }[] = [];
+
+    for (let i = windowStart; i < totalPoints; i++) {
       const relativeSeconds = Math.round(timeSeries.timestamps[i] - baseTimestamp);
       const minutes = Math.floor(relativeSeconds / 60);
       const seconds = relativeSeconds % 60;
       const timeLabel = `${minutes}:${seconds.toString().padStart(2, '0')}`;
 
-      sampledData.unshift({
+      chartPoints.push({
         time: timeLabel,
-        mgasPerSec: timeSeries.mgasPerSec[i] ?? 0,
-        txPerSec: timeSeries.txPerSec[i] ?? 0,
-        fillRate: timeSeries.fillRate[i] ?? 0,
+        mgasPerSec: smooth(timeSeries.mgasPerSec, i),
+        txPerSec: smooth(timeSeries.txPerSec, i),
+        fillRate: smooth(timeSeries.fillRate, i),
       });
     }
 
-    return sampledData;
-  }, [timeSeries, isHistoricalMode]);
+    return chartPoints;
+  }, [timeSeries]);
 
   return (
     <Card className="col-span-2">
@@ -124,7 +143,7 @@ export function RealTimeChart() {
             <>
               <div>
                 <span className="text-muted-foreground">{isHistoricalMode ? "Avg: " : "Current: "}</span>
-                <span className="font-mono font-semibold" style={{ color: COLORS.primary }}>
+                <span className="font-mono font-semibold" style={{ color: COLORS.mgas }}>
                   {snapshot.currentMgasPerSec.toFixed(2)} Mgas/s
                 </span>
               </div>
@@ -145,7 +164,7 @@ export function RealTimeChart() {
             <>
               <div>
                 <span className="text-muted-foreground">Avg: </span>
-                <span className="font-mono font-semibold" style={{ color: COLORS.secondary }}>
+                <span className="font-mono font-semibold" style={{ color: COLORS.tps }}>
                   {snapshot.currentTxPerSec.toFixed(1)} tx/s
                 </span>
               </div>
@@ -175,48 +194,48 @@ export function RealTimeChart() {
                   <>
                     <YAxis
                       yAxisId="left"
-                      stroke={COLORS.primary}
+                      stroke={COLORS.mgas}
                       fontSize={10}
                       tickLine={false}
                       label={{
                         value: "Mgas/s",
                         angle: -90,
                         position: "insideLeft",
-                        style: { fill: COLORS.primary, fontSize: 10 },
+                        style: { fill: COLORS.mgas, fontSize: 10 },
                       }}
                     />
                     <YAxis
                       yAxisId="right"
                       orientation="right"
-                      stroke={COLORS.secondary}
+                      stroke={COLORS.tps}
                       fontSize={10}
                       tickLine={false}
                       label={{
                         value: "tx/s",
                         angle: 90,
                         position: "insideRight",
-                        style: { fill: COLORS.secondary, fontSize: 10 },
+                        style: { fill: COLORS.tps, fontSize: 10 },
                       }}
                     />
                   </>
                 ) : (
                   <YAxis
                     yAxisId="left"
-                    stroke={COLORS.secondary}
+                    stroke={COLORS.tps}
                     fontSize={10}
                     tickLine={false}
                     label={{
                       value: "tx/s",
                       angle: -90,
                       position: "insideLeft",
-                      style: { fill: COLORS.secondary, fontSize: 10 },
+                      style: { fill: COLORS.tps, fontSize: 10 },
                     }}
                   />
                 )}
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "#FFFFFF",
-                    border: "1px solid #E2E8F0",
+                    backgroundColor: colors.background,
+                    border: `1px solid ${colors.border}`,
                     borderRadius: "8px",
                   }}
                   labelStyle={{ color: COLORS.axis }}
@@ -229,7 +248,7 @@ export function RealTimeChart() {
                       type="monotone"
                       dataKey="mgasPerSec"
                       name="Mgas/s"
-                      stroke={COLORS.primary}
+                      stroke={COLORS.mgas}
                       strokeWidth={2}
                       dot={false}
                       activeDot={{ r: 4 }}
@@ -252,7 +271,7 @@ export function RealTimeChart() {
                   type="monotone"
                   dataKey="txPerSec"
                   name="tx/s"
-                  stroke={COLORS.secondary}
+                  stroke={COLORS.tps}
                   strokeWidth={2}
                   dot={false}
                   activeDot={{ r: 4 }}
@@ -260,8 +279,17 @@ export function RealTimeChart() {
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-full flex items-center justify-center text-muted-foreground">
-              No data yet. Start a load test to see real-time metrics.
+            <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
+              {liveStatus === "completed" || liveStatus === "error" ? (
+                <>
+                  <p>Chart data not available for this session.</p>
+                  <p className="text-sm">View detailed results in <a href="/load-test/history" className="text-primary hover:underline">History</a>.</p>
+                </>
+              ) : liveStatus === "initializing" || liveStatus === "running" || liveStatus === "verifying" ? (
+                <p>Collecting metrics...</p>
+              ) : (
+                <p>No data yet. Start a load test to see real-time metrics.</p>
+              )}
             </div>
           )}
         </div>

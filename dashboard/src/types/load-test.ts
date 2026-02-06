@@ -1,4 +1,4 @@
-export type LoadPattern = "constant" | "ramp" | "spike" | "adaptive" | "realistic";
+export type LoadPattern = "constant" | "ramp" | "spike" | "adaptive" | "realistic" | "adaptive-realistic";
 
 export type TipDistribution = "exponential" | "power-law" | "uniform";
 
@@ -161,6 +161,15 @@ export type InitPhase =
   | "initializing_nonces"
   | "deploying_contracts"
   | "starting_workers";
+
+// Verification phases during post-test verification
+export type VerifyPhase =
+  | ""
+  | "on_chain_metrics"
+  | "aggregating"
+  | "tx_count"
+  | "tip_ordering"
+  | "receipts";
 
 export interface LoadTestState {
   status: LoadTestStatus;

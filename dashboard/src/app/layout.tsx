@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { WebSocketProvider } from "@/contexts/websocket-context";
 import { Header } from "@/components/layout/header";
+import { Footer } from "@/components/layout/footer";
 import "./globals.css";
 
 const inter = Inter({
@@ -28,11 +29,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} antialiased min-h-screen font-sans`}
+        className={`${inter.variable} ${jetbrainsMono.variable} antialiased min-h-screen flex flex-col font-sans`}
       >
         <WebSocketProvider>
           <Header />
-          {children}
+          <main className="flex-1">{children}</main>
+          <Footer />
         </WebSocketProvider>
         <Toaster />
       </body>

@@ -11,6 +11,7 @@ import type {
   TxTypeMetrics,
   LatencyStats,
   InitPhase,
+  VerifyPhase,
 } from "@/types/load-test";
 
 // Load generator API base URL - proxied through nginx in docker
@@ -74,6 +75,13 @@ export interface GoLoadTestMetrics {
   fundingTxsTotal?: number;
   contractsDeployed?: number;
   contractsTotal?: number;
+  // Verification progress
+  verifyPhase?: VerifyPhase;
+  verifyProgress?: string;
+  blocksToVerify?: number;
+  blocksVerified?: number;
+  receiptsToSample?: number;
+  receiptsSampled?: number;
   // Preconfirmation stage counters
   txPending?: number;
   txPreconfirmed?: number;

@@ -21,9 +21,9 @@ function getBlockTimeColor(ms: number, targetMs: number): string {
 
   const deviation = Math.abs(ms - targetMs) / targetMs;
 
-  if (deviation <= 0.2) return "text-green-400";  // Within 20%
-  if (deviation <= 0.5) return "text-yellow-400"; // Within 50%
-  return "text-red-400";                           // More than 50% off
+  if (deviation <= 0.2) return "text-success";  // Within 20%
+  if (deviation <= 0.5) return "text-warning"; // Within 50%
+  return "text-destructive";                    // More than 50% off
 }
 
 // Format gas price - show more precision for very low values
@@ -85,52 +85,52 @@ export function MetricsSnapshot() {
 
   const metrics = [
     {
-      label: showMgasLabel ? (isHistoricalMode ? "Avg Mgas/s" : "Current Mgas/s") : "Avg tx/s",
-      value: showMgasMetrics ? avgMgasPerSec.toFixed(2) : snapshot.currentTxPerSec.toFixed(1),
+      label: isHistoricalMode ? "Avg" : "Now",
+      value: showMgasMetrics ? avgMgasPerSec.toFixed(1) : snapshot.currentTxPerSec.toFixed(1),
       unit: showMgasMetrics ? "Mgas/s" : "tx/s",
-      color: showMgasMetrics ? "text-blue-400" : "text-purple-400",
+      color: showMgasMetrics ? "text-info" : "text-primary",
     },
     {
-      label: showMgasLabel ? "Peak Mgas/s" : "Peak tx/s",
-      value: showMgasMetrics ? peakMgasPerSec.toFixed(2) : snapshot.peakTxPerSec.toFixed(1),
+      label: "Peak",
+      value: showMgasMetrics ? peakMgasPerSec.toFixed(1) : snapshot.peakTxPerSec.toFixed(1),
       unit: showMgasMetrics ? "Mgas/s" : "tx/s",
-      color: "text-green-400",
+      color: "text-success",
     },
     {
-      label: showMgasLabel ? (isHistoricalMode ? "Avg tx/s" : "Current tx/s") : "Confirmed",
-      value: showMgasMetrics ? snapshot.currentTxPerSec.toFixed(1) : snapshot.totalTransactions.toLocaleString(),
-      unit: showMgasMetrics ? "tx/s" : "txs",
-      color: "text-purple-400",
+      label: isHistoricalMode ? "Avg TPS" : "TPS",
+      value: showMgasMetrics ? snapshot.currentTxPerSec.toFixed(0) : snapshot.totalTransactions.toLocaleString(),
+      unit: showMgasMetrics ? "" : "txs",
+      color: "text-primary",
     },
     {
-      label: showMgasLabel ? "Peak tx/s" : "Success Rate",
+      label: "Peak TPS",
       value: showMgasMetrics
-        ? snapshot.peakTxPerSec.toFixed(1)
+        ? snapshot.peakTxPerSec.toFixed(0)
         : snapshot.totalTransactions > 0 ? "100%" : "-",
-      unit: showMgasMetrics ? "tx/s" : "",
-      color: showMgasMetrics ? "text-purple-400" : "text-green-400",
+      unit: "",
+      color: showMgasMetrics ? "text-primary" : "text-success",
     },
     {
-      label: "Block Time",
-      value: (blockMetrics.length > 0 || snapshot.currentBlockTimeMs > 0) ? formatBlockTime(snapshot.currentBlockTimeMs) : "N/A",
+      label: "Block",
+      value: (blockMetrics.length > 0 || snapshot.currentBlockTimeMs > 0) ? formatBlockTime(snapshot.currentBlockTimeMs) : "—",
       unit: (blockMetrics.length > 0 || snapshot.currentBlockTimeMs > 0) && snapshot.currentBlockTimeMs > 0 && snapshot.currentBlockTimeMs < 1000 ? "ms" : "",
       color: (blockMetrics.length > 0 || snapshot.currentBlockTimeMs > 0) ? getBlockTimeColor(snapshot.currentBlockTimeMs, targetBlockTimeMs) : "text-muted-foreground",
     },
     {
-      label: "Avg Block Time",
-      value: (blockMetrics.length > 0 || snapshot.avgBlockTimeMs > 0) ? formatBlockTime(snapshot.avgBlockTimeMs) : "N/A",
+      label: "Avg Block",
+      value: (blockMetrics.length > 0 || snapshot.avgBlockTimeMs > 0) ? formatBlockTime(snapshot.avgBlockTimeMs) : "—",
       unit: (blockMetrics.length > 0 || snapshot.avgBlockTimeMs > 0) && snapshot.avgBlockTimeMs > 0 && snapshot.avgBlockTimeMs < 1000 ? "ms" : "",
       color: (blockMetrics.length > 0 || snapshot.avgBlockTimeMs > 0) ? getBlockTimeColor(snapshot.avgBlockTimeMs, targetBlockTimeMs) : "text-muted-foreground",
     },
     {
-      label: "Avg Fill Rate",
-      value: showMgasMetrics ? formatPercent(avgFillRate) : "N/A",
+      label: "Fill",
+      value: showMgasMetrics ? formatPercent(avgFillRate) : "—",
       unit: "",
-      color: showMgasMetrics ? "text-orange-400" : "text-muted-foreground",
+      color: showMgasMetrics ? "text-warning" : "text-muted-foreground",
     },
     {
       label: "Blocks",
-      value: showMgasMetrics ? blocksProduced.toString() : "N/A",
+      value: showMgasMetrics ? blocksProduced.toString() : "—",
       unit: "",
       color: "text-muted-foreground",
     },
@@ -138,62 +138,49 @@ export function MetricsSnapshot() {
       label: "Base Fee",
       value: formatGasPrice(isHistoricalMode ? snapshot.baseFeeGwei ?? 0 : latestBaseFeeGwei),
       unit: (isHistoricalMode ? (snapshot.baseFeeGwei ?? 0) > 0 : latestBaseFeeGwei > 0) ? "gwei" : "",
-      color: (isHistoricalMode ? (snapshot.baseFeeGwei ?? 0) : latestBaseFeeGwei) > 1.5 ? "text-red-400" : ((isHistoricalMode ? (snapshot.baseFeeGwei ?? 0) : latestBaseFeeGwei) > 1.0 ? "text-yellow-400" : "text-green-400"),
+      color: (isHistoricalMode ? (snapshot.baseFeeGwei ?? 0) : latestBaseFeeGwei) > 1.5 ? "text-destructive" : ((isHistoricalMode ? (snapshot.baseFeeGwei ?? 0) : latestBaseFeeGwei) > 1.0 ? "text-warning" : "text-success"),
     },
     {
       label: "Gas Price",
       value: formatGasPrice(isHistoricalMode ? snapshot.gasPriceGwei ?? 0 : latestGasPriceGwei),
       unit: (isHistoricalMode ? (snapshot.gasPriceGwei ?? 0) > 0 : latestGasPriceGwei > 0) ? "gwei" : "",
-      color: (isHistoricalMode ? (snapshot.gasPriceGwei ?? 0) : latestGasPriceGwei) > 2.0 ? "text-red-400" : ((isHistoricalMode ? (snapshot.gasPriceGwei ?? 0) : latestGasPriceGwei) > 1.5 ? "text-yellow-400" : "text-green-400"),
+      color: (isHistoricalMode ? (snapshot.gasPriceGwei ?? 0) : latestGasPriceGwei) > 2.0 ? "text-destructive" : ((isHistoricalMode ? (snapshot.gasPriceGwei ?? 0) : latestGasPriceGwei) > 1.5 ? "text-warning" : "text-success"),
     },
     {
       label: "Total Gas",
-      value: showMgasMetrics ? formatGas(totalGasUsed) : "N/A",
+      value: showMgasMetrics ? formatGas(totalGasUsed) : "—",
       unit: "",
-      color: "text-cyan-400",
+      color: "text-info",
     },
     {
       label: "Total Txs",
       value: totalTxs.toLocaleString(),
       unit: "",
-      color: "text-amber-400",
+      color: "text-warning",
     },
   ];
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base font-semibold">
+        <CardTitle className="text-base font-semibold font-mono">
           {isHistoricalMode ? "Historical Metrics" : (hasBlockMetrics ? "Live Metrics" : "Test Metrics")}
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-2">
           {metrics.map((metric) => (
-            <div key={metric.label} className="rounded-lg border p-3">
-              <p className="text-xs text-muted-foreground">{metric.label}</p>
-              <p className={`text-xl font-bold font-mono ${metric.color}`}>
+            <div key={metric.label} className="rounded-lg border p-2 min-w-0 overflow-hidden">
+              <p className="text-[10px] text-muted-foreground font-mono truncate">{metric.label}</p>
+              <p className={`text-base font-bold font-mono ${metric.color} truncate`}>
                 {metric.value}
-                {metric.unit && (
-                  <span className="text-xs font-normal text-muted-foreground ml-1">
-                    {metric.unit}
-                  </span>
-                )}
               </p>
+              {metric.unit && (
+                <p className="text-[10px] text-muted-foreground font-mono truncate">{metric.unit}</p>
+              )}
             </div>
           ))}
         </div>
-        {hasBlockMetrics && snapshot.minBlockTimeMs > 0 && (
-          <div className="mt-3 pt-3 border-t">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Block Time (min/max)</span>
-              <span className="font-mono">
-                {formatBlockTime(snapshot.minBlockTimeMs)} / {formatBlockTime(snapshot.maxBlockTimeMs)}
-                {snapshot.minBlockTimeMs < 1000 && <span className="text-xs text-muted-foreground ml-1">ms</span>}
-              </span>
-            </div>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

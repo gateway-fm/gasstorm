@@ -43,6 +43,14 @@ export function parseMetricsMessage(
   else if (metrics.status === "completed") status = "completed";
   else if (metrics.status === "error") status = "error";
 
+  // Cap elapsed time at duration when test is done (verifying/completed)
+  // Timer should freeze at test duration, not keep running during verification
+  const durationSec = Math.floor(metrics.durationMs / 1000);
+  const rawElapsedTime = Math.floor(metrics.elapsedMs / 1000);
+  const elapsedTime = (status === "verifying" || status === "completed")
+    ? Math.min(rawElapsedTime, durationSec)
+    : rawElapsedTime;
+
   const state: Partial<GoLoadTestState> = {
     status,
     txSentCount: metrics.txSent,
@@ -50,10 +58,10 @@ export function parseMetricsMessage(
     txFailedCount: metrics.txFailed,
     currentRate: metrics.currentTps,
     averageTps: metrics.averageTps,
-    elapsedTime: Math.floor(metrics.elapsedMs / 1000),
+    elapsedTime,
     targetTps: metrics.targetTps,
     peakTps: metrics.peakTps ?? 0,
-    durationSec: Math.floor(metrics.durationMs / 1000),
+    durationSec,
     error: metrics.error || null,
     // Initialization progress
     initPhase: metrics.initPhase ?? "",
@@ -64,6 +72,13 @@ export function parseMetricsMessage(
     fundingTxsTotal: metrics.fundingTxsTotal ?? 0,
     contractsDeployed: metrics.contractsDeployed ?? 0,
     contractsTotal: metrics.contractsTotal ?? 0,
+    // Verification progress
+    verifyPhase: metrics.verifyPhase ?? "",
+    verifyProgress: metrics.verifyProgress ?? "",
+    blocksToVerify: metrics.blocksToVerify ?? 0,
+    blocksVerified: metrics.blocksVerified ?? 0,
+    receiptsToSample: metrics.receiptsToSample ?? 0,
+    receiptsSampled: metrics.receiptsSampled ?? 0,
     // Preconfirmation stage counters
     txPendingCount: metrics.txPending ?? 0,
     txPreconfirmedCount: metrics.txPreconfirmed ?? 0,
@@ -94,7 +109,7 @@ export function parseMetricsMessage(
     currentFillRate: metrics.currentFillRate ?? 0,
   };
 
-  // Build time series for live chart (only during running status)
+  // Build time series for live chart (ONLY during running - stop immediately when verifying/completed)
   let newTimeSeries: ChartTimeSeries | undefined;
   if (status === "running" && metrics.elapsedMs > 0) {
     const timestamp = metrics.elapsedMs / 1000;
@@ -184,9 +199,19 @@ export function createWebSocketManager(callbacks: WebSocketCallbacks) {
             batchedUpdate(state);
           }
 
-          // Disconnect when test completes
-          if ((state.status === "completed" || state.status === "error") && metrics.txSent > 0) {
+          // Disconnect when test completes or errors (including init errors where txSent=0)
+          if (state.status === "completed" || state.status === "error") {
             console.log("[LoadTest] Test finished, closing WebSocket");
+            // Flush any pending update immediately before disconnecting
+            // (disconnect() cancels pending RAF, which would lose the final state)
+            if (pendingUpdate) {
+              callbacks.onStateUpdate(pendingUpdate);
+              pendingUpdate = null;
+              if (rafId !== null) {
+                cancelAnimationFrame(rafId);
+                rafId = null;
+              }
+            }
             disconnect();
             callbacks.stopPolling();
           }

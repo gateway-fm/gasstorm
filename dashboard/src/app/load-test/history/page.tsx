@@ -266,7 +266,7 @@ function HistoryDetailView({ testId }: { testId: string }) {
         <LatencyHistogram />
       </div>
 
-      {testRun?.pattern === "realistic" && (
+      {(testRun?.pattern === "realistic" || testRun?.pattern === "adaptive-realistic") && (
         <div className="grid gap-4 md:grid-cols-2 mb-6">
           <TipHistogram />
           <TxTypeBreakdown />

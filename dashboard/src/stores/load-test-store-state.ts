@@ -7,6 +7,7 @@ import type {
   LoadTestStatus,
   LatencyStats,
   InitPhase,
+  VerifyPhase,
   TipHistogramBucket,
   TxTypeMetrics,
 } from "@/types/load-test";
@@ -41,6 +42,13 @@ export interface GoLoadTestState {
   fundingTxsTotal: number;
   contractsDeployed: number;
   contractsTotal: number;
+  // Verification progress
+  verifyPhase: VerifyPhase;
+  verifyProgress: string;
+  blocksToVerify: number;
+  blocksVerified: number;
+  receiptsToSample: number;
+  receiptsSampled: number;
   // Preconfirmation stage counters
   txPendingCount: number;
   txPreconfirmedCount: number;
@@ -116,6 +124,13 @@ export const INITIAL_STATE: GoLoadTestState = {
   fundingTxsTotal: 0,
   contractsDeployed: 0,
   contractsTotal: 0,
+  // Verification progress
+  verifyPhase: "",
+  verifyProgress: "",
+  blocksToVerify: 0,
+  blocksVerified: 0,
+  receiptsToSample: 0,
+  receiptsSampled: 0,
   // Preconfirmation stage counters
   txPendingCount: 0,
   txPreconfirmedCount: 0,
@@ -181,6 +196,13 @@ export function getResetState(): Partial<GoLoadTestState> {
     fundingTxsTotal: 0,
     contractsDeployed: 0,
     contractsTotal: 0,
+    // Verification progress
+    verifyPhase: "",
+    verifyProgress: "",
+    blocksToVerify: 0,
+    blocksVerified: 0,
+    receiptsToSample: 0,
+    receiptsSampled: 0,
     // Preconfirmation stage counters
     txPendingCount: 0,
     txPreconfirmedCount: 0,

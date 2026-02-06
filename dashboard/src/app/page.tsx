@@ -83,7 +83,7 @@ export default function DashboardPage() {
 
       <main className="container mx-auto px-4 py-6">
         {/* Status Cards Grid */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
           <ChainStatusCard
             title="L1 - Anvil"
             subtitle="Ethereum L1 (local)"
@@ -120,16 +120,16 @@ export default function DashboardPage() {
           <QuickActions onRefresh={refreshAll} />
         </div>
 
-        {/* Architecture Diagram */}
-        <div className="mb-6">
-          <ArchitectureDiagram />
+        {/* Compact Account + Activity Row */}
+        <div className="grid gap-4 md:grid-cols-3 mb-4">
+          <AccountCard l1Balance={accountL1Balance} l2Balance={accountL2Balance} compact />
+          <div className="md:col-span-2">
+            <ActivityLog compact maxItems={3} />
+          </div>
         </div>
 
-        {/* Account and Activity Log */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <AccountCard l1Balance={accountL1Balance} l2Balance={accountL2Balance} />
-          <ActivityLog />
-        </div>
+        {/* Architecture Diagram - Full Width */}
+        <ArchitectureDiagram />
       </main>
     </div>
   );

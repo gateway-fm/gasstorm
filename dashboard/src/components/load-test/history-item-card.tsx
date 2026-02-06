@@ -17,7 +17,10 @@ import {
   ExternalLink,
   Star,
   Pencil,
+  Square,
+  CheckSquare,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   LineChart as RechartsLineChart,
   Line,
@@ -29,10 +32,36 @@ import {
 } from "recharts";
 import type { TestResult, TimeSeriesPoint, TestRun } from "@/types/load-test";
 
+/**
+ * Apply a simple moving average to smooth spiky time series data.
+ * Uses a centered window to avoid shifting the data.
+ */
+function smoothTimeSeries(data: TimeSeriesPoint[], windowSize: number): TimeSeriesPoint[] {
+  if (data.length < windowSize) return data;
+
+  const half = Math.floor(windowSize / 2);
+  return data.map((point, i) => {
+    const start = Math.max(0, i - half);
+    const end = Math.min(data.length, i + half + 1);
+    const window = data.slice(start, end);
+
+    const avgTps = window.reduce((sum, p) => sum + (p.currentTps || 0), 0) / window.length;
+    const avgMgas = window.reduce((sum, p) => sum + (p.mgasPerSec || 0), 0) / window.length;
+
+    return {
+      ...point,
+      currentTps: avgTps,
+      mgasPerSec: avgMgas,
+    };
+  });
+}
+
 export interface HistoryItem extends TestResult {
   txLoggingEnabled?: boolean;
   customName?: string;
   isFavorite?: boolean;
+  /** True when test just completed but is still being saved to storage */
+  isSaving?: boolean;
 }
 
 interface HistoryItemCardProps {
@@ -51,6 +80,10 @@ interface HistoryItemCardProps {
   onViewFullResults: () => void;
   onViewTxLogs: () => void;
   onDelete: () => void;
+  // Compare mode props
+  compareMode?: boolean;
+  selectedForCompare?: boolean;
+  onToggleCompareSelect?: () => void;
 }
 
 export function formatDuration(ms: number | undefined | null): string {
@@ -88,26 +121,56 @@ export function HistoryItemCard({
   onViewFullResults,
   onViewTxLogs,
   onDelete,
+  compareMode = false,
+  selectedForCompare = false,
+  onToggleCompareSelect,
 }: HistoryItemCardProps) {
+  const isSaving = result.isSaving ?? false;
+
   return (
-    <div className="border rounded-lg p-3 hover:bg-accent/50 transition-colors">
+    <div
+      className={cn(
+        "border rounded-lg p-3 transition-colors",
+        selectedForCompare && "border-info bg-info/5",
+        isSaving ? "opacity-70 animate-pulse" : "hover:bg-accent/50"
+      )}
+    >
       <div className="flex items-center justify-between">
-        {/* Star button */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleFavorite();
-          }}
-          className="p-1 hover:bg-accent rounded -ml-1 mr-1"
-        >
-          <Star
-            className={`h-4 w-4 ${
-              result.isFavorite
-                ? "fill-yellow-400 text-yellow-400"
-                : "text-muted-foreground hover:text-yellow-400"
-            }`}
-          />
-        </button>
+        {/* Compare checkbox (when in compare mode) */}
+        {compareMode && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleCompareSelect?.();
+            }}
+            className="p-1 hover:bg-accent rounded -ml-1 mr-1"
+          >
+            {selectedForCompare ? (
+              <CheckSquare className="h-4 w-4 text-info" />
+            ) : (
+              <Square className="h-4 w-4 text-muted-foreground hover:text-info" />
+            )}
+          </button>
+        )}
+
+        {/* Star button (hidden in compare mode) */}
+        {!compareMode && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite();
+            }}
+            className="p-1 hover:bg-accent rounded -ml-1 mr-1"
+          >
+            <Star
+              className={`h-4 w-4 ${
+                result.isFavorite
+                  ? "fill-yellow-400 text-yellow-400"
+                  : "text-muted-foreground hover:text-yellow-400"
+              }`}
+            />
+          </button>
+        )}
 
         {/* Name with edit icon */}
         <div
@@ -152,6 +215,12 @@ export function HistoryItemCard({
           className="flex items-center gap-2 cursor-pointer"
           onClick={onToggleExpand}
         >
+          {isSaving && (
+            <Badge variant="secondary" className="font-mono text-xs bg-warning/20 text-warning animate-pulse">
+              <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+              Saving...
+            </Badge>
+          )}
           <Badge variant="outline" className="font-mono text-xs">
             {result.pattern || "unknown"}
           </Badge>
@@ -159,8 +228,8 @@ export function HistoryItemCard({
             variant="secondary"
             className={`font-mono text-xs ${
               (result as TestRun).executionLayer === "cdk-erigon"
-                ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
-                : "bg-orange-500/10 text-orange-400 border-orange-500/20"
+                ? "bg-primary/10 text-primary border-primary/20"
+                : "bg-warning/10 text-warning border-warning/20"
             }`}
           >
             {(result as TestRun).executionLayer || "reth"}
@@ -178,11 +247,11 @@ export function HistoryItemCard({
             {formatDuration(result.durationMs)}
           </span>
           <span className="flex items-center gap-1 font-mono">
-            <Activity className="h-3 w-3 text-blue-400" />
+            <Activity className="h-3 w-3 text-info" />
             {(result.averageTps ?? 0).toFixed(1)} tx/s
           </span>
           <span className="flex items-center gap-1">
-            <CheckCircle className="h-3 w-3 text-green-400" />
+            <CheckCircle className="h-3 w-3 text-success" />
             {getSuccessRate(result)}%
           </span>
           {expanded ? (
@@ -203,19 +272,21 @@ export function HistoryItemCard({
             </div>
             <div>
               <div className="text-muted-foreground">Confirmed</div>
-              <div className="font-mono text-green-400">
+              <div className="font-mono text-success">
                 {(result.txConfirmed ?? 0).toLocaleString()}
               </div>
             </div>
             <div>
               <div className="text-muted-foreground">Failed</div>
-              <div className="font-mono text-red-400">
+              <div className="font-mono text-destructive">
                 {(result.txFailed ?? 0).toLocaleString()}
               </div>
             </div>
             <div>
               <div className="text-muted-foreground">TX Type</div>
-              <div className="font-mono">{result.transactionType}</div>
+              <div className="font-mono">
+                {result.pattern === "realistic" ? "Mixed" : result.transactionType}
+              </div>
             </div>
           </div>
 
@@ -228,22 +299,27 @@ export function HistoryItemCard({
             <div className="mt-2">
               <div className="flex items-center gap-1 text-muted-foreground mb-2">
                 <LineChart className="h-3 w-3" />
-                <span>TPS Over Time</span>
+                <span>TPS & MGas/s Over Time</span>
               </div>
               <div className="h-32 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <RechartsLineChart
-                    data={timeSeries}
-                    margin={{ top: 5, right: 5, left: -20, bottom: 5 }}
+                    data={smoothTimeSeries(timeSeries, 5)}
+                    margin={{ top: 5, right: 35, left: -20, bottom: 5 }}
                   >
                     <XAxis
                       dataKey="timestampMs"
                       tickFormatter={(ms) => `${(ms / 1000).toFixed(0)}s`}
                       tick={{ fontSize: 10 }}
                     />
-                    <YAxis tick={{ fontSize: 10 }} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
                     <Tooltip
                       labelFormatter={(ms) => `${(Number(ms) / 1000).toFixed(1)}s`}
+                      formatter={(value, name) => [
+                        name === "MGas/s" ? Number(value).toFixed(1) : Number(value).toFixed(0),
+                        name,
+                      ]}
                       contentStyle={{
                         backgroundColor: "hsl(var(--background))",
                         border: "1px solid hsl(var(--border))",
@@ -251,18 +327,29 @@ export function HistoryItemCard({
                       }}
                     />
                     <ReferenceLine
+                      yAxisId="left"
                       y={timeSeries[0]?.targetTps || 0}
                       stroke="#666"
                       strokeDasharray="3 3"
                       label={{ value: "Target", fontSize: 10 }}
                     />
                     <Line
+                      yAxisId="left"
                       type="monotone"
                       dataKey="currentTps"
                       stroke="#3b82f6"
                       strokeWidth={1.5}
                       dot={false}
-                      name="Current TPS"
+                      name="TPS"
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="mgasPerSec"
+                      stroke="#22c55e"
+                      strokeWidth={1.5}
+                      dot={false}
+                      name="MGas/s"
                     />
                   </RechartsLineChart>
                 </ResponsiveContainer>
@@ -272,9 +359,9 @@ export function HistoryItemCard({
 
           {/* Latency Stats */}
           {result.preconfLatency && result.preconfLatency.count > 0 && (
-            <div className="flex items-center gap-2 p-2 bg-green-500/10 rounded">
-              <Zap className="h-4 w-4 text-green-400" />
-              <span className="text-green-400">Preconf:</span>
+            <div className="flex items-center gap-2 p-2 bg-success/10 rounded">
+              <Zap className="h-4 w-4 text-success" />
+              <span className="text-success">Preconf:</span>
               <span className="font-mono">
                 p50 {(result.preconfLatency.p50 ?? 0).toFixed(0)}ms
               </span>
@@ -286,9 +373,9 @@ export function HistoryItemCard({
           )}
 
           {result.latency && result.latency.count > 0 && (
-            <div className="flex items-center gap-2 p-2 bg-blue-500/10 rounded">
-              <Clock className="h-4 w-4 text-blue-400" />
-              <span className="text-blue-400">Confirm:</span>
+            <div className="flex items-center gap-2 p-2 bg-info/10 rounded">
+              <Clock className="h-4 w-4 text-info" />
+              <span className="text-info">Confirm:</span>
               <span className="font-mono">
                 p50 {(result.latency.p50 ?? 0).toFixed(0)}ms
               </span>

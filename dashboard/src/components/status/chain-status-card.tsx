@@ -29,10 +29,10 @@ export function ChainStatusCard({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <div>
-          <CardTitle className="text-base font-semibold">{title}</CardTitle>
+          <CardTitle className="text-base font-semibold font-mono">{title}</CardTitle>
           <p className="text-xs text-muted-foreground">{subtitle}</p>
         </div>
-        <Badge variant={isOnline ? "default" : "destructive"} className={isOnline ? "bg-green-600 hover:bg-green-600" : ""}>
+        <Badge variant={isOnline ? "default" : "destructive"} className={isOnline ? "bg-success hover:bg-success" : "bg-destructive hover:bg-destructive"}>
           {isOnline ? "Online" : "Offline"}
         </Badge>
       </CardHeader>
@@ -43,7 +43,7 @@ export function ChainStatusCard({
             href={`http://${endpoint}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-blue-400 hover:underline font-mono"
+            className="text-info hover:underline font-mono"
           >
             {endpoint}
           </a>
