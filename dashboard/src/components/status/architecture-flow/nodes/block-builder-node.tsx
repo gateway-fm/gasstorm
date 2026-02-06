@@ -71,27 +71,23 @@ export const BlockBuilderNode = memo(function BlockBuilderNode({
         <MetricRow label="Block Time" value={`${blockTimeMs}ms`} />
       </MetricSection>
 
-      {/* Input port - TX from Load Generator */}
+      {/* Default target handle */}
       <Handle
-        id="tx-input"
         type="target"
-        position={Position.Left}
+        position={Position.Top}
         className={cn(
-          "!h-3 !w-3 !rounded-full !border-2",
-          "!border-purple-400 !bg-purple-500/80",
-          "!-left-1.5"
+          "!h-2 !w-2 !rounded-full",
+          "!border !border-purple-400/50 !bg-purple-500/60"
         )}
       />
 
-      {/* Output port - Engine API to op-reth */}
+      {/* Default source handle */}
       <Handle
-        id="engine-output"
         type="source"
-        position={Position.Right}
+        position={Position.Bottom}
         className={cn(
-          "!h-3 !w-3 !rounded-full !border-2",
-          "!border-pink-400 !bg-pink-500/80",
-          "!-right-1.5"
+          "!h-2 !w-2 !rounded-full",
+          "!border !border-purple-400/50 !bg-purple-500/60"
         )}
       />
     </BaseNode>

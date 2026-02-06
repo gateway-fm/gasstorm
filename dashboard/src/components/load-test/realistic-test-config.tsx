@@ -82,9 +82,11 @@ export function RealisticTestConfigPanel() {
       <div className="space-y-2">
         <Label>Number of Accounts</Label>
         <Input
-          type="text"
-          value={realisticConfig.numAccounts}
-          onChange={(e) => updateRealisticConfig({ numAccounts: parseInt(e.target.value) || 100 })}
+          type="number"
+          min={1}
+          key={`accounts-${realisticConfig.numAccounts}`}
+          defaultValue={realisticConfig.numAccounts}
+          onBlur={(e) => updateRealisticConfig({ numAccounts: e.target.valueAsNumber || 100 })}
           disabled={isDisabled}
         />
         <p className="text-xs text-muted-foreground">
@@ -96,9 +98,11 @@ export function RealisticTestConfigPanel() {
       <div className="space-y-2">
         <Label>Target TPS</Label>
         <Input
-          type="text"
-          value={realisticConfig.targetTps}
-          onChange={(e) => updateRealisticConfig({ targetTps: parseInt(e.target.value) || 0 })}
+          type="number"
+          min={1}
+          key={`tps-${realisticConfig.targetTps}`}
+          defaultValue={realisticConfig.targetTps}
+          onBlur={(e) => updateRealisticConfig({ targetTps: e.target.valueAsNumber || 100 })}
           disabled={isDisabled}
         />
       </div>
@@ -108,18 +112,24 @@ export function RealisticTestConfigPanel() {
         <div className="space-y-2">
           <Label>Min Tip (gwei)</Label>
           <Input
-            type="text"
-            value={realisticConfig.minTipGwei}
-            onChange={(e) => updateRealisticConfig({ minTipGwei: parseFloat(e.target.value) || 0 })}
+            type="number"
+            min={0}
+            step={0.1}
+            key={`mintip-${realisticConfig.minTipGwei}`}
+            defaultValue={realisticConfig.minTipGwei}
+            onBlur={(e) => updateRealisticConfig({ minTipGwei: e.target.valueAsNumber || 0 })}
             disabled={isDisabled}
           />
         </div>
         <div className="space-y-2">
           <Label>Max Tip (gwei)</Label>
           <Input
-            type="text"
-            value={realisticConfig.maxTipGwei}
-            onChange={(e) => updateRealisticConfig({ maxTipGwei: parseFloat(e.target.value) || 0 })}
+            type="number"
+            min={0}
+            step={0.1}
+            key={`maxtip-${realisticConfig.maxTipGwei}`}
+            defaultValue={realisticConfig.maxTipGwei}
+            onBlur={(e) => updateRealisticConfig({ maxTipGwei: e.target.valueAsNumber || 0 })}
             disabled={isDisabled}
           />
         </div>

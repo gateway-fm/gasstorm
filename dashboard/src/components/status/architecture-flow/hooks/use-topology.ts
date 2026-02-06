@@ -17,28 +17,46 @@ import type {
 } from "../types";
 import { getExecutionLayerConfig } from "../constants";
 
-// Two-tier layout: L1 + Bridge at top, L2 pipeline at bottom
+/**
+ * Architecture Layout - Clean Three-Column Design
+ *
+ * ┌───────────────┬─────────────────────┬─────────────────┐
+ * │               │   Load Generator    │   Hyperlane     │
+ * │   L1 Anvil    │         ↓           │    Relayer      │
+ * │  (Settlement) │   Block Builder     │       ↓         │
+ * │               │         ↓           │   Bridge UI     │
+ * │               │      op-reth        │                 │
+ * └───────────────┴─────────────────────┴─────────────────┘
+ *
+ * Left:   L1 Settlement layer (context)
+ * Center: L2 Pipeline (main flow)
+ * Right:  Bridge services
+ */
 const POSITIONS = {
   withBlockBuilder: {
-    // TIER 1 - L1 + Bridge (TOP) - y=50
-    l1:            { x: 50, y: 50 },
-    bridgeRelayer: { x: 280, y: 50 },
-    bridgeUI:      { x: 510, y: 50 },
+    // CENTER: L2 Pipeline (vertical flow)
+    loadGenerator: { x: 280, y: 20 },
+    blockBuilder:  { x: 280, y: 140 },
+    execution:     { x: 280, y: 280 },
 
-    // TIER 2 - L2 Pipeline (BOTTOM) - y=300
-    loadGenerator: { x: 50, y: 300 },
-    blockBuilder:  { x: 280, y: 300 },
-    execution:     { x: 510, y: 300 },
+    // LEFT: L1 Settlement (positioned for visual context)
+    l1:            { x: 50, y: 140 },
+
+    // RIGHT: Bridge Services
+    bridgeRelayer: { x: 520, y: 80 },
+    bridgeUI:      { x: 520, y: 230 },
   },
   directSequencer: {
-    // TIER 1 - L1 + Bridge (TOP)
-    l1:            { x: 100, y: 50 },
-    bridgeRelayer: { x: 330, y: 50 },
-    bridgeUI:      { x: 560, y: 50 },
+    // CENTER: L2 Pipeline (no block builder)
+    loadGenerator: { x: 280, y: 60 },
+    execution:     { x: 280, y: 220 },
 
-    // TIER 2 - L2 Pipeline (BOTTOM) - no block builder
-    loadGenerator: { x: 150, y: 300 },
-    execution:     { x: 450, y: 300 },
+    // LEFT: L1 Settlement
+    l1:            { x: 50, y: 140 },
+
+    // RIGHT: Bridge Services
+    bridgeRelayer: { x: 520, y: 80 },
+    bridgeUI:      { x: 520, y: 230 },
   },
 } as const;
 
@@ -161,84 +179,45 @@ export function useTopology() {
       selectable: false,
     });
 
-    // Edges
+    // Edges - Core pipeline only for now
     const edges: ArchitectureEdge[] = [];
 
     if (hasBlockBuilder) {
-      // Load Generator → Block Builder
+      // CENTER: Load Generator → Block Builder (down)
       edges.push({
         id: "lg-bb",
         source: "load-generator",
         target: "block-builder",
-        targetHandle: "tx-input",
         type: "animated",
-        data: { animated: isActive, tps: currentRate, label: "eth_sendRawTx" },
+        data: { animated: isActive, tps: currentRate },
       });
 
-      // Block Builder → Execution (Engine API)
+      // CENTER: Block Builder → Execution (down)
       edges.push({
         id: "bb-exec",
         source: "block-builder",
         target: "execution",
-        sourceHandle: "engine-output",
-        targetHandle: "engine-input",
         type: "animated",
-        data: { animated: isActive && builder.isOnline, tps: currentRate, label: "Engine API" },
+        data: { animated: isActive && builder.isOnline, tps: currentRate },
       });
     } else {
-      // Direct mode: Load Generator → Execution
+      // DIRECT MODE: Load Generator → Execution (down)
       edges.push({
         id: "lg-exec",
         source: "load-generator",
         target: "execution",
-        targetHandle: "engine-input",
         type: "animated",
-        data: { animated: isActive, tps: currentRate, label: "JSON-RPC" },
+        data: { animated: isActive, tps: currentRate },
       });
     }
 
-    // L1 → Bridge Relayer (Hyperlane messaging)
-    edges.push({
-      id: "l1-relayer",
-      source: "l1",
-      target: "bridge-relayer",
-      sourceHandle: "bridge-output",
-      targetHandle: "l1-input",
-      type: "animated",
-      data: { animated: false, tps: 0, label: "Hyperlane" },
-    });
-
-    // Bridge Relayer → Bridge UI (status)
+    // RIGHT: Bridge Relayer → Bridge UI (down)
     edges.push({
       id: "relayer-ui",
       source: "bridge-relayer",
       target: "bridge-ui",
-      sourceHandle: "ui-output",
-      targetHandle: "relayer-input",
       type: "animated",
-      data: { animated: false, tps: 0, label: "" },
-    });
-
-    // Bridge Relayer → Execution (relay to L2)
-    edges.push({
-      id: "relayer-exec",
-      source: "bridge-relayer",
-      target: "execution",
-      sourceHandle: "relay-output",
-      targetHandle: "bridge-input",
-      type: "animated",
-      data: { animated: false, tps: 0, label: "Relay" },
-    });
-
-    // Execution → L1 (Settlement) - goes UP from execution to L1
-    edges.push({
-      id: "exec-l1",
-      source: "execution",
-      target: "l1",
-      sourceHandle: "settlement-output",
-      targetHandle: "settlement-input",
-      type: "animated",
-      data: { animated: false, tps: 0, label: "Settlement" },
+      data: { animated: false, tps: 0 },
     });
 
     return { nodes, edges };

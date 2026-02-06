@@ -119,9 +119,11 @@ export function LoadTestConfig() {
             <div className="space-y-2">
               <Label className="font-mono">Rate (tx/s)</Label>
               <Input
-                type="text"
-                value={config?.constantRate ?? 100}
-                onChange={(e) => setConfig({ constantRate: parseInt(e.target.value) || 0 })}
+                type="number"
+                min={1}
+                key={`constant-${config?.constantRate}`}
+                defaultValue={config?.constantRate ?? 100}
+                onBlur={(e) => setConfig({ constantRate: e.target.valueAsNumber || 100 })}
                 disabled={isDisabled}
               />
             </div>
@@ -133,18 +135,22 @@ export function LoadTestConfig() {
               <div className="space-y-2">
                 <Label className="font-mono">Start Rate (tx/s)</Label>
                 <Input
-                  type="text"
-                  value={config?.rampStart ?? 100}
-                  onChange={(e) => setConfig({ rampStart: parseInt(e.target.value) || 0 })}
+                  type="number"
+                  min={1}
+                  key={`rampstart-${config?.rampStart}`}
+                  defaultValue={config?.rampStart ?? 100}
+                  onBlur={(e) => setConfig({ rampStart: e.target.valueAsNumber || 100 })}
                   disabled={isDisabled}
                 />
               </div>
               <div className="space-y-2">
                 <Label className="font-mono">End Rate (tx/s)</Label>
                 <Input
-                  type="text"
-                  value={config?.rampEnd ?? 5000}
-                  onChange={(e) => setConfig({ rampEnd: parseInt(e.target.value) || 0 })}
+                  type="number"
+                  min={1}
+                  key={`rampend-${config?.rampEnd}`}
+                  defaultValue={config?.rampEnd ?? 5000}
+                  onBlur={(e) => setConfig({ rampEnd: e.target.valueAsNumber || 5000 })}
                   disabled={isDisabled}
                 />
               </div>
@@ -152,9 +158,11 @@ export function LoadTestConfig() {
             <div className="space-y-2">
               <Label className="font-mono">Steps</Label>
               <Input
-                type="text"
-                value={config?.rampSteps ?? 10}
-                onChange={(e) => setConfig({ rampSteps: parseInt(e.target.value) || 0 })}
+                type="number"
+                min={1}
+                key={`rampsteps-${config?.rampSteps}`}
+                defaultValue={config?.rampSteps ?? 10}
+                onBlur={(e) => setConfig({ rampSteps: e.target.valueAsNumber || 10 })}
                 disabled={isDisabled}
               />
             </div>
@@ -166,18 +174,22 @@ export function LoadTestConfig() {
               <div className="space-y-2">
                 <Label className="font-mono">Baseline Rate (tx/s)</Label>
                 <Input
-                  type="text"
-                  value={config?.baselineRate ?? 100}
-                  onChange={(e) => setConfig({ baselineRate: parseInt(e.target.value) || 0 })}
+                  type="number"
+                  min={1}
+                  key={`baseline-${config?.baselineRate}`}
+                  defaultValue={config?.baselineRate ?? 100}
+                  onBlur={(e) => setConfig({ baselineRate: e.target.valueAsNumber || 100 })}
                   disabled={isDisabled}
                 />
               </div>
               <div className="space-y-2">
                 <Label className="font-mono">Spike Rate (tx/s)</Label>
                 <Input
-                  type="text"
-                  value={config?.spikeRate ?? 5000}
-                  onChange={(e) => setConfig({ spikeRate: parseInt(e.target.value) || 0 })}
+                  type="number"
+                  min={1}
+                  key={`spikerate-${config?.spikeRate}`}
+                  defaultValue={config?.spikeRate ?? 5000}
+                  onBlur={(e) => setConfig({ spikeRate: e.target.valueAsNumber || 5000 })}
                   disabled={isDisabled}
                 />
               </div>
@@ -186,18 +198,22 @@ export function LoadTestConfig() {
               <div className="space-y-2">
                 <Label className="font-mono">Spike Duration (s)</Label>
                 <Input
-                  type="text"
-                  value={config?.spikeDuration ?? 5}
-                  onChange={(e) => setConfig({ spikeDuration: parseInt(e.target.value) || 0 })}
+                  type="number"
+                  min={1}
+                  key={`spikedur-${config?.spikeDuration}`}
+                  defaultValue={config?.spikeDuration ?? 5}
+                  onBlur={(e) => setConfig({ spikeDuration: e.target.valueAsNumber || 5 })}
                   disabled={isDisabled}
                 />
               </div>
               <div className="space-y-2">
                 <Label className="font-mono">Spike Interval (s)</Label>
                 <Input
-                  type="text"
-                  value={config?.spikeInterval ?? 15}
-                  onChange={(e) => setConfig({ spikeInterval: parseInt(e.target.value) || 0 })}
+                  type="number"
+                  min={1}
+                  key={`spikeint-${config?.spikeInterval}`}
+                  defaultValue={config?.spikeInterval ?? 15}
+                  onBlur={(e) => setConfig({ spikeInterval: e.target.valueAsNumber || 15 })}
                   disabled={isDisabled}
                 />
               </div>
@@ -210,18 +226,22 @@ export function LoadTestConfig() {
               <div className="space-y-2">
                 <Label className="font-mono">Initial Rate (tx/s)</Label>
                 <Input
-                  type="text"
-                  value={config?.adaptiveInitialRate ?? 100}
-                  onChange={(e) => setConfig({ adaptiveInitialRate: parseInt(e.target.value) || 0 })}
+                  type="number"
+                  min={1}
+                  key={`adaptinit-${config?.adaptiveInitialRate}`}
+                  defaultValue={config?.adaptiveInitialRate ?? 100}
+                  onBlur={(e) => setConfig({ adaptiveInitialRate: e.target.valueAsNumber || 100 })}
                   disabled={isDisabled}
                 />
               </div>
               <div className="space-y-2">
                 <Label className="font-mono">Rate Step (tx/s)</Label>
                 <Input
-                  type="text"
-                  value={config?.adaptiveRateStep ?? 100}
-                  onChange={(e) => setConfig({ adaptiveRateStep: parseInt(e.target.value) || 0 })}
+                  type="number"
+                  min={1}
+                  key={`adaptstep-${config?.adaptiveRateStep}`}
+                  defaultValue={config?.adaptiveRateStep ?? 100}
+                  onBlur={(e) => setConfig({ adaptiveRateStep: e.target.valueAsNumber || 100 })}
                   disabled={isDisabled}
                 />
               </div>
@@ -229,9 +249,11 @@ export function LoadTestConfig() {
             <div className="space-y-2">
               <Label className="font-mono">Target Pending TXs</Label>
               <Input
-                type="text"
-                value={config?.adaptiveTargetPending ?? 1000}
-                onChange={(e) => setConfig({ adaptiveTargetPending: parseInt(e.target.value) || 0 })}
+                type="number"
+                min={1}
+                key={`adaptpending-${config?.adaptiveTargetPending}`}
+                defaultValue={config?.adaptiveTargetPending ?? 1000}
+                onBlur={(e) => setConfig({ adaptiveTargetPending: e.target.valueAsNumber || 1000 })}
                 disabled={isDisabled}
               />
             </div>
@@ -248,9 +270,11 @@ export function LoadTestConfig() {
           <div className="space-y-2">
             <Label className="font-mono">Test Duration (seconds)</Label>
             <Input
-              type="text"
-              value={config?.duration ?? 60}
-              onChange={(e) => setConfig({ duration: parseInt(e.target.value) || 0 })}
+              type="number"
+              min={1}
+              key={`duration-${config?.duration}`}
+              defaultValue={config?.duration ?? 60}
+              onBlur={(e) => setConfig({ duration: e.target.valueAsNumber || 60 })}
               disabled={isDisabled}
             />
             <p className="text-xs text-muted-foreground">

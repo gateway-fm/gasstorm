@@ -30,56 +30,23 @@ export const ExecutionNode = memo(function ExecutionNode({
         <MetricRow label="Chain ID" value={chainId} />
       </MetricSection>
 
-      <MetricSection title="Ports" className="pt-1">
-        <div className="flex items-center justify-between text-[9px]">
-          <span className="text-muted-foreground/70">HTTP</span>
-          <code className="text-cyan-400/80">:18545</code>
-        </div>
-        <div className="flex items-center justify-between text-[9px]">
-          <span className="text-muted-foreground/70">WS</span>
-          <code className="text-cyan-400/80">:18546</code>
-        </div>
-        <div className="flex items-center justify-between text-[9px]">
-          <span className="text-muted-foreground/70">Engine</span>
-          <code className="text-pink-400/80">:8551</code>
-        </div>
-      </MetricSection>
-
-      {/* Input port - Engine API (LEFT) */}
+      {/* Default target handle (from Block Builder) */}
       <Handle
-        id="engine-input"
         type="target"
+        position={Position.Top}
+        className={cn(
+          "!h-2 !w-2 !rounded-full",
+          "!border !border-blue-400/50 !bg-blue-500/60"
+        )}
+      />
+
+      {/* Source to L1 (left) */}
+      <Handle
+        type="source"
         position={Position.Left}
         className={cn(
-          "!h-3 !w-3 !rounded-full !border-2",
-          "!border-blue-400 !bg-blue-500/80",
-          "!-left-1.5"
-        )}
-      />
-
-      {/* Output port - Settlement to L1 (TOP - goes UP to L1) */}
-      <Handle
-        id="settlement-output"
-        type="source"
-        position={Position.Top}
-        style={{ left: "30%" }}
-        className={cn(
-          "!h-2.5 !w-2.5 !rounded-full !border-2",
-          "!border-cyan-400/50 !bg-cyan-500/50",
-          "!-top-1"
-        )}
-      />
-
-      {/* Input port - Bridge messages from Relayer (TOP) */}
-      <Handle
-        id="bridge-input"
-        type="target"
-        position={Position.Top}
-        style={{ left: "70%" }}
-        className={cn(
-          "!h-2.5 !w-2.5 !rounded-full !border-2",
-          "!border-orange-400/50 !bg-orange-500/50",
-          "!-top-1"
+          "!h-2 !w-2 !rounded-full",
+          "!border !border-blue-400/50 !bg-blue-500/60"
         )}
       />
     </BaseNode>

@@ -39,9 +39,9 @@ const edgeTypes: EdgeTypes = {
 };
 
 const fitViewOptions = {
-  padding: 0.1,
-  minZoom: 0.8,
-  maxZoom: 1.2,
+  padding: 0.15,
+  minZoom: 0.6,
+  maxZoom: 1.0,
 };
 
 function ArchitectureFlowInner() {
@@ -60,14 +60,29 @@ function ArchitectureFlowInner() {
           </span>
         </div>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="p-0 relative">
+        {/* Column Labels - positioned to match the three-column layout */}
+        <div className="absolute top-2 left-0 right-0 pointer-events-none z-10">
+          <div className="flex justify-between px-8">
+            <div className="text-[9px] text-muted-foreground/40 font-medium uppercase tracking-wider">
+              L1
+            </div>
+            <div className="text-[9px] text-muted-foreground/40 font-medium uppercase tracking-wider">
+              L2 Pipeline
+            </div>
+            <div className="text-[9px] text-muted-foreground/40 font-medium uppercase tracking-wider">
+              Bridge
+            </div>
+          </div>
+        </div>
+
         {/* Mobile view */}
         <div className="sm:hidden">
           <MobileArchitectureView config={config} />
         </div>
 
         {/* Desktop diagram */}
-        <div className="hidden sm:block h-[520px]">
+        <div className="hidden sm:block h-[600px]">
           <ReactFlow
             nodes={nodes}
             edges={edges}

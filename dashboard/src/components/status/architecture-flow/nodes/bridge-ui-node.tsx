@@ -42,15 +42,13 @@ export const BridgeUINode = memo(function BridgeUINode({
         </a>
       </div>
 
-      {/* Input port - from Bridge Relayer */}
+      {/* Default target handle (from Relayer) */}
       <Handle
-        id="relayer-input"
         type="target"
-        position={Position.Left}
+        position={Position.Top}
         className={cn(
-          "!h-3 !w-3 !rounded-full !border-2",
-          "!border-amber-400 !bg-amber-500/80",
-          "!-left-1.5"
+          "!h-2 !w-2 !rounded-full",
+          "!border !border-amber-400/50 !bg-amber-500/60"
         )}
       />
     </BaseNode>

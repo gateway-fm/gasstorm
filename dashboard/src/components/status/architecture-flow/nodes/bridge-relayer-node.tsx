@@ -33,39 +33,13 @@ export const BridgeRelayerNode = memo(function BridgeRelayerNode({
         )}
       </MetricSection>
 
-      {/* Input port - from L1 */}
+      {/* Default source handle (to Bridge UI) */}
       <Handle
-        id="l1-input"
-        type="target"
-        position={Position.Left}
-        className={cn(
-          "!h-3 !w-3 !rounded-full !border-2",
-          "!border-orange-400 !bg-orange-500/80",
-          "!-left-1.5"
-        )}
-      />
-
-      {/* Output port - to Bridge UI */}
-      <Handle
-        id="ui-output"
-        type="source"
-        position={Position.Right}
-        className={cn(
-          "!h-3 !w-3 !rounded-full !border-2",
-          "!border-amber-400 !bg-amber-500/80",
-          "!-right-1.5"
-        )}
-      />
-
-      {/* Output port - relay to Execution (L2) */}
-      <Handle
-        id="relay-output"
         type="source"
         position={Position.Bottom}
         className={cn(
-          "!h-2.5 !w-2.5 !rounded-full !border-2",
-          "!border-blue-400/50 !bg-blue-500/50",
-          "!-bottom-1"
+          "!h-2 !w-2 !rounded-full",
+          "!border !border-orange-400/50 !bg-orange-500/60"
         )}
       />
     </BaseNode>

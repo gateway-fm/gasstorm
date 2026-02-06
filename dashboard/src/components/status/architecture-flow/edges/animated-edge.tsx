@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useMemo } from "react";
-import { BaseEdge, getBezierPath, type EdgeProps } from "@xyflow/react";
+import { BaseEdge, getBezierPath, getSmoothStepPath, type EdgeProps } from "@xyflow/react";
 import type { ArchitectureEdge } from "../types";
 import { ANIMATION, COLORS } from "../constants";
 
@@ -34,6 +34,7 @@ export const AnimatedEdge = memo(function AnimatedEdge({
 }: EdgeProps<ArchitectureEdge>) {
   const { animated = false, tps = 0, label } = data || {};
 
+  // Use bezier for all edges - simpler and more reliable
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -53,9 +54,6 @@ export const AnimatedEdge = memo(function AnimatedEdge({
       delay: (duration / particleCount) * i,
     }));
   }, [particleCount, duration]);
-
-  // Determine if this is a vertical edge (settlement)
-  const isVertical = Math.abs(targetY - sourceY) > Math.abs(targetX - sourceX);
 
   return (
     <>
@@ -80,9 +78,9 @@ export const AnimatedEdge = memo(function AnimatedEdge({
         style={{
           ...style,
           stroke: strokeColor,
-          strokeWidth: animated ? 2 : 1,
-          opacity: animated ? 0.7 : 0.25,
-          strokeDasharray: !animated ? "4 4" : undefined,
+          strokeWidth: animated ? 2 : 1.5,
+          opacity: animated ? 0.7 : 0.4,
+          strokeDasharray: !animated ? "6 4" : undefined,
         }}
       />
 

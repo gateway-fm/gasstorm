@@ -41,14 +41,13 @@ export const LoadGeneratorNode = memo(function LoadGeneratorNode({
         </div>
       )}
 
-      {/* Output port */}
+      {/* Default source handle */}
       <Handle
         type="source"
-        position={Position.Right}
+        position={Position.Bottom}
         className={cn(
-          "!h-3 !w-3 !rounded-full !border-2",
-          "!border-violet-400 !bg-violet-500/80",
-          "!-right-1.5"
+          "!h-2 !w-2 !rounded-full",
+          "!border !border-violet-400/50 !bg-violet-500/60"
         )}
       />
     </BaseNode>

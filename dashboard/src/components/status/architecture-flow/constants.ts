@@ -1,23 +1,46 @@
 /**
  * Constants for the Architecture Flow diagram
+ *
+ * Layout Design (Three-Column):
+ * ┌─────────────────┬────────────────────────┬─────────────────┐
+ * │                 │   Load Generator        │  Hyperlane      │
+ * │   L1 Anvil      │        ↓                │    Relayer      │
+ * │ (Settlement)    │   Block Builder         │       ↓         │
+ * │                 │        ↓                │   Bridge UI     │
+ * │                 │   op-reth/L2           │                 │
+ * └─────────────────┴────────────────────────┴─────────────────┘
+ *
+ * Left Column:  L1 Settlement Layer (connected via Settlement edge)
+ * Center:       L2 Pipeline (Load Gen → Block Builder → Execution)
+ * Right Column: Bridge Services (Relayer → UI)
  */
 
 import type { ExecutionLayerConfig, ExecutionLayerType } from "./types";
 
-// Node positions for layouts
+// Node positions for layouts - Three column design
 export const NODE_POSITIONS = {
-  // Layout with block builder (reth mode)
+  // Layout with block builder (reth mode) - Three column layout
   withBlockBuilder: {
-    loadGenerator: { x: 50, y: 100 },
-    blockBuilder: { x: 250, y: 100 },
-    execution: { x: 450, y: 100 },
-    l1: { x: 450, y: 250 },
+    // LEFT: L1 Settlement Layer
+    l1: { x: 30, y: 400 },
+    // CENTER: L2 Pipeline (vertical flow)
+    loadGenerator: { x: 280, y: 80 },
+    blockBuilder: { x: 280, y: 280 },
+    execution: { x: 280, y: 480 },
+    // RIGHT: Bridge Services
+    bridgeRelayer: { x: 530, y: 200 },
+    bridgeUI: { x: 530, y: 400 },
   },
-  // Direct sequencer layout (gravity-reth, cdk-erigon)
+  // Direct sequencer layout (gravity-reth, cdk-erigon) - Three column layout
   directSequencer: {
-    loadGenerator: { x: 100, y: 100 },
-    execution: { x: 350, y: 100 },
-    l1: { x: 350, y: 250 },
+    // LEFT: L1 Settlement Layer
+    l1: { x: 30, y: 400 },
+    // CENTER: L2 Pipeline (no block builder)
+    loadGenerator: { x: 280, y: 150 },
+    execution: { x: 280, y: 480 },
+    // RIGHT: Bridge Services
+    bridgeRelayer: { x: 530, y: 200 },
+    bridgeUI: { x: 530, y: 400 },
   },
 } as const;
 
