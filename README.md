@@ -125,6 +125,7 @@ make stop
 
 | Document | Description |
 |----------|-------------|
+| [MCP Server](./docs/mcp.md) | AI tool integration (24 tools: stack management, builder, load generator) |
 | [System Architecture](./docs/system-architecture.md) | Service map, critical paths, design patterns, nonce management |
 | [Configuration](./docs/configuration.md) | Env vars, Makefile targets, Docker Compose profiles |
 | [Execution Layers](./docs/execution-layers.md) | reth / cdk-erigon / gravity-reth comparison |
