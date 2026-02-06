@@ -6,32 +6,11 @@ set -e
 
 echo "Running pre-commit checks..."
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
-# Function to print status
-print_status() {
-    if [ $1 -eq 0 ]; then
-        echo -e "${GREEN}✓${NC} $2"
-    else
-        echo -e "${RED}✗${NC} $2"
-        exit 1
-    fi
-}
-
-# Get the project root (where .git is)
 PROJECT_ROOT=$(git rev-parse --show-toplevel)
 cd "$PROJECT_ROOT"
 
-echo ""
-echo "=== Dashboard Lint ==="
-cd dashboard && npm run lint > /dev/null 2>&1
-print_status $? "dashboard lint"
-cd "$PROJECT_ROOT"
+make test
 
 echo ""
-echo -e "${GREEN}All pre-commit checks passed!${NC}"
+echo "All pre-commit checks passed!"
 echo ""

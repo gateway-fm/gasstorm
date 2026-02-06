@@ -12,6 +12,9 @@
 *.dylib
 *.test
 
+# MCP server binary
+mcp/mcp
+
 # Go workspace
 go.work
 go.work.sum
