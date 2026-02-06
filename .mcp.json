@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "gasstorm": {
+      "command": "go",
+      "args": ["run", "."],
+      "cwd": "mcp",
+      "env": {
+        "BUILDER_URL": "http://localhost:13000",
+        "LOADGEN_URL": "http://localhost:13001",
+        "GASSTORM_DIR": "."
+      }
+    }
+  }
+}
