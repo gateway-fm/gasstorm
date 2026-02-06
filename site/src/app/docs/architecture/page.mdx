@@ -1,0 +1,191 @@
+import { Callout } from "@/components/mdx/callout"
+
+export const metadata = {
+  title: "Architecture",
+  description: "System architecture, service boundaries, critical paths, and design patterns.",
+}
+
+# Architecture
+
+GasStorm is a modular monolith with capability-based execution layer abstraction. Services communicate via HTTP and WebSocket APIs with no shared code between services.
+
+## System Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Load Generator                              │
+│  (transaction building, signing, sending via HTTP/WS)               │
+└────────────────────────────┬────────────────────────────────────────┘
+                             │ HTTP: eth_sendRawTransaction
+                             ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                    Block Builder (Docker image)                     │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────────┐ │
+│  │ TX Queue │→ │ TX Pool  │→ │ Filter   │→ │ Engine API (op-reth) │ │
+│  │ (100k)   │  │ (sharded)│  │ (nonces) │  │ FCU + GetPayload     │ │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────────────────┘ │
+│                     │                              │                 │
+│                     ▼                              ▼                 │
+│              Preconf Hub ────────────────→ WebSocket Events          │
+└─────────────────────────────────────────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                           op-reth                                   │
+│              (execution layer, block production)                    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+## Service Map
+
+### Block Builder
+
+External block building via Engine API for op-reth. Manages the transaction pool, nonce tracking, and preconfirmations.
+
+| Component | Purpose |
+|-----------|---------|
+| `builder.go` | Core block building logic — FCU + GetPayload pipeline |
+| `txpool/nonce_cache.go` | Unified nonce management with LRU eviction |
+| `txpool/filter.go` | Transaction filtering and ordering (FIFO, tip-based) |
+| `preconf/hub.go` | WebSocket preconfirmation event broadcasting |
+| `engine/client.go` | Authenticated Engine API client with JWT caching |
+
+**Ports**: 13000 (HTTP), 13002 (WebSocket)
+
+### Load Generator
+
+High-throughput load testing with multiple transaction types and patterns. Manages accounts, metrics, and verification.
+
+| Component | Purpose |
+|-----------|---------|
+| `account/account.go` | Account with reservation pattern (ReserveNonce/Commit/Rollback) |
+| `account/manager.go` | Dynamic account generation, funding, initialization |
+| `execnode/capabilities.go` | Capability flags for different execution layers |
+| `metrics/collector.go` | Latency and throughput tracking |
+| `storage/sqlite.go` | SQLite persistence for test runs |
+| `transport/http.go` | HTTP API handlers for REST API |
+
+**Port**: 13001 (HTTP)
+
+### Dashboard
+
+Next.js UI for load test control, metrics visualization, and test history.
+
+| Component | Purpose |
+|-----------|---------|
+| `stores/metrics-store.ts` | Zustand store for MGas/s, TPS, block metrics |
+| `stores/go-load-test-store.ts` | Load generator integration store |
+| `types/load-test.ts` | TypeScript type definitions (API contract) |
+
+**Port**: 18000 (HTTP)
+
+## Transaction Flow
+
+The primary data path in reth mode with external block builder:
+
+1. **Load Generator** builds and signs transactions, sends via `eth_sendRawTransaction` to the block builder (HTTP port 13000)
+2. **Block Builder** parses, validates, and queues transactions in a 100k-capacity buffer
+3. **Nonce Cache** looks up expected nonces, classifying TXs as executable or future
+4. **Filter** selects transactions for the next block based on ordering strategy
+5. **Engine API** calls `forkchoiceUpdated` then `GetPayload` on op-reth
+6. **Preconf Hub** emits events via WebSocket: `pending` → `preconfirmed` → `confirmed`
+7. **Load Generator** receives confirmations via L2 `newHeads` WebSocket subscription
+
+## Metrics Collection
+
+```
+Block Builder           Load Generator              Dashboard
+    │                        │                           │
+    │ block-metrics WS ──────>│                           │
+    │                        │ Time series (200ms) ─────>│
+    │                        │                           │
+    │                        │ L2 newHeads WS ──────────>│
+    │                        │                           │
+    │                        │ Store → SQLite            │
+```
+
+The load generator collects metrics from two sources:
+- **Block builder** WebSocket for block-level metrics (gas used, fill rate)
+- **L2 node** WebSocket for confirmation events
+
+Metrics are aggregated into 200ms time series samples and served via the REST API to the dashboard.
+
+## Preconfirmation State Machine
+
+Preconfirmation events track transaction lifecycle:
+
+```
+[*] ──> Pending ──> Preconfirmed ──> Confirmed
+  │         │             │
+  │         │             └──> Dropped (block build failed)
+  │         │
+  │         └──> Dropped (nonce gap or timeout)
+  │
+  └──> Revoked (preconfirmation revoked)
+```
+
+## Nonce Management
+
+### Block Builder: Unified NonceCache
+
+Single unified nonce management with LRU eviction and singleflight coalescing:
+
+- **LRU eviction**: Bounds memory by evicting least-recently-used entries
+- **Freshness tracking**: `GetFresh()` forces RPC lookup if cache is stale
+- **Singleflight**: Concurrent lookups for the same address share one RPC call
+- **SetIfHigher**: Prevents stale writes from overwriting newer data
+
+### Load Generator: Reservation Pattern
+
+High-throughput nonce management with atomic reservation:
+
+```go
+n := account.ReserveNonce()  // Increments immediately
+sender.SendAsync(ctx, txData, func(err error) {
+    if err != nil { n.Rollback() } else { n.Commit() }
+})
+```
+
+- **Local tracking**: Nonces tracked locally (not fetched per-TX) for speed
+- **Reservation pattern**: `ReserveNonce` increments immediately, preventing gaps
+- **Commit in callback**: Never commit before async send completes
+- **Reactive sync**: Resync only on circuit breaker open (not periodic)
+
+## Performance Optimizations
+
+- **Buffer pooling**: Pre-allocated buffers reused per block
+- **Lock-free seen hash tracker**: Epoch-based eviction
+- **Async signature verification**: ECDSA recovery moved to worker pool
+- **JWT caching**: Engine API tokens cached with 50s TTL
+- **Pipelined block production**: Overlap mode overlaps FCU with TX collection
+- **Rolling window metrics**: 5-second window for smooth MGas/s charts
+
+## Known Bottlenecks
+
+1. **Engine API SYNCING** — if op-reth falls behind, the builder gets stuck and needs recovery
+2. **Nonce filtering** — each block only includes sequential nonces per account; gaps cause drops
+3. **Engine API latency** — FCU + GetPayload take 100-500ms per block
+
+## Service Ports
+
+| Service | Port | Protocol | Description |
+|---------|------|----------|-------------|
+| block-builder | 13000 | HTTP | TX reception (`eth_sendRawTransaction`) |
+| block-builder | 13002 | WebSocket | Preconfirmation events |
+| load-generator | 13001 | HTTP | Load test API |
+| dashboard | 18000 | HTTP | Web UI |
+| op-reth | 18545 | HTTP | L2 RPC |
+| op-reth | 18546 | WebSocket | L2 WebSocket |
+| op-reth | 18551 | HTTP | Engine API (JWT auth) |
+| l1-anvil | 18545 | HTTP | L1 RPC |
+
+## Glossary
+
+| Term | Definition |
+|------|------------|
+| **Preconfirmation** | Promise that a TX will be included before actual block confirmation |
+| **Inflight nonce** | Nonce assigned to a block being built, not yet confirmed by reth |
+| **FCU** | `forkchoiceUpdated` — Engine API call to set chain head and request new payload |
+| **GetPayload** | Engine API call to retrieve a built block after FCU |
+| **Deposit TX** | L1→L2 system transaction, must be first in every block |
+| **RBF** | Replace-by-fee — requires 10% gas price bump to replace a pending TX |

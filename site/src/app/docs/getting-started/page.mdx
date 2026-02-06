@@ -1,0 +1,144 @@
+import { Step } from "@/components/mdx/step"
+import { Callout } from "@/components/mdx/callout"
+
+export const metadata = {
+  title: "Getting Started",
+  description: "Set up GasStorm and run your first load test in minutes.",
+}
+
+# Getting Started
+
+Set up GasStorm and run your first load test in minutes.
+
+## Prerequisites
+
+- **Docker** and **Docker Compose** v2+
+- **Make** (included on macOS and most Linux distros)
+- **Git**
+
+<Callout variant="info" title="No Go required">
+  The block builder and load generator run as Docker images. You only need Go installed if you're developing the services locally.
+</Callout>
+
+## Installation
+
+<Step number={1} title="Clone the repositories">
+
+GasStorm is a monorepo that orchestrates two external services. Clone all three repositories as siblings:
+
+```bash
+# Main orchestrator (Docker Compose, dashboard, MCP server)
+git clone https://github.com/gateway-fm/gasstorm.git
+
+# Block builder (external block production via Engine API)
+git clone https://github.com/gateway-fm/blockbuilder.git
+
+# Load generator (high-throughput TX sender)
+git clone https://github.com/gateway-fm/loadgenerator.git
+```
+
+Your directory structure should look like:
+
+```
+parent/
+├── gasstorm/        # Main repo
+├── blockbuilder/    # Block builder (needed for make run-build, make dev)
+└── loadgenerator/   # Load generator (needed for make dev, tests)
+```
+
+```bash
+cd gasstorm
+```
+
+<Callout variant="info" title="Sibling repos optional for Docker mode">
+  If you only use `make run-reth` (pulls pre-built Docker images), you only need the gasstorm repo. The sibling repos are needed for `make run-build` (build from source), `make dev` (local development), and running tests.
+</Callout>
+</Step>
+
+<Step number={2} title="Start the stack">
+```bash
+make run-reth
+```
+
+This starts the full stack: L1 Anvil, op-reth, block builder, load generator, and dashboard. First run will pull Docker images which takes a few minutes.
+</Step>
+
+<Step number={3} title="Open the dashboard">
+```bash
+open http://localhost:18000/load-test/
+```
+
+The dashboard shows real-time metrics including MGas/s, TPS, latency histograms, and block fill rates.
+</Step>
+
+<Step number={4} title="Run your first load test">
+
+Use the dashboard UI to configure and start a test, or use the API directly:
+
+```bash
+curl -X POST http://localhost:13001/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pattern": "constant",
+    "constantRate": 100,
+    "durationSec": 60,
+    "transactionType": "uniswap-swap"
+  }'
+```
+
+This sends 100 Uniswap V3 swaps per second for 60 seconds.
+</Step>
+
+## Performance Profiles
+
+GasStorm includes pre-configured profiles for common benchmarks:
+
+```bash
+# High throughput: 1 gigagas, 100ms blocks
+make run-high-throughput
+
+# Fast confirmations: 150M gas, 50ms blocks
+make run-fast-confirm
+```
+
+## Configuration
+
+Tune the stack with environment variables:
+
+```bash
+# 250ms blocks with preconfirmations
+BLOCK_TIME_MS=250 ENABLE_PRECONFIRMATIONS=true make run-reth
+
+# Tip-based transaction ordering
+TX_ORDERING=tip_desc make run-reth
+```
+
+See [Configuration](/docs/configuration) for the full reference.
+
+## Alternative Execution Layers
+
+```bash
+# cdk-erigon standalone sequencer
+make run-cdk-erigon
+
+# gravity-reth parallel EVM
+make run-gravity-reth
+```
+
+See [Execution Layers](/docs/execution-layers) for a detailed comparison.
+
+## Stopping the Stack
+
+```bash
+# Stop all services
+make stop
+
+# Stop and remove volumes (clean state)
+make clean
+```
+
+## Next Steps
+
+- [Architecture](/docs/architecture) — understand the system design
+- [Load Testing](/docs/load-testing) — transaction types and patterns
+- [MCP Integration](/docs/mcp) — AI-driven stack management

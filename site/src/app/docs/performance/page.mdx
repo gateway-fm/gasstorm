@@ -1,0 +1,155 @@
+import { Callout } from "@/components/mdx/callout"
+
+export const metadata = {
+  title: "Performance",
+  description: "Benchmarks, known bottlenecks, and tuning tips for GasStorm.",
+}
+
+# Performance
+
+Benchmarks, bottlenecks, and tuning tips for getting the most out of GasStorm.
+
+## Tested Throughput
+
+| Scenario | TPS | Success Rate | Avg Latency |
+|----------|-----|-------------|-------------|
+| ETH transfers @ 100 TPS | 100 | 99% | ~235ms |
+| ETH transfers @ 200 TPS | 180-200 | 95-98% | ~400ms |
+| Uniswap swaps @ 50 TPS | 50 | 99% | ~350ms |
+| Block rate @ 250ms blocks | ~4 blocks/sec | — | — |
+
+<Callout variant="info" title="Host-dependent">
+  These numbers were measured on development hardware. Your results will vary based on CPU, disk I/O, and Docker resource allocation.
+</Callout>
+
+## Known Bottlenecks
+
+### 1. Engine API SYNCING
+
+If op-reth falls behind the block builder, it returns `SYNCING` status and block production stalls. This typically happens when:
+- Block time is very low (< 100ms) and op-reth can't keep up
+- The host machine is under heavy load
+- Docker resource limits are too restrictive
+
+**Mitigation**: Increase `BLOCK_TIME_MS` or give op-reth more CPU/memory.
+
+### 2. Nonce Filtering
+
+Each block can only include sequential nonces per account. If an account has a nonce gap (e.g., nonce 5 submitted before nonce 4 is confirmed), subsequent transactions queue as "future" and can't be included.
+
+**Mitigation**: Use more accounts to distribute nonce contention.
+
+### 3. Engine API Latency
+
+`forkchoiceUpdated` + `GetPayload` take 100-500ms per block cycle. This sets a hard floor on block time.
+
+**Mitigation**: Use pipelined mode (enabled by default in reth mode) to overlap FCU with transaction collection.
+
+## Tuning Guide
+
+### High Throughput
+
+Maximize transactions per second:
+
+```bash
+BLOCK_TIME_MS=100 \
+GAS_LIMIT=1000000000 \
+MAX_TXS_PER_BLOCK=25000 \
+TX_ORDERING=fifo \
+make run-reth
+```
+
+Or use the pre-configured profile:
+
+```bash
+make run-high-throughput
+```
+
+### Fast Confirmations
+
+Minimize time from TX send to on-chain confirmation:
+
+```bash
+BLOCK_TIME_MS=50 \
+GAS_LIMIT=150000000 \
+ENABLE_PRECONFIRMATIONS=true \
+make run-reth
+```
+
+Or use the pre-configured profile:
+
+```bash
+make run-fast-confirm
+```
+
+### Tip-Based Ordering
+
+Test priority fee ordering for MEV scenarios:
+
+```bash
+TX_ORDERING=tip_desc make run-reth
+```
+
+### Account Scaling
+
+More accounts reduce nonce contention. Set the account count in the load test config:
+
+```bash
+curl -X POST http://localhost:13001/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pattern": "constant",
+    "constantRate": 200,
+    "durationSec": 60,
+    "transactionType": "eth-transfer",
+    "numAccounts": 50
+  }'
+```
+
+## Metrics to Watch
+
+### During a Test
+
+| Metric | What It Tells You |
+|--------|-------------------|
+| MGas/s | Primary throughput — how much gas the chain processes per second |
+| TPS | Transaction throughput — useful for comparing TX types |
+| Block fill rate | Whether blocks are full (> 80% is good) or underutilized |
+| Pending count | If growing, block production can't keep up with TX submission |
+| Circuit breaker | If open, there's a systemic issue (check nonces, Engine API) |
+| Confirmation latency p99 | Tail latency — indicates stragglers or nonce issues |
+
+### After a Test
+
+| Metric | What It Tells You |
+|--------|-------------------|
+| Peak MGas/s | Maximum sustained throughput achieved |
+| Total gas used | Cumulative workload processed |
+| Success rate | Percentage of TXs confirmed on-chain |
+| Preconf accuracy | How often preconfirmations matched actual confirmations |
+| Latency percentiles | Distribution of confirmation times |
+
+## Docker Resource Allocation
+
+For best results, ensure Docker has adequate resources:
+
+- **CPU**: At least 4 cores (op-reth is the most CPU-intensive)
+- **Memory**: At least 8 GB
+- **Disk**: SSD recommended for op-reth's database
+
+On Docker Desktop, check Settings → Resources to increase limits.
+
+## Profiling the Block Builder
+
+The block builder exposes metrics in its logs. Key log lines to grep for:
+
+```bash
+# Block production timing
+docker compose logs block-builder | grep "block produced"
+
+# Engine API call latency
+docker compose logs block-builder | grep "engine_"
+
+# Transaction pool size
+docker compose logs block-builder | grep "pool_size"
+```

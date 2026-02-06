@@ -1,0 +1,167 @@
+import { EnvTable } from "@/components/mdx/env-table"
+import { Callout } from "@/components/mdx/callout"
+
+export const metadata = {
+  title: "Configuration",
+  description: "Complete configuration reference — environment variables, Makefile targets, and Docker Compose profiles.",
+}
+
+# Configuration
+
+Complete configuration reference for GasStorm.
+
+## Block Builder Environment Variables
+
+<EnvTable vars={[
+  { name: "BLOCK_TIME_MS", default: "1000", description: "Block interval in milliseconds" },
+  { name: "GAS_LIMIT", default: "1000000000", description: "Block gas limit (1 gigagas)" },
+  { name: "MAX_TXS_PER_BLOCK", default: "25000", description: "Maximum transactions per block" },
+  { name: "TX_ORDERING", default: "fifo", description: "Transaction ordering: fifo, tip_desc, tip_asc" },
+  { name: "ENABLE_PRECONFIRMATIONS", default: "true", description: "WebSocket preconfirmation events" },
+  { name: "SKIP_EMPTY_BLOCKS", default: "false", description: "Don't produce blocks without transactions" },
+]} />
+
+## Load Generator Environment Variables
+
+<EnvTable vars={[
+  { name: "EXECUTION_LAYER", default: "reth", description: "Execution layer: reth, cdk-erigon, gravity-reth" },
+  { name: "RPC_URL", default: "http://block-builder:13000", description: "Transaction submission endpoint" },
+  { name: "L2_RPC_URL", default: "http://l2-reth:8545", description: "L2 node for confirmations" },
+  { name: "HTTP_PORT", default: "13001", description: "Load generator API port" },
+  { name: "DATABASE_PATH", default: "/data/loadgen.db", description: "SQLite database path" },
+  { name: "CIRCUIT_BREAKER_FAILURE_THRESHOLD", default: "0.05", description: "Failure rate threshold (5%)" },
+  { name: "CIRCUIT_BREAKER_REVOCATION_THRESHOLD", default: "0.20", description: "Revocation rate threshold (20%)" },
+]} />
+
+## Docker Image Versions
+
+<EnvTable vars={[
+  { name: "BLOCKBUILDER_VERSION", default: "latest", description: "Block builder Docker image tag" },
+  { name: "LOADGENERATOR_VERSION", default: "latest", description: "Load generator Docker image tag" },
+]} />
+
+```bash
+# Pin specific versions
+BLOCKBUILDER_VERSION=v1.0.0 LOADGENERATOR_VERSION=v1.0.0 make run-reth
+```
+
+## Makefile Targets
+
+### Running the Stack
+
+```bash
+# Default: op-reth + block-builder
+make run
+
+# Explicit reth mode
+make run-reth
+
+# cdk-erigon standalone sequencer
+make run-cdk-erigon
+
+# gravity-reth parallel EVM
+make run-gravity-reth
+```
+
+### Performance Profiles
+
+```bash
+# High throughput: 1 gigagas, 100ms blocks
+make run-high-throughput
+
+# Fast confirmations: 150M gas, 50ms blocks
+make run-fast-confirm
+```
+
+### Development
+
+```bash
+# Local development (runs load-generator outside Docker)
+make dev              # reth mode
+make dev-cdk-erigon   # cdk-erigon mode
+
+# View logs
+make logs
+
+# Restart services
+make restart
+
+# Stop everything
+make stop
+```
+
+### Testing
+
+```bash
+# All tests with race detector
+make test
+
+# Specific test suites
+make test-block-builder
+make test-load-generator
+make test-dashboard
+make test-contract
+
+# Benchmarks
+make bench-block-builder
+make bench-load-generator
+
+# Integration tests
+make test-integration  # Starts/stops stack
+make test-e2e          # Requires running stack
+```
+
+## Docker Compose Profiles
+
+| Profile | Services | Use Case |
+|---------|----------|----------|
+| `reth` | block-builder, l2-reth, l1-anvil | Default block-builder mode |
+| `cdk-erigon` | cdk-erigon, l1-anvil | Standalone sequencer |
+| `gravity-reth` | gravity-reth, l1-anvil | Parallel EVM sequencer |
+| `bridge` | bridge-ui, bridge-service | Hyperlane bridge UI |
+| `prover-sp1` | op-succinct, agglayer-db | SP1 prover stack |
+| `prover-zisk` | zisk-prover, agglayer-db | ZisK prover stack |
+
+```bash
+# Single profile
+docker compose --profile reth up -d
+
+# Multiple profiles
+docker compose --profile reth --profile bridge up -d
+```
+
+## Service Ports
+
+| Service | Port | Protocol | Description |
+|---------|------|----------|-------------|
+| dashboard | 18000 | HTTP | Web UI |
+| block-builder | 13000 | HTTP | TX submission RPC |
+| block-builder | 13002 | WS | Preconfirmation WebSocket |
+| load-generator | 13001 | HTTP | Load test API |
+| l1-anvil | 18545 | HTTP | L1 RPC |
+| l2-reth | 18546 | HTTP/WS | L2 RPC/WebSocket |
+
+## Chain Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| L1 Chain ID | 1 (Ethereum mainnet fork) |
+| L2 Chain ID | 42069 |
+| Block Time | Configurable (default: 1000ms) |
+| Gas Limit | 1,000,000,000 (1 gigagas) |
+
+## JWT Configuration
+
+The block builder and op-reth authenticate via a shared JWT secret:
+
+```bash
+# Generate JWT token
+openssl rand -hex 32 > config/jwt.hex
+
+# Restart services to apply
+docker compose restart l2-reth block-builder
+```
+
+<Callout variant="warning" title="Shared secret">
+  Both op-reth and the block builder must share the same `jwt.hex` file. If you regenerate it, restart both services.
+</Callout>

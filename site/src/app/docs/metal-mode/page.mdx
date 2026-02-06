@@ -1,0 +1,212 @@
+import { Step } from "@/components/mdx/step"
+import { Callout } from "@/components/mdx/callout"
+
+export const metadata = {
+  title: "Metal Mode",
+  description: "Run GasStorm natively on bare metal for maximum performance — no Docker overhead.",
+}
+
+# Metal Mode (Bare Metal)
+
+Run all GasStorm components natively on the host machine with no Docker overhead. Metal mode eliminates the ~2-3x I/O penalty from Docker-on-Mac's VM layer, unlocking higher TPS for performance testing.
+
+<Callout variant="info" title="When to use Metal Mode">
+  Metal mode is designed for high-TPS benchmarks (10k+ TPS) where Docker's virtualized I/O becomes the bottleneck. For normal usage under 5k TPS, Docker mode (`make run-reth`) works fine.
+</Callout>
+
+## Prerequisites
+
+Metal mode requires all components installed locally:
+
+- **op-reth** (or reth) — L2 execution layer
+- **Go 1.25+** — to build block-builder and load-generator from source
+- **Node.js** — for the dashboard dev server
+- **Sibling repos** — `../blockbuilder` and `../loadgenerator` cloned alongside gasstorm
+
+```
+parent/
+├── gasstorm/        # Main repo
+├── blockbuilder/    # Required for Metal mode
+└── loadgenerator/   # Required for Metal mode
+```
+
+### Installing op-reth
+
+```bash
+# Via cargo (requires Rust)
+cargo install --git https://github.com/paradigmxyz/reth --tag v1.9.3 \
+  --bin op-reth --features "op" op-reth
+
+# Or download pre-built from GitHub releases
+# https://github.com/paradigmxyz/reth/releases
+```
+
+## Quick Start
+
+<Step number={1} title="Start the stack">
+```bash
+make run-metal
+```
+
+This will:
+1. Check prerequisites (op-reth, Go, Node.js, sibling repos, genesis files)
+2. Build Go binaries for block-builder and load-generator
+3. Start op-reth with MDBX tuning flags
+4. Start block-builder and load-generator from pre-built binaries
+5. Start the dashboard dev server
+6. Write PID files for lifecycle management
+</Step>
+
+<Step number={2} title="Open the dashboard">
+```bash
+open http://localhost:3000/load-test/
+```
+
+<Callout variant="warning" title="Dashboard port differs from Docker mode">
+  In Metal mode the dashboard runs on port **3000** (Next.js dev server), not 18000 (Docker nginx). All other service ports are the same as Docker mode.
+</Callout>
+</Step>
+
+<Step number={3} title="Run a load test">
+```bash
+curl -X POST http://localhost:13001/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pattern": "constant",
+    "constantRate": 5000,
+    "durationSec": 60,
+    "transactionType": "eth-transfer"
+  }'
+```
+</Step>
+
+## Lifecycle Commands
+
+| Command | Description |
+|---------|-------------|
+| `make run-metal` | Build binaries and start all services |
+| `make stop-metal` | Gracefully stop all services via PID files |
+| `make restart-metal` | Stop then start (full restart) |
+| `make clean-metal` | Remove all Metal mode data (`data/metal/`) |
+
+## Configuration
+
+Metal mode reads configuration from `.env` just like Docker mode. All the same environment variables apply:
+
+```bash
+# Example: high-throughput Metal mode
+BLOCK_TIME_MS=150
+GAS_LIMIT=1500000000
+MAX_TXS_PER_BLOCK=50000
+ENABLE_PRECONFIRMATIONS=true
+```
+
+You can also pass env vars inline:
+
+```bash
+BLOCK_TIME_MS=100 GAS_LIMIT=2000000000 make run-metal
+```
+
+See [Configuration](/docs/configuration) for the full variable reference.
+
+## Services and Ports
+
+| Service | Port | Same as Docker? |
+|---------|------|-----------------|
+| op-reth HTTP | 18546 | Yes |
+| op-reth WS | 18547 | Yes |
+| op-reth Engine API | 18551 | Yes |
+| block-builder | 13000 | Yes |
+| preconfirmation WS | 13002 | Yes |
+| load-generator | 13001 | Yes |
+| dashboard | 3000 | No (Docker: 18000) |
+
+## Data Directory
+
+All Metal mode data lives under `data/metal/`:
+
+```
+data/metal/
+├── bin/          # Pre-built Go binaries
+├── reth/         # op-reth chain data (MDBX)
+├── loadgen/      # Load generator SQLite database
+├── pids/         # PID files (reth.pid, blockbuilder.pid, loadgen.pid, dashboard.pid)
+└── logs/         # Service log files
+```
+
+## Log Files
+
+Logs are written to both stdout (with service prefixes like `[reth]`, `[builder]`) and to individual files:
+
+| File | Service |
+|------|---------|
+| `data/metal/logs/reth.log` | op-reth |
+| `data/metal/logs/blockbuilder.log` | Block builder |
+| `data/metal/logs/loadgen.log` | Load generator |
+| `data/metal/logs/dashboard.log` | Dashboard |
+
+## MCP Tool Integration
+
+The MCP tools (`stack_status`, `stack_logs`, `stack_up`, `stack_down`, `stack_restart`) auto-detect whether the stack is running in Docker or Metal mode. No configuration needed — the tools check for Metal mode PID files and route commands accordingly.
+
+```bash
+# These work in both Docker and Metal mode:
+# stack_status → shows PID/uptime in Metal, docker ps in Docker
+# stack_logs service=reth → reads log file in Metal, docker logs in Docker
+# stack_down → runs stop-metal.sh in Metal, docker compose down in Docker
+```
+
+## op-reth Tuning Flags
+
+Metal mode includes the same MDBX and performance tuning flags as the Docker configuration:
+
+| Flag | Value | Purpose |
+|------|-------|---------|
+| `--db.sync-mode` | `safe-no-sync` | Skip fsync for faster writes |
+| `--db.growth-step` | `4GB` | Reduce MDBX file growth overhead |
+| `--db.max-readers` | `512` | Support more concurrent readers |
+| `--engine.multiproof-chunking` | enabled | Parallel state root computation |
+| `--engine.multiproof-chunk-size` | `100` | Chunk size for multiproof |
+| `--rpc.max-tracing-requests` | `50` | Higher tracing concurrency |
+
+## Performance Comparison
+
+Docker-on-Mac introduces I/O overhead due to the Linux VM layer (VirtioFS/gRPC FUSE). The main bottleneck at high TPS is op-reth's `GetPayload` call (state root computation via MDBX), which is I/O-intensive.
+
+| Metric | Docker Mode | Metal Mode |
+|--------|-------------|------------|
+| MDBX I/O latency | ~2-3x native | Native |
+| Max sustainable TPS | ~10k (Mac) | 20k+ (Mac) |
+| `GetPayload` time | 80-150ms | 30-60ms |
+
+<Callout variant="info" title="Linux servers">
+  On Linux, Docker overhead is minimal (native kernel, no VM layer). Metal mode is most beneficial on macOS where Docker Desktop uses a Linux VM.
+</Callout>
+
+## Troubleshooting
+
+### op-reth fails to start
+Check that the genesis files exist:
+```bash
+ls genesis/genesis.json genesis/jwt.hex
+```
+
+### Block builder or load generator won't build
+Ensure sibling repos are up to date:
+```bash
+cd ../blockbuilder && git pull
+cd ../loadgenerator && git pull
+```
+
+### Port already in use
+Metal mode automatically kills conflicting processes on startup. If this fails:
+```bash
+lsof -ti :13000 | xargs kill -9  # block-builder port
+lsof -ti :13001 | xargs kill -9  # load-generator port
+```
+
+### Stale PID files after crash
+If `make stop-metal` reports processes not running, clean up:
+```bash
+rm -f data/metal/pids/*.pid
+```

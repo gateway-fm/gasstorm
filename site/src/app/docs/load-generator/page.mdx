@@ -1,0 +1,153 @@
+import { ApiEndpoint } from "@/components/mdx/api-endpoint"
+import { Callout } from "@/components/mdx/callout"
+
+export const metadata = {
+  title: "Load Generator",
+  description: "Load generator API reference, test patterns, nonce management, and circuit breaker.",
+}
+
+# Load Generator
+
+The load generator is a high-throughput transaction sender that supports multiple transaction types, load patterns, account management, and on-chain verification.
+
+**Repository**: [github.com/gateway-fm/loadgenerator](https://github.com/gateway-fm/loadgenerator)
+
+## API Reference
+
+### Test Control
+
+<ApiEndpoint method="POST" path="/start" description="Start a new load test" />
+
+```json
+{
+  "pattern": "constant",
+  "constantRate": 100,
+  "durationSec": 60,
+  "transactionType": "uniswap-swap",
+  "numAccounts": 10
+}
+```
+
+<ApiEndpoint method="POST" path="/stop" description="Stop the running load test" />
+<ApiEndpoint method="POST" path="/api/reset" description="Reset load generator state" />
+<ApiEndpoint method="POST" path="/api/recycle" description="Recycle accounts (re-fund and reset nonces)" />
+
+### Status & Metrics
+
+<ApiEndpoint method="GET" path="/api/status" description="Current test status, metrics, and configuration" />
+<ApiEndpoint method="GET" path="/api/health" description="Health check" />
+<ApiEndpoint method="WS" path="/ws" description="Real-time metrics WebSocket stream" />
+
+### Test History
+
+<ApiEndpoint method="GET" path="/api/history" description="List past test runs" />
+<ApiEndpoint method="GET" path="/api/history/:id" description="Detailed results for a test run" />
+<ApiEndpoint method="GET" path="/api/history/:id/txs" description="Transaction-level details" />
+<ApiEndpoint method="DELETE" path="/api/history/:id" description="Delete a test run" />
+
+## Test Lifecycle
+
+```
+StartTest
+    │
+    ├── Initialize accounts (generate/fund)
+    ├── Deploy contracts (if needed)
+    ├── Start workers
+    ├── Send transactions via async sender
+    ├── Track via preconf WS & L2 WS
+    ├── Collect metrics
+    │
+StopTest
+    │
+    ├── Grace period (3s for late confirmations)
+    ├── On-chain verification
+    ├── Persist to SQLite
+    │
+Test Complete
+```
+
+## Nonce Management
+
+The load generator uses a **reservation pattern** for high-throughput nonce management:
+
+```go
+// Reserve nonce atomically
+n := account.ReserveNonce()  // Increments immediately
+
+// Send transaction asynchronously
+sender.SendAsync(ctx, txData, func(err error) {
+    if err != nil {
+        n.Rollback()  // Return nonce to pool on failure
+    } else {
+        n.Commit()    // Mark nonce as successfully used
+    }
+})
+```
+
+### Design Decisions
+
+- **Local tracking**: Nonces are tracked locally (not fetched per-TX) for speed
+- **Reservation pattern**: `ReserveNonce` increments immediately, preventing gaps
+- **Commit in callback**: Never commit before async send completes
+- **Reactive sync**: Resync only on circuit breaker open (not periodic)
+
+### Nonce Fetch Strategy
+
+When fetching nonces from the chain:
+
+1. First tries `eth_getPendingNonce` (block builder's view of pending nonces)
+2. Falls back to `eth_getTransactionCount("pending")` to include mempool
+
+## Circuit Breaker
+
+The circuit breaker protects against cascading failures:
+
+| Parameter | Threshold | Action |
+|-----------|-----------|--------|
+| Failure rate | > 5% | Opens circuit |
+| Revocation rate | > 20% | Opens circuit |
+
+When the circuit breaker opens:
+
+1. **Rate reduction**: TX rate drops to 10 TPS
+2. **Nonce resync**: All accounts resync nonces from the builder
+3. **Gradual recovery**: Rate increases as success rate improves
+
+<Callout variant="warning" title="Circuit breaker recovery">
+  The circuit breaker auto-recovers, but if it keeps tripping, check for underlying issues like Engine API SYNCING or nonce cache staleness. See [Troubleshooting](/docs/troubleshooting).
+</Callout>
+
+## Account Management
+
+The load generator dynamically manages test accounts:
+
+- **Generation**: Deterministic key derivation from a seed
+- **Funding**: Automatic ETH distribution from pre-funded accounts
+- **Nonce tracking**: Per-account reservation with atomic operations
+- **Recycling**: Re-fund and reset nonces between test runs
+
+## Capability-Based Execution
+
+The load generator adapts its behavior based on the execution layer's capabilities:
+
+```go
+type ExecutionLayerCapabilities struct {
+    Name                     string
+    HasExternalBlockBuilder  bool
+    SupportsPreconfirmations bool
+    SupportsBuilderStatusAPI bool
+    SupportsBlockMetricsWS   bool
+}
+```
+
+When a capability is not supported (e.g., preconfirmations on gravity-reth), the load generator gracefully disables that feature rather than failing.
+
+## Metrics
+
+The load generator tracks and exposes:
+
+- **Throughput**: MGas/s and TPS over rolling 5-second windows
+- **Latency**: Confirmation and preconfirmation latency distributions
+- **Block metrics**: Gas used, gas limit, fill rate per block
+- **Percentiles**: p50/p75/p90/p95/p99 for all latency and throughput metrics
+- **Verification**: TX sent, confirmed, failed, and revoked counts

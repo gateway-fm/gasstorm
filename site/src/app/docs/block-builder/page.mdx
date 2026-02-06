@@ -1,0 +1,147 @@
+import { ApiEndpoint } from "@/components/mdx/api-endpoint"
+import { Callout } from "@/components/mdx/callout"
+
+export const metadata = {
+  title: "Block Builder",
+  description: "Block builder HTTP/WebSocket API, nonce management, and preconfirmations.",
+}
+
+# Block Builder
+
+The block builder is an external block production service that receives transactions via HTTP, manages a transaction pool with nonce tracking, and drives op-reth's block production via the Engine API.
+
+**Repository**: [github.com/gateway-fm/blockbuilder](https://github.com/gateway-fm/blockbuilder)
+
+## HTTP API (Port 13000)
+
+<ApiEndpoint method="POST" path="/" description="JSON-RPC endpoint for eth_sendRawTransaction" />
+
+```bash
+curl -X POST http://localhost:13000 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "eth_sendRawTransaction",
+    "params": ["0x...signedTxHex"],
+    "id": 1
+  }'
+```
+
+<ApiEndpoint method="GET" path="/status" description="Builder status and metrics" />
+
+Returns the block builder's current state including:
+- Pipeline status (running/stopped)
+- Block production metrics (blocks produced, gas used)
+- Transaction pool size
+- Configuration (block time, gas limit, ordering)
+
+```bash
+curl http://localhost:13000/status | jq
+```
+
+<ApiEndpoint method="GET" path="/eth_getPendingNonce?address=0x..." description="Get pending nonce for an address" />
+
+Returns the builder's view of the next expected nonce for an address. This includes transactions in the mempool that haven't been included in a block yet.
+
+```bash
+curl "http://localhost:13000/eth_getPendingNonce?address=0xf39F...2266"
+```
+
+## WebSocket API (Port 13002)
+
+<ApiEndpoint method="WS" path="/ws/preconfirmations" description="Preconfirmation events stream" />
+
+Streams transaction lifecycle events as JSON messages:
+
+```json
+{
+  "type": "preconfirmed",
+  "txHash": "0x...",
+  "blockNumber": 42,
+  "timestamp": 1706000000
+}
+```
+
+**Event types**: `pending`, `preconfirmed`, `confirmed`, `dropped`, `revoked`
+
+<ApiEndpoint method="WS" path="/ws/block-metrics" description="Block production metrics stream" />
+
+Streams per-block metrics:
+
+```json
+{
+  "blockNumber": 42,
+  "gasUsed": 15000000,
+  "gasLimit": 1000000000,
+  "txCount": 85,
+  "buildTimeMs": 120
+}
+```
+
+## Block Production Pipeline
+
+The block builder operates a continuous pipeline:
+
+1. **Receive** — transactions arrive via HTTP RPC and enter a 100k-capacity queue
+2. **Validate** — signature verification (async worker pool), basic checks
+3. **Pool** — transactions indexed by sender address with nonce tracking
+4. **Filter** — select executable transactions (sequential nonces) with configured ordering
+5. **Build** — call `forkchoiceUpdated` on op-reth to request a new payload
+6. **Finalize** — call `GetPayload` to retrieve the built block
+7. **Preconfirm** — emit WebSocket events for transaction lifecycle
+
+## Nonce Management
+
+The builder maintains a unified `NonceCache` for all nonce tracking:
+
+### Lookup Strategy
+
+1. Check local cache (LRU-based, bounded by `maxAccounts`)
+2. If stale or missing, fetch via L2 RPC (`eth_getTransactionCount("pending")`)
+3. Singleflight ensures concurrent lookups for the same address share one RPC call
+
+### Filtering
+
+Transactions are classified as:
+- **Executable** — nonce matches expected next nonce for the sender
+- **Future** — nonce is higher than expected (queued until gap is filled)
+- **Stale** — nonce is lower than expected (rejected)
+
+<Callout variant="info" title="SetIfHigher semantics">
+  The nonce cache uses `SetIfHigher` when updating — a stale update from a slow RPC response can never overwrite a newer value. This prevents nonce regression bugs.
+</Callout>
+
+## Transaction Ordering
+
+Controlled by the `TX_ORDERING` environment variable:
+
+| Mode | Description |
+|------|-------------|
+| `fifo` | First-in-first-out (default) |
+| `tip_desc` | Highest tip (priority fee) first |
+| `tip_asc` | Lowest tip first |
+
+## Preconfirmation Flow
+
+```
+TX arrives → Pending → Preconfirmed → Confirmed
+                │             │
+                │             └─→ Dropped (block build failed)
+                │
+                └─→ Dropped (nonce gap or timeout)
+```
+
+- **Pending**: TX received and validated
+- **Preconfirmed**: TX included in a payload sent to op-reth
+- **Confirmed**: Block containing TX finalized by op-reth
+- **Dropped**: TX removed due to nonce gap, timeout, or build failure
+- **Revoked**: Preconfirmation invalidated (block reverted)
+
+## Engine API Integration
+
+The builder communicates with op-reth via the authenticated Engine API (port 18551):
+
+- **JWT Authentication**: Tokens cached with 50s TTL, auto-refreshed
+- **`engine_forkchoiceUpdatedV3`**: Sets chain head and requests new payload
+- **`engine_getPayloadV3`**: Retrieves built block
+- **Pipelined mode**: Overlaps FCU with transaction collection for lower latency

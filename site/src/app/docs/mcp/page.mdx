@@ -1,0 +1,278 @@
+import { McpToolCard } from "@/components/mdx/mcp-tool-card"
+import { Callout } from "@/components/mdx/callout"
+
+export const metadata = {
+  title: "MCP Integration",
+  description: "AI-native stack management with 24 MCP tools for Claude Code, OpenCode, Codex CLI, and Gemini CLI.",
+}
+
+# MCP Integration
+
+GasStorm includes a unified [MCP](https://modelcontextprotocol.io/) (Model Context Protocol) server that combines block builder tools, load generator tools, and Docker Compose stack management into a single server. It exposes **24 tools** over stdio transport.
+
+## Setup
+
+Any MCP-compatible AI coding tool can use the GasStorm MCP server. The repo includes config files for the most popular clients.
+
+### Claude Code
+
+The `.mcp.json` in the repo root auto-configures the server. Open the project in Claude Code and the tools are available immediately.
+
+### OpenCode
+
+The `opencode.json` in the repo root auto-configures the server. Open the project in OpenCode and the tools are available immediately.
+
+### Codex CLI
+
+Add the MCP server to your Codex CLI configuration (`~/.codex/config.json`):
+
+```json
+{
+  "mcpServers": {
+    "gasstorm": {
+      "command": "go",
+      "args": ["run", "./mcp"],
+      "cwd": "/path/to/gasstorm",
+      "env": {
+        "BUILDER_URL": "http://localhost:13000",
+        "LOADGEN_URL": "http://localhost:13001",
+        "GASSTORM_DIR": "."
+      }
+    }
+  }
+}
+```
+
+### Gemini CLI
+
+Add the MCP server to your Gemini CLI settings file (`~/.gemini/settings.json`):
+
+```json
+{
+  "mcpServers": {
+    "gasstorm": {
+      "command": "go",
+      "args": ["run", "./mcp"],
+      "cwd": "/path/to/gasstorm",
+      "env": {
+        "BUILDER_URL": "http://localhost:13000",
+        "LOADGEN_URL": "http://localhost:13001",
+        "GASSTORM_DIR": "."
+      }
+    }
+  }
+}
+```
+
+### Manual
+
+```bash
+BUILDER_URL=http://localhost:13000 \
+LOADGEN_URL=http://localhost:13001 \
+GASSTORM_DIR=. \
+go run ./mcp
+```
+
+<Callout variant="info" title="Any MCP client works">
+  The GasStorm MCP server uses stdio transport, which is supported by all MCP-compatible clients. The configs above are convenience — any tool that speaks MCP can connect.
+</Callout>
+
+## Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BUILDER_URL` | `http://localhost:13000` | Block builder HTTP endpoint |
+| `LOADGEN_URL` | `http://localhost:13001` | Load generator HTTP endpoint |
+| `GASSTORM_DIR` | `.` | Path to gasstorm repo root (for docker compose and .env) |
+
+## Stack Management Tools (7)
+
+<McpToolCard
+  name="stack_status"
+  description="Show Docker Compose service states and ports."
+/>
+
+<McpToolCard
+  name="stack_up"
+  description="Start the GasStorm stack with a profile."
+  mutating
+  params={[
+    { name: "profile", type: "string", required: false, description: "Docker Compose profile: reth (default), cdk-erigon, gravity-reth" }
+  ]}
+/>
+
+<McpToolCard
+  name="stack_down"
+  description="Stop the GasStorm stack."
+  mutating
+  params={[
+    { name: "volumes", type: "boolean", required: false, description: "Also remove volumes (default: false)" }
+  ]}
+/>
+
+<McpToolCard
+  name="stack_restart"
+  description="Restart a specific service or all services."
+  mutating
+  params={[
+    { name: "service", type: "string", required: false, description: "Service name (e.g. block-builder, load-generator). If empty, restarts all." }
+  ]}
+/>
+
+<McpToolCard
+  name="stack_logs"
+  description="Get recent logs for a service."
+  params={[
+    { name: "service", type: "string", required: true, description: "Service name (e.g. block-builder, load-generator, l2-reth)" },
+    { name: "lines", type: "number", required: false, description: "Number of lines to tail (default: 50)" }
+  ]}
+/>
+
+<McpToolCard
+  name="stack_config"
+  description="Read current .env configuration values."
+/>
+
+<McpToolCard
+  name="stack_config_set"
+  description="Update a .env value. Requires service restart to take effect."
+  mutating
+  params={[
+    { name: "key", type: "string", required: true, description: "Configuration key (e.g. BLOCK_TIME_MS, GAS_LIMIT)" },
+    { name: "value", type: "string", required: true, description: "New value" }
+  ]}
+/>
+
+## Block Builder Tools (7)
+
+<McpToolCard
+  name="builder_status"
+  description="Get block builder status including configuration, pipeline state, and metrics."
+/>
+
+<McpToolCard
+  name="builder_health"
+  description="Health check for the block builder service."
+/>
+
+<McpToolCard
+  name="builder_txpool_status"
+  description="Get transaction pool status (pending, queued counts)."
+/>
+
+<McpToolCard
+  name="builder_txpool_inspect"
+  description="Inspect transaction pool contents with details per address."
+/>
+
+<McpToolCard
+  name="builder_get_nonce"
+  description="Get the pending nonce for an address from the builder's view."
+  params={[
+    { name: "address", type: "string", required: true, description: "Ethereum address (0x...)" }
+  ]}
+/>
+
+<McpToolCard
+  name="builder_send_tx"
+  description="Send a raw signed transaction via the block builder."
+  mutating
+  params={[
+    { name: "rawTx", type: "string", required: true, description: "Hex-encoded signed transaction" }
+  ]}
+/>
+
+<McpToolCard
+  name="builder_reset_nonces"
+  description="Reset the builder's nonce cache, forcing fresh lookups from L2."
+  mutating
+/>
+
+## Load Generator Tools (10)
+
+<McpToolCard
+  name="loadgen_status"
+  description="Get current load generator status including active test, metrics, and configuration."
+/>
+
+<McpToolCard
+  name="loadgen_health"
+  description="Health check for the load generator service."
+/>
+
+<McpToolCard
+  name="loadgen_start"
+  description="Start a new load test with the specified configuration."
+  mutating
+  params={[
+    { name: "pattern", type: "string", required: true, description: "Load pattern: constant, ramp, step, spike" },
+    { name: "constantRate", type: "number", required: false, description: "TPS for constant pattern" },
+    { name: "durationSec", type: "number", required: true, description: "Test duration in seconds" },
+    { name: "transactionType", type: "string", required: true, description: "TX type: eth-transfer, erc20-transfer, uniswap-swap, heavy-compute" }
+  ]}
+/>
+
+<McpToolCard
+  name="loadgen_stop"
+  description="Stop the currently running load test."
+  mutating
+/>
+
+<McpToolCard
+  name="loadgen_reset"
+  description="Reset the load generator state (clear active test)."
+  mutating
+/>
+
+<McpToolCard
+  name="loadgen_recycle"
+  description="Recycle load generator accounts (re-fund and reset nonces)."
+  mutating
+/>
+
+<McpToolCard
+  name="loadgen_history"
+  description="Get a list of past test runs with summary stats."
+/>
+
+<McpToolCard
+  name="loadgen_test_detail"
+  description="Get detailed results for a specific test run."
+  params={[
+    { name: "runId", type: "string", required: true, description: "Test run ID" }
+  ]}
+/>
+
+<McpToolCard
+  name="loadgen_test_txs"
+  description="Get transaction-level details for a test run."
+  params={[
+    { name: "runId", type: "string", required: true, description: "Test run ID" }
+  ]}
+/>
+
+<McpToolCard
+  name="loadgen_delete_run"
+  description="Delete a test run and its associated data."
+  mutating
+  params={[
+    { name: "runId", type: "string", required: true, description: "Test run ID" }
+  ]}
+/>
+
+## Example Usage
+
+With any MCP-compatible AI tool (Claude Code, OpenCode, Codex CLI, Gemini CLI), you can manage the full stack conversationally:
+
+- *"Start the stack with the reth profile"*
+- *"What's the stack status?"*
+- *"Show me the block builder logs"*
+- *"Set BLOCK_TIME_MS to 250 and restart the block builder"*
+- *"Start a constant 100 TPS uniswap swap test for 60 seconds"*
+- *"What's the builder status? Any circuit breaker issues?"*
+- *"Stop the test and show me the results"*
+- *"Tear down the stack"*
+
+<Callout variant="info" title="Fully autonomous workflows">
+  AI agents can chain these tools together for fully autonomous testing workflows — start the stack, configure parameters, run tests, collect results, and tear down — all from a single conversation.
+</Callout>

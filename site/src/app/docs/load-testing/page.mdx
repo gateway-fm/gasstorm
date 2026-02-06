@@ -1,0 +1,150 @@
+import { Callout } from "@/components/mdx/callout"
+import { ApiEndpoint } from "@/components/mdx/api-endpoint"
+
+export const metadata = {
+  title: "Load Testing",
+  description: "Transaction types, load patterns, and how to interpret test results.",
+}
+
+# Load Testing
+
+GasStorm supports multiple transaction types and load patterns for comprehensive sequencer benchmarking.
+
+## Transaction Types
+
+| Type | Gas per TX | Description |
+|------|-----------|-------------|
+| `eth-transfer` | 21,000 | Basic ETH transfers between accounts |
+| `erc20-transfer` | ~65,000 | ERC20 token transfers (deployed at test start) |
+| `uniswap-swap` | 180,000–250,000 | Real Uniswap V3 AMM swaps with pool deployment |
+| `heavy-compute` | ~500,000 | Compute-intensive operations for stress testing |
+
+<Callout variant="info" title="Real contracts">
+  Transaction types like `uniswap-swap` deploy actual Uniswap V3 contracts and execute real swaps — not mock transactions. This gives accurate gas measurements and realistic EVM workloads.
+</Callout>
+
+## Load Patterns
+
+### Constant
+
+Sends transactions at a fixed rate for the entire test duration.
+
+```bash
+curl -X POST http://localhost:13001/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pattern": "constant",
+    "constantRate": 100,
+    "durationSec": 60,
+    "transactionType": "uniswap-swap"
+  }'
+```
+
+### Ramp
+
+Linearly increases the transaction rate from a start value to an end value.
+
+```bash
+curl -X POST http://localhost:13001/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pattern": "ramp",
+    "rampStartRate": 10,
+    "rampEndRate": 200,
+    "durationSec": 120,
+    "transactionType": "eth-transfer"
+  }'
+```
+
+### Step
+
+Increases the rate in discrete steps, holding each step for a period.
+
+```bash
+curl -X POST http://localhost:13001/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pattern": "step",
+    "stepStartRate": 50,
+    "stepEndRate": 200,
+    "stepSize": 50,
+    "stepDurationSec": 30,
+    "transactionType": "erc20-transfer"
+  }'
+```
+
+### Spike
+
+Alternates between a base rate and spike rate to test burst handling.
+
+```bash
+curl -X POST http://localhost:13001/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pattern": "spike",
+    "spikeBaseRate": 50,
+    "spikeRate": 500,
+    "spikeDurationSec": 5,
+    "spikeIntervalSec": 30,
+    "durationSec": 120,
+    "transactionType": "eth-transfer"
+  }'
+```
+
+## Using the Dashboard
+
+The dashboard at `http://localhost:18000/load-test/` provides a visual interface for:
+
+1. **Configuring tests** — select TX type, pattern, rate, and duration
+2. **Real-time monitoring** — MGas/s and TPS charts, latency histograms
+3. **Metrics snapshot** — current MGas/s, peak MGas/s, total gas used
+4. **Percentile tables** — p50/p75/p90/p95/p99 for latency, MGas/s, TPS, block fill rate
+5. **Verification summary** — TX sent, confirmed, failed counts
+
+## Using the API
+
+<ApiEndpoint method="POST" path="/start" description="Start a new load test" />
+<ApiEndpoint method="POST" path="/stop" description="Stop the running load test" />
+<ApiEndpoint method="GET" path="/api/status" description="Get current test status and metrics" />
+<ApiEndpoint method="GET" path="/api/health" description="Health check" />
+<ApiEndpoint method="GET" path="/api/history" description="List past test runs" />
+<ApiEndpoint method="GET" path="/api/history/:id" description="Get detailed results for a test run" />
+<ApiEndpoint method="GET" path="/api/history/:id/txs" description="Get transaction-level details" />
+<ApiEndpoint method="DELETE" path="/api/history/:id" description="Delete a test run" />
+<ApiEndpoint method="POST" path="/api/recycle" description="Recycle accounts (re-fund and reset nonces)" />
+<ApiEndpoint method="POST" path="/api/reset" description="Reset load generator state" />
+
+## Interpreting Results
+
+### Key Metrics
+
+- **MGas/s** — megagas processed per second; the primary throughput metric
+- **TPS** — transactions per second confirmed on-chain
+- **Block fill rate** — percentage of block gas limit used (gasUsed/gasLimit)
+- **Confirmation latency** — time from TX send to on-chain inclusion
+- **Preconfirmation latency** — time from TX send to preconfirmation event
+
+### What Good Looks Like
+
+| Metric | Good | Concerning |
+|--------|------|------------|
+| Success rate | > 98% | < 95% |
+| Confirmation latency p50 | < 500ms | > 2s |
+| Block fill rate | > 80% | < 50% |
+| Circuit breaker | Closed | Open |
+
+### Common Issues
+
+- **Low TPS with high pending count** — block production is the bottleneck (check Engine API latency)
+- **Increasing failure rate** — circuit breaker may open; check nonce sync
+- **Zero preconfirmation events** — ensure `ENABLE_PRECONFIRMATIONS=true` and you're in reth mode
+
+## Test History
+
+All test runs are persisted to SQLite and include:
+
+- **Time series data** — MGas/s, TPS, and block fill rate per sample
+- **Summary statistics** — peak MGas/s, total gas used, average TPS
+- **Latency percentiles** — p50/p75/p90/p95/p99 for both confirmation and preconfirmation
+- **Gas metrics per block** — gasUsed, gasLimit, fillRate
+- **Transaction-level details** — individual TX hashes, latencies, and statuses

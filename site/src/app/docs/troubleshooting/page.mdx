@@ -1,0 +1,159 @@
+import { Callout } from "@/components/mdx/callout"
+
+export const metadata = {
+  title: "Troubleshooting",
+  description: "Common issues and diagnostic commands for GasStorm.",
+}
+
+# Troubleshooting
+
+Common issues and solutions for GasStorm.
+
+## Pipeline Stuck / No Blocks Being Produced
+
+**Symptom**: Blocks stop being produced, pending count grows, load test shows 0 TPS.
+
+### Engine API SYNCING
+
+op-reth fell behind and returned SYNCING status.
+
+```bash
+docker compose logs block-builder | grep -i syncing
+```
+
+**Fix**: Restart the stack.
+
+```bash
+make stop && make run-reth
+```
+
+### Block Builder Crash
+
+Check if the container is running:
+
+```bash
+docker compose ps block-builder
+docker compose logs --tail 50 block-builder
+```
+
+### op-reth Not Responding
+
+Engine API port may be unreachable:
+
+```bash
+docker compose logs --tail 50 l2-reth
+```
+
+## Invalid JWT Errors
+
+**Symptom**: Block builder logs show "invalid JWT" or "unauthorized" errors.
+
+**Fix**: Regenerate the JWT secret and restart both services that share it.
+
+```bash
+openssl rand -hex 32 > genesis/jwt.hex
+docker compose restart l2-reth block-builder
+```
+
+<Callout variant="warning" title="Shared secret">
+  Both op-reth and the block builder must share the same `jwt.hex` file.
+</Callout>
+
+## Low Throughput (&lt; 100 TPS)
+
+### Diagnosis Steps
+
+1. **Check Engine API latency**:
+   ```bash
+   docker compose logs block-builder | grep -i "latency\|elapsed\|took"
+   ```
+
+2. **Check pending transaction count**:
+   ```bash
+   curl -s http://localhost:13000/status | jq '.pendingCount'
+   ```
+   If pending count is growing but TPS is low, the bottleneck is block production.
+
+3. **Check block fill rate**:
+   ```bash
+   curl -s http://localhost:13001/api/status | jq '.metrics'
+   ```
+
+4. **Increase accounts**: More accounts distribute nonce contention. Use the dashboard to set higher account counts in test config.
+
+## Nonce Gap / Stuck Transactions
+
+**Symptom**: "nonce too low" or "nonce gap" errors in block builder logs.
+
+**Causes**:
+- Load generator nonce tracking fell out of sync with chain state
+- Circuit breaker opened and reset nonces
+
+**Fix**: The circuit breaker should auto-recover. If not:
+
+```bash
+docker compose restart load-generator
+```
+
+## Dashboard Not Connecting
+
+**Symptom**: Dashboard shows "disconnected" or metrics aren't updating.
+
+1. **Verify load generator is running**:
+   ```bash
+   curl http://localhost:13001/api/health
+   ```
+
+2. **Verify block builder status endpoint**:
+   ```bash
+   curl http://localhost:13000/status
+   ```
+
+3. **Check browser console** for CORS or WebSocket errors.
+
+## Docker / Port Conflicts
+
+**Symptom**: "address already in use" errors on startup.
+
+```bash
+# Check what's using a specific port
+lsof -i :13000
+
+# Stop all GasStorm services
+make stop
+
+# Nuclear option: stop and remove all volumes
+make clean
+```
+
+## Service Health Checks
+
+Quick commands to verify each service:
+
+| Service | Check Command |
+|---------|--------------|
+| block-builder | `curl http://localhost:13000/status` |
+| preconf WS | `wscat -c ws://localhost:13002/ws/preconfirmations` |
+| load-generator | `curl http://localhost:13001/api/health` |
+| dashboard | `open http://localhost:18000` |
+| op-reth RPC | `curl -X POST http://localhost:18546 -d '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'` |
+
+## Viewing Logs
+
+```bash
+# All services
+make logs
+
+# Specific service
+docker compose logs -f block-builder
+docker compose logs -f load-generator
+docker compose logs -f l2-reth
+
+# Last 100 lines
+docker compose logs --tail 100 block-builder
+```
+
+## Getting Help
+
+- Check logs: `make logs` or `docker compose logs -f <service>`
+- File an issue: [github.com/gateway-fm/gasstorm/issues](https://github.com/gateway-fm/gasstorm/issues)

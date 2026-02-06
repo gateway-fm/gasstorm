@@ -1,0 +1,150 @@
+import { Callout } from "@/components/mdx/callout"
+
+export const metadata = {
+  title: "Execution Layers",
+  description: "Comparison of supported execution layers: reth, gravity-reth, and cdk-erigon.",
+}
+
+# Execution Layers
+
+GasStorm supports multiple execution layer backends via a **capability-based architecture**. Select the execution layer with the `EXECUTION_LAYER` environment variable.
+
+<Callout variant="info" title="Core vs overhanging">
+  Only reth mode is core to GasStorm. cdk-erigon and gravity-reth are overhanging features that will be extracted into separate configurations later.
+</Callout>
+
+## Comparison
+
+| Feature | reth / op-reth | gravity-reth | cdk-erigon |
+|---------|---------------|-------------|------------|
+| Block Builder | External (custom) | None (direct sequencer) | None (direct sequencer) |
+| Preconfirmations | Yes | No | No |
+| Builder Status API | Yes | No | No |
+| Block Metrics WS | Yes | No | No |
+| EVM | Standard | Parallel (Grevm) | Standard |
+| Use Case | Full feature testing | Parallel EVM benchmarks | Polygon CDK compatibility |
+
+## Capability Architecture
+
+The load generator uses capability checks instead of string comparisons to adapt behavior:
+
+```go
+type ExecutionLayerCapabilities struct {
+    Name                     string
+    HasExternalBlockBuilder  bool   // true = uses block-builder
+    SupportsPreconfirmations bool   // WebSocket preconf events
+    SupportsBuilderStatusAPI bool   // GET /status endpoint
+    SupportsBlockMetricsWS   bool   // WebSocket /ws/block-metrics
+}
+```
+
+This means adding a new execution layer requires zero changes to load-generator logic, dashboard code, or API handlers — just register the capabilities.
+
+## reth Mode (Default)
+
+Uses the custom block-builder with op-reth via Engine API. Full feature set.
+
+```
+load-generator → block-builder:13000 → op-reth Engine API:8551
+```
+
+```bash
+make run-reth
+# or
+EXECUTION_LAYER=reth make run
+```
+
+**Capabilities**: External block builder, preconfirmations, builder status API, block metrics WebSocket.
+
+**Best for**: Full-featured load testing, preconfirmation validation, block builder development.
+
+## gravity-reth Mode
+
+High-performance parallel EVM with Grevm. Direct sequencer mode — no external block builder.
+
+```
+load-generator → gravity-reth:8545 (direct sequencer)
+```
+
+```bash
+make run-gravity-reth
+# or
+EXECUTION_LAYER=gravity-reth make run
+```
+
+**Capabilities**: None — direct sequencer mode with no external builder or preconfirmations.
+
+**Best for**: Parallel EVM benchmarks, comparing throughput vs standard reth.
+
+## cdk-erigon Mode
+
+Uses Polygon's cdk-erigon as a standalone sequencer. Block builder is bypassed.
+
+```
+load-generator → cdk-erigon:8545 (direct sequencer)
+```
+
+```bash
+make run-cdk-erigon
+# or
+EXECUTION_LAYER=cdk-erigon make run
+```
+
+**Capabilities**: None — direct sequencer mode.
+
+**Best for**: Polygon CDK compatibility testing, comparing Erigon vs Reth performance.
+
+## Adding a New Execution Layer
+
+1. **Add capability function** in the loadgenerator repo (`internal/execnode/registry.go`)
+2. **Register** in `DefaultRegistry()`
+3. **Create** `docker-compose-new-node.yaml` in the gasstorm repo
+4. **Add Makefile target** (optional)
+
+No changes needed to load-generator logic, dashboard code, or API handlers.
+
+### Example Registration
+
+```go
+func NewCustomNode() *ExecutionLayerCapabilities {
+    return &ExecutionLayerCapabilities{
+        Name:                     "custom-node",
+        HasExternalBlockBuilder:  false,
+        SupportsPreconfirmations: false,
+        SupportsBuilderStatusAPI: false,
+        SupportsBlockMetricsWS:   false,
+    }
+}
+
+func DefaultRegistry() *Registry {
+    r := NewRegistry()
+    r.Register("reth", NewReth())
+    r.Register("gravity-reth", NewGravityReth())
+    r.Register("cdk-erigon", NewCdkErigon())
+    r.Register("custom-node", NewCustomNode())  // Add here
+    return r
+}
+```
+
+## Prover Selection
+
+GasStorm also supports two validity proof backends, orthogonal to execution layer selection:
+
+| Prover | Description | Profile |
+|--------|-------------|---------|
+| `sp1` (default) | OP Succinct with SP1 zkVM | `prover-sp1` |
+| `zisk` | ZisK zkVM (Polygon) | `prover-zisk` |
+
+```bash
+# SP1 prover (default)
+make run-agglayer
+
+# ZisK prover
+PROVER=zisk make run-agglayer
+```
+
+| Aspect | SP1 (op-succinct) | ZisK |
+|--------|-------------------|------|
+| Architecture | RISC-V 32-bit | RISC-V 64-bit |
+| Precompiles | keccak, sha256, secp256k1 | keccak, sha256 (no secp256k1) |
+| Mode | Mock by default | Emulator by default |
