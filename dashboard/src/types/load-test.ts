@@ -1,4 +1,4 @@
-export type LoadPattern = "constant" | "ramp" | "spike" | "adaptive" | "realistic";
+export type LoadPattern = "constant" | "ramp" | "spike" | "adaptive" | "realistic" | "adaptive-realistic";
 
 export type TipDistribution = "exponential" | "power-law" | "uniform";
 

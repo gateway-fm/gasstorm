@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import type { TestResult, TimeSeriesPoint, TestRunMetadataUpdate } from "@/types
 import { TxLogViewer } from "./tx-log-viewer";
 import { HistoryItemCard, type HistoryItem } from "./history-item-card";
 import { transformTestRun, transformTimeSeriesPoint } from "./history-transforms";
+import { useGoLoadTestStore } from "@/stores/go-load-test-store";
 
 const LOAD_GEN_API = "/api/loadgen";
 
@@ -33,6 +34,18 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
   const [editingNameValue, setEditingNameValue] = useState("");
   const [compareMode, setCompareMode] = useState(false);
   const [selectedForCompare, setSelectedForCompare] = useState<string[]>([]);
+  const [ghostEntry, setGhostEntry] = useState<HistoryItem | null>(null);
+
+  // Subscribe to load test status to detect when tests complete
+  const testStatus = useGoLoadTestStore((s) => s.status);
+  const testConfig = useGoLoadTestStore((s) => s.config);
+  const txSentCount = useGoLoadTestStore((s) => s.txSentCount);
+  const txConfirmedCount = useGoLoadTestStore((s) => s.txConfirmedCount);
+  const txFailedCount = useGoLoadTestStore((s) => s.txFailedCount);
+  const averageTps = useGoLoadTestStore((s) => s.averageTps);
+  const peakTps = useGoLoadTestStore((s) => s.peakTps);
+  const elapsedTime = useGoLoadTestStore((s) => s.elapsedTime);
+  const prevStatusRef = useRef(testStatus);
 
   const fetchHistory = useCallback(async () => {
     setLoading(true);
@@ -190,6 +203,64 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
     fetchHistory();
   }, [fetchHistory]);
 
+  // Create ghost entry when test transitions to verifying/completed
+  useEffect(() => {
+    const prevStatus = prevStatusRef.current;
+    prevStatusRef.current = testStatus;
+
+    // When transitioning to "verifying", create a ghost entry
+    if (testStatus === "verifying" && prevStatus === "running") {
+      const ghost: HistoryItem = {
+        id: `ghost-${Date.now()}`,
+        startedAt: new Date(Date.now() - elapsedTime * 1000).toISOString(),
+        completedAt: new Date().toISOString(),
+        pattern: testConfig?.pattern ?? "constant",
+        transactionType: testConfig?.transactionType ?? "eth-transfer",
+        durationMs: elapsedTime * 1000,
+        txSent: txSentCount,
+        txConfirmed: txConfirmedCount,
+        txFailed: txFailedCount,
+        averageTps,
+        peakTps,
+        config: {
+          pattern: testConfig?.pattern ?? "constant",
+          durationSec: testConfig?.duration ?? 60,
+          constantRate: testConfig?.constantRate,
+          rampStart: testConfig?.rampStart,
+          rampEnd: testConfig?.rampEnd,
+          rampSteps: testConfig?.rampSteps,
+          baselineRate: testConfig?.baselineRate,
+          spikeRate: testConfig?.spikeRate,
+          spikeDuration: testConfig?.spikeDuration,
+          spikeInterval: testConfig?.spikeInterval,
+          adaptiveInitialRate: testConfig?.adaptiveInitialRate,
+          adaptiveTargetPending: testConfig?.adaptiveTargetPending,
+          adaptiveRateStep: testConfig?.adaptiveRateStep,
+          realisticConfig: testConfig?.realisticConfig,
+        },
+        isSaving: true,
+      };
+      setGhostEntry(ghost);
+    }
+
+    // When test completes, auto-refresh history after a short delay
+    // This gives the backend time to persist the data
+    if (testStatus === "completed" && prevStatus === "verifying") {
+      const timer = setTimeout(() => {
+        fetchHistory().then(() => {
+          // Clear ghost entry after successful fetch
+          setGhostEntry(null);
+        });
+      }, 2000); // Wait 2s for persistence to complete
+      return () => clearTimeout(timer);
+    }
+
+    // Clear ghost if user manually resets
+    if (testStatus === "idle" && prevStatus !== "idle") {
+      setGhostEntry(null);
+    }
+  }, [testStatus, testConfig, elapsedTime, txSentCount, txConfirmedCount, txFailedCount, averageTps, peakTps, fetchHistory]);
+
   const handleExpand = (testId: string) => {
     if (expanded === testId) {
       setExpanded(null);
@@ -199,41 +270,49 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
     }
   };
 
+  // Combine ghost entry with real history (ghost appears first if it exists)
+  const historyWithGhost = ghostEntry ? [ghostEntry, ...history] : history;
+
   const filteredHistory = showFavoritesOnly
-    ? history.filter((h) => h.isFavorite)
-    : history;
+    ? historyWithGhost.filter((h) => h.isFavorite || h.isSaving)
+    : historyWithGhost;
 
   const favoriteCount = history.filter((h) => h.isFavorite).length;
 
   const renderHistoryList = () => (
     <>
-      {filteredHistory.map((result, index) => (
+      {filteredHistory.map((result, index) => {
+        const isSaving = result.isSaving ?? false;
+        // Disable interactions for ghost/saving entries
+        const noop = () => {};
+        return (
         <HistoryItemCard
           key={result.id || `history-${index}`}
           result={result}
-          expanded={expanded === result.id}
-          onToggleExpand={() => handleExpand(result.id)}
+          expanded={!isSaving && expanded === result.id}
+          onToggleExpand={isSaving ? noop : () => handleExpand(result.id)}
           timeSeries={timeSeries[result.id]}
           loadingDetail={loadingDetail === result.id}
-          editingName={editingNameId === result.id}
+          editingName={!isSaving && editingNameId === result.id}
           editingNameValue={editingNameValue}
           onEditingNameChange={setEditingNameValue}
-          onSaveName={() => saveName(result.id, editingNameValue)}
-          onCancelEditName={() => setEditingNameId(null)}
-          onStartEditName={() => startEditingName(result.id, result.customName)}
-          onToggleFavorite={() => toggleFavorite(result.id, result.isFavorite ?? false)}
-          onViewFullResults={() => router.push(`/load-test/history?id=${result.id}`)}
-          onViewTxLogs={() => setTxLogViewerId(result.id)}
-          onDelete={() => deleteTest(result.id)}
+          onSaveName={isSaving ? noop : () => saveName(result.id, editingNameValue)}
+          onCancelEditName={isSaving ? noop : () => setEditingNameId(null)}
+          onStartEditName={isSaving ? noop : () => startEditingName(result.id, result.customName)}
+          onToggleFavorite={isSaving ? noop : () => toggleFavorite(result.id, result.isFavorite ?? false)}
+          onViewFullResults={isSaving ? noop : () => router.push(`/load-test/history?id=${result.id}`)}
+          onViewTxLogs={isSaving ? noop : () => setTxLogViewerId(result.id)}
+          onDelete={isSaving ? noop : () => deleteTest(result.id)}
           compareMode={compareMode}
           selectedForCompare={selectedForCompare.includes(result.id)}
-          onToggleCompareSelect={() => toggleCompareSelect(result.id)}
+          onToggleCompareSelect={isSaving ? noop : () => toggleCompareSelect(result.id)}
         />
-      ))}
+        );
+      })}
     </>
   );
 
-  if (history.length === 0) {
+  if (history.length === 0 && !ghostEntry) {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

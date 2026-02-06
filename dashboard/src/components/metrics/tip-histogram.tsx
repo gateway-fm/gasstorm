@@ -26,8 +26,8 @@ const TIP_COLORS = chartColors.tipGradient;
 export function TipHistogram() {
   const { tipHistogram, config, status } = useGoLoadTestStore();
 
-  // Only show for realistic mode
-  if (config?.pattern !== "realistic") {
+  // Only show for realistic and adaptive-realistic modes
+  if (config?.pattern !== "realistic" && config?.pattern !== "adaptive-realistic") {
     return null;
   }
 

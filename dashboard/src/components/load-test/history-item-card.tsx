@@ -32,10 +32,36 @@ import {
 } from "recharts";
 import type { TestResult, TimeSeriesPoint, TestRun } from "@/types/load-test";
 
+/**
+ * Apply a simple moving average to smooth spiky time series data.
+ * Uses a centered window to avoid shifting the data.
+ */
+function smoothTimeSeries(data: TimeSeriesPoint[], windowSize: number): TimeSeriesPoint[] {
+  if (data.length < windowSize) return data;
+
+  const half = Math.floor(windowSize / 2);
+  return data.map((point, i) => {
+    const start = Math.max(0, i - half);
+    const end = Math.min(data.length, i + half + 1);
+    const window = data.slice(start, end);
+
+    const avgTps = window.reduce((sum, p) => sum + (p.currentTps || 0), 0) / window.length;
+    const avgMgas = window.reduce((sum, p) => sum + (p.mgasPerSec || 0), 0) / window.length;
+
+    return {
+      ...point,
+      currentTps: avgTps,
+      mgasPerSec: avgMgas,
+    };
+  });
+}
+
 export interface HistoryItem extends TestResult {
   txLoggingEnabled?: boolean;
   customName?: string;
   isFavorite?: boolean;
+  /** True when test just completed but is still being saved to storage */
+  isSaving?: boolean;
 }
 
 interface HistoryItemCardProps {
@@ -99,11 +125,14 @@ export function HistoryItemCard({
   selectedForCompare = false,
   onToggleCompareSelect,
 }: HistoryItemCardProps) {
+  const isSaving = result.isSaving ?? false;
+
   return (
     <div
       className={cn(
-        "border rounded-lg p-3 hover:bg-accent/50 transition-colors",
-        selectedForCompare && "border-info bg-info/5"
+        "border rounded-lg p-3 transition-colors",
+        selectedForCompare && "border-info bg-info/5",
+        isSaving ? "opacity-70 animate-pulse" : "hover:bg-accent/50"
       )}
     >
       <div className="flex items-center justify-between">
@@ -186,6 +215,12 @@ export function HistoryItemCard({
           className="flex items-center gap-2 cursor-pointer"
           onClick={onToggleExpand}
         >
+          {isSaving && (
+            <Badge variant="secondary" className="font-mono text-xs bg-warning/20 text-warning animate-pulse">
+              <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+              Saving...
+            </Badge>
+          )}
           <Badge variant="outline" className="font-mono text-xs">
             {result.pattern || "unknown"}
           </Badge>
@@ -264,22 +299,27 @@ export function HistoryItemCard({
             <div className="mt-2">
               <div className="flex items-center gap-1 text-muted-foreground mb-2">
                 <LineChart className="h-3 w-3" />
-                <span>TPS Over Time</span>
+                <span>TPS & MGas/s Over Time</span>
               </div>
               <div className="h-32 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <RechartsLineChart
-                    data={timeSeries}
-                    margin={{ top: 5, right: 5, left: -20, bottom: 5 }}
+                    data={smoothTimeSeries(timeSeries, 5)}
+                    margin={{ top: 5, right: 35, left: -20, bottom: 5 }}
                   >
                     <XAxis
                       dataKey="timestampMs"
                       tickFormatter={(ms) => `${(ms / 1000).toFixed(0)}s`}
                       tick={{ fontSize: 10 }}
                     />
-                    <YAxis tick={{ fontSize: 10 }} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
                     <Tooltip
                       labelFormatter={(ms) => `${(Number(ms) / 1000).toFixed(1)}s`}
+                      formatter={(value, name) => [
+                        name === "MGas/s" ? Number(value).toFixed(1) : Number(value).toFixed(0),
+                        name,
+                      ]}
                       contentStyle={{
                         backgroundColor: "hsl(var(--background))",
                         border: "1px solid hsl(var(--border))",
@@ -287,18 +327,29 @@ export function HistoryItemCard({
                       }}
                     />
                     <ReferenceLine
+                      yAxisId="left"
                       y={timeSeries[0]?.targetTps || 0}
                       stroke="#666"
                       strokeDasharray="3 3"
                       label={{ value: "Target", fontSize: 10 }}
                     />
                     <Line
+                      yAxisId="left"
                       type="monotone"
                       dataKey="currentTps"
                       stroke="#3b82f6"
                       strokeWidth={1.5}
                       dot={false}
-                      name="Current TPS"
+                      name="TPS"
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="mgasPerSec"
+                      stroke="#22c55e"
+                      strokeWidth={1.5}
+                      dot={false}
+                      name="MGas/s"
                     />
                   </RechartsLineChart>
                 </ResponsiveContainer>

@@ -51,48 +51,12 @@ export function LoadTestConfig() {
         <CardTitle className="text-base font-semibold font-mono">Load Test Configuration</CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        {/* Transaction Type Selection - only show for non-realistic modes */}
-        {config?.pattern !== "realistic" && (
-          <div className="space-y-2">
-            <Label className="font-mono">Transaction Type</Label>
-            <Select
-              value={config?.transactionType ?? "eth-transfer"}
-              onValueChange={(v) => handleTxTypeChange(v as TransactionType)}
-              disabled={isDisabled}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select transaction type" />
-              </SelectTrigger>
-              <SelectContent>
-                {TRANSACTION_TYPES.map((type) => (
-                  <SelectItem key={type.id} value={type.id}>
-                    <div className="flex items-center justify-between w-full gap-4">
-                      <span>{type.label}</span>
-                      <span className="text-xs text-muted-foreground">
-                        ~{(type.gasEstimate / 1000).toFixed(0)}k gas
-                      </span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              {selectedType?.description}
-            </p>
-            {needsDeploy && (
-              <p className="text-xs text-amber-600">
-                Requires contract deployment (auto-deployed on first test)
-              </p>
-            )}
-          </div>
-        )}
-
         {/* Pattern Selection */}
         <Tabs
           value={config?.pattern ?? "constant"}
           onValueChange={(v) => handlePatternChange(v as LoadPattern)}
         >
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="constant" disabled={isDisabled}>
               Constant
             </TabsTrigger>
@@ -105,6 +69,9 @@ export function LoadTestConfig() {
             <TabsTrigger value="adaptive" disabled={isDisabled}>
               Adaptive
             </TabsTrigger>
+            <TabsTrigger value="adaptive-realistic" disabled={isDisabled}>
+              Adaptive Mix
+            </TabsTrigger>
             <TabsTrigger value="realistic" disabled={isDisabled}>
               Realistic
             </TabsTrigger>
@@ -113,6 +80,42 @@ export function LoadTestConfig() {
           <p className="text-xs text-muted-foreground mt-2">
             {getPatternDescription(config?.pattern ?? "constant")}
           </p>
+
+          {/* Transaction Type Selection - only show for non-realistic modes */}
+          {config?.pattern !== "realistic" && config?.pattern !== "adaptive-realistic" && (
+            <div className="space-y-2 mt-4">
+              <Label className="font-mono">Transaction Type</Label>
+              <Select
+                value={config?.transactionType ?? "eth-transfer"}
+                onValueChange={(v) => handleTxTypeChange(v as TransactionType)}
+                disabled={isDisabled}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select transaction type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TRANSACTION_TYPES.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      <div className="flex items-center justify-between w-full gap-4">
+                        <span>{type.label}</span>
+                        <span className="text-xs text-muted-foreground">
+                          ~{(type.gasEstimate / 1000).toFixed(0)}k gas
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {selectedType?.description}
+              </p>
+              {needsDeploy && (
+                <p className="text-xs text-amber-600">
+                  Requires contract deployment (auto-deployed on first test)
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Constant Pattern Config */}
           <TabsContent value="constant" className="mt-4 space-y-4">
@@ -256,6 +259,74 @@ export function LoadTestConfig() {
                 onBlur={(e) => setConfig({ adaptiveTargetPending: e.target.valueAsNumber || 1000 })}
                 disabled={isDisabled}
               />
+            </div>
+          </TabsContent>
+
+          {/* Adaptive Realistic Pattern Config */}
+          <TabsContent value="adaptive-realistic" className="mt-4 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="font-mono">Initial Rate (tx/s)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  key={`adaptrealinit-${config?.adaptiveInitialRate}`}
+                  defaultValue={config?.adaptiveInitialRate ?? 100}
+                  onBlur={(e) => setConfig({ adaptiveInitialRate: e.target.valueAsNumber || 100 })}
+                  disabled={isDisabled}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="font-mono">Rate Step (tx/s)</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  key={`adaptrealstep-${config?.adaptiveRateStep}`}
+                  defaultValue={config?.adaptiveRateStep ?? 100}
+                  onBlur={(e) => setConfig({ adaptiveRateStep: e.target.valueAsNumber || 100 })}
+                  disabled={isDisabled}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label className="font-mono">Target Pending TXs</Label>
+              <Input
+                type="number"
+                min={1}
+                key={`adaptrealpending-${config?.adaptiveTargetPending}`}
+                defaultValue={config?.adaptiveTargetPending ?? 1000}
+                onBlur={(e) => setConfig({ adaptiveTargetPending: e.target.valueAsNumber || 1000 })}
+                disabled={isDisabled}
+              />
+            </div>
+
+            {/* TX Type Mix Preview (read-only) */}
+            <div className="border-t pt-4 mt-4">
+              <Label className="text-xs text-muted-foreground mb-2 block">TX Type Mix (fixed defaults)</Label>
+              <div className="space-y-1">
+                {[
+                  { label: "ETH Transfer", value: 50 },
+                  { label: "ERC20 Transfer", value: 20 },
+                  { label: "Uniswap Swap", value: 15 },
+                  { label: "ERC20 Approve", value: 5 },
+                  { label: "Storage Write", value: 5 },
+                  { label: "Heavy Compute", value: 5 },
+                ].map(({ label, value }) => (
+                  <div key={label} className="flex items-center gap-2 text-xs">
+                    <span className="w-28 text-muted-foreground">{label}</span>
+                    <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-primary/60 rounded-full"
+                        style={{ width: `${value}%` }}
+                      />
+                    </div>
+                    <span className="w-8 text-right">{value}%</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Tips: exponential distribution (0-10 gwei)
+              </p>
             </div>
           </TabsContent>
 

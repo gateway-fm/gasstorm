@@ -66,6 +66,14 @@ export function generateLoadSchedule(config: LoadTestConfig): LoadScheduleEntry[
       schedule.push({ timestamp: 0, rate: targetTps });
       schedule.push({ timestamp: durationMs, rate: targetTps });
       break;
+
+    case "adaptive-realistic":
+      // Adaptive-realistic mode: adaptive rate with mixed tx types
+      // Actual rate is managed dynamically by the Go load generator
+      const adaptiveRealisticRate = config.adaptiveInitialRate ?? 100;
+      schedule.push({ timestamp: 0, rate: adaptiveRealisticRate });
+      schedule.push({ timestamp: durationMs, rate: adaptiveRealisticRate });
+      break;
   }
 
   return schedule.sort((a, b) => a.timestamp - b.timestamp);
@@ -103,6 +111,8 @@ export function getPatternDescription(pattern: LoadPattern): string {
       return "Adaptive rate that finds maximum throughput";
     case "realistic":
       return "Realistic mempool: many senders, variable tips, mixed tx types";
+    case "adaptive-realistic":
+      return "Adaptive rate with realistic tx mix (auto-adjusting throughput)";
   }
 }
 
@@ -119,5 +129,7 @@ export function getDefaultConfigForPattern(pattern: LoadPattern): Partial<LoadTe
       return { adaptiveInitialRate: 100, adaptiveTargetPending: 1000, adaptiveRateStep: 100, duration: 60 };
     case "realistic":
       return { duration: 120 }; // Realistic config handled separately via realisticConfig
+    case "adaptive-realistic":
+      return { adaptiveInitialRate: 100, adaptiveTargetPending: 1000, adaptiveRateStep: 100, duration: 60 };
   }
 }

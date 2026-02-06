@@ -64,6 +64,13 @@ function buildStartRequest(cfg: LoadTestConfig): StartTestRequest {
       request.realisticConfig = cfg.realisticConfig ?? DEFAULT_REALISTIC_CONFIG;
       request.numAccounts = request.realisticConfig.numAccounts;
       break;
+    case "adaptive-realistic":
+      // Adaptive-realistic uses adaptive rate control with default realistic TX types
+      request.adaptiveInitialRate = cfg.adaptiveInitialRate ?? DEFAULT_LOAD_TEST_CONFIG.adaptiveInitialRate;
+      request.adaptiveTargetPending = cfg.adaptiveTargetPending ?? DEFAULT_LOAD_TEST_CONFIG.adaptiveTargetPending;
+      request.adaptiveRateStep = cfg.adaptiveRateStep ?? DEFAULT_LOAD_TEST_CONFIG.adaptiveRateStep;
+      // Note: realisticConfig is NOT sent - Go uses sensible defaults internally
+      break;
   }
 
   return request;
@@ -84,6 +91,8 @@ function getInitialTargetTps(request: StartTestRequest): number {
       return request.adaptiveInitialRate ?? 10;
     case "realistic":
       return request.realisticConfig?.targetTps ?? 500;
+    case "adaptive-realistic":
+      return request.adaptiveInitialRate ?? 100;
     default:
       return 0;
   }
@@ -115,7 +124,17 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()((set, get) => {
         return;
       }
 
-      set({ isStarting: true });
+      // Reset display values immediately to avoid showing stale data from previous test
+      set({
+        isStarting: true,
+        currentRate: 0,
+        averageTps: 0,
+        peakTps: 0,
+        txSentCount: 0,
+        txConfirmedCount: 0,
+        txFailedCount: 0,
+        elapsedTime: 0,
+      });
       useMetricsStore.getState().reset();
 
       const request = buildStartRequest(state.config);
@@ -131,30 +150,15 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()((set, get) => {
           throw new Error(await response.text());
         }
 
+        // Reset ALL fields first, then set starting-specific values
         set({
+          ...getResetState(),
           status: "initializing",
           startTime: Date.now(),
-          elapsedTime: 0,
-          txSentCount: 0,
-          txConfirmedCount: 0,
-          txFailedCount: 0,
-          txDiscardedCount: 0,
-          currentRate: 0,
-          averageTps: 0,
           targetTps: getInitialTargetTps(request),
-          peakTps: 0,
           durationSec: request.durationSec,
-          error: null,
           isPolling: true,
-          isStarting: false,
-          initPhase: "",
           initProgress: "Starting initialization...",
-          accountsTotal: 0,
-          accountsGenerated: 0,
-          fundingTxsSent: 0,
-          fundingTxsTotal: 0,
-          contractsDeployed: 0,
-          contractsTotal: 0,
         });
 
         wsManager.connect();
