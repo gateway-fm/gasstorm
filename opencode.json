@@ -3,7 +3,7 @@
   "mcp": {
     "gasstorm": {
       "type": "local",
-      "command": ["go", "run", "./mcp"],
+      "command": ["./mcp/mcp"],
       "environment": {
         "BUILDER_URL": "http://localhost:13000",
         "LOADGEN_URL": "http://localhost:13001",
