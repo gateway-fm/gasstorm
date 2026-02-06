@@ -10,9 +10,6 @@
 *.dll
 *.so
 *.dylib
-block-builder/block-builder
-block-builder/block-builder-pure
-block-builder/block-builder.test
 *.test
 
 # Go workspace
@@ -91,9 +88,6 @@ output/
 
 # Runtime data (Metal mode, etc)
 data/
-
-# Test contracts at root
-Test.sol
 
 # One-off scripts and analysis docs
 screenshot*.js

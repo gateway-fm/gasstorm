@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gateway/sequencer-poc/zisk-prover/internal/prover"
-	"github.com/gateway/sequencer-poc/zisk-prover/internal/witness"
-	"github.com/gateway/sequencer-poc/zisk-prover/pkg/types"
+	"github.com/gateway-fm/gasstorm/zisk-prover/internal/prover"
+	"github.com/gateway-fm/gasstorm/zisk-prover/internal/witness"
+	"github.com/gateway-fm/gasstorm/zisk-prover/pkg/types"
 )
 
 const (

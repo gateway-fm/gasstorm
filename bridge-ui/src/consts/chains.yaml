@@ -1,4 +1,4 @@
-# Local development chains for Sequencer PoC
+# Local development chains for GasStorm
 # L1: Anvil (local Ethereum)
 # L2: op-reth (Optimism-style L2)
 ---

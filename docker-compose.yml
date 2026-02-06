@@ -2,7 +2,7 @@ services:
   # Layer 1 - Anvil (local Ethereum node)
   l1:
     image: ghcr.io/foundry-rs/foundry:latest
-    container_name: sequencer-poc-l1
+    container_name: gasstorm-l1
     entrypoint: ["anvil"]
     command: [
       "--host", "0.0.0.0",
@@ -25,7 +25,7 @@ services:
   # Layer 2 - op-reth with Engine API (profile: reth)
   l2-reth:
     image: ghcr.io/paradigmxyz/op-reth:v1.9.3
-    container_name: sequencer-poc-l2
+    container_name: gasstorm-l2
     profiles: ["reth"]
     depends_on:
       l1:
@@ -92,11 +92,15 @@ services:
     # Note: healthcheck disabled as curl/wget not available in op-reth image
     restart: unless-stopped
 
+  # ===========================================================================
+  # OVERHANGING: CDK-Erigon (alternative execution layer)
+  # ===========================================================================
+
   # Layer 2 - CDK-Erigon (alternative execution layer - sequencer mode)
   # When using cdk-erigon, the block-builder is NOT used - cdk-erigon is its own sequencer
   l2-cdk-erigon:
     image: hermeznetwork/cdk-erigon:20251127001542-3aa1157
-    container_name: sequencer-poc-cdk-erigon
+    container_name: gasstorm-cdk-erigon
     profiles: ["cdk-erigon"]
     depends_on:
       l1:
@@ -136,7 +140,7 @@ services:
     build:
       context: ./dashboard
       dockerfile: Dockerfile
-    container_name: sequencer-poc-dashboard
+    container_name: gasstorm-dashboard
     profiles: ["reth"]
     depends_on:
       - l1
@@ -153,7 +157,7 @@ services:
     build:
       context: ./dashboard
       dockerfile: Dockerfile
-    container_name: sequencer-poc-dashboard
+    container_name: gasstorm-dashboard
     profiles: ["cdk-erigon"]
     depends_on:
       - l1
@@ -167,7 +171,7 @@ services:
   # Override with BLOCKBUILDER_VERSION env var or docker-compose.override.yaml for local builds
   block-builder:
     image: gatewayfm/blockbuilder:${BLOCKBUILDER_VERSION:-latest}
-    container_name: sequencer-poc-builder
+    container_name: gasstorm-builder
     profiles: ["reth"]
     depends_on:
       - l2-reth
@@ -205,13 +209,17 @@ services:
       - "16060:6060"   # pprof for profiling
     restart: unless-stopped
 
+  # ===========================================================================
+  # OVERHANGING: ZisK Prover
+  # ===========================================================================
+
   # ZisK Prover Service - ZK validity proof generation
   # Used when PROVER=zisk, alternative to op-succinct
   zisk-prover:
     build:
       context: ./zisk-prover
       dockerfile: Dockerfile
-    container_name: sequencer-poc-prover
+    container_name: gasstorm-prover
     profiles: ["prover-zisk"]
     depends_on:
       - l2-reth
@@ -234,7 +242,7 @@ services:
   # Override with docker-compose.override.yaml for local builds
   load-generator:
     image: gatewayfm/loadgenerator:${LOADGENERATOR_VERSION:-latest}
-    container_name: sequencer-poc-loadgen
+    container_name: gasstorm-loadgen
     profiles: ["reth"]
     depends_on:
       - block-builder
@@ -258,7 +266,7 @@ services:
   # Sends transactions directly to cdk-erigon RPC (no block-builder)
   load-generator-cdk:
     image: gatewayfm/loadgenerator:${LOADGENERATOR_VERSION:-latest}
-    container_name: sequencer-poc-loadgen
+    container_name: gasstorm-loadgen
     profiles: ["cdk-erigon"]
     depends_on:
       - l2-cdk-erigon
@@ -276,13 +284,17 @@ services:
       - "13001:3001"   # REST API for load test control
     restart: unless-stopped
 
+  # ===========================================================================
+  # OVERHANGING: Hyperlane Bridge
+  # ===========================================================================
+
   # Hyperlane Init - Deploys Hyperlane contracts on startup
   # Automatically runs when bridge profile is enabled
   hyperlane-init:
     build:
       context: .
       dockerfile: ./hyperlane-init/Dockerfile
-    container_name: sequencer-poc-hyperlane-init
+    container_name: gasstorm-hyperlane-init
     profiles: ["bridge"]
     depends_on:
       l1:
@@ -304,7 +316,7 @@ services:
   # Automatically starts after hyperlane-init deploys contracts
   hyperlane-relayer:
     image: gcr.io/abacus-labs-dev/hyperlane-agent:agents-v1.3.0
-    container_name: sequencer-poc-relayer
+    container_name: gasstorm-relayer
     profiles: ["bridge"]
     depends_on:
       l1:
@@ -335,7 +347,7 @@ services:
       args:
         - NEXT_PUBLIC_WALLET_CONNECT_ID=${WALLET_CONNECT_ID:-00000000000000000000000000000000}
         - NEXT_PUBLIC_RPC_OVERRIDES={"l1local":{"http":"http://host.docker.internal:18545"},"l2local":{"http":"http://host.docker.internal:13000"}}
-    container_name: sequencer-poc-hyperlane-bridge-ui
+    container_name: gasstorm-hyperlane-bridge-ui
     profiles: ["bridge"]
     depends_on:
       hyperlane-init:
@@ -348,15 +360,17 @@ services:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
-  # =============================================================================
+  # ===========================================================================
+  # OVERHANGING: AggLayer & Provers
+  # ===========================================================================
+
   # AggLayer FEP Stack (profile: agglayer)
   # Images sourced from kurtosis-cdk constants.star (2025-01)
-  # =============================================================================
 
   # PostgreSQL for AggLayer services
   agglayer-db:
     image: postgres:17.6
-    container_name: sequencer-poc-postgres
+    container_name: gasstorm-postgres
     profiles: ["agglayer"]
     environment:
       - POSTGRES_USER=agglayer
@@ -378,7 +392,7 @@ services:
   # Run with: docker compose --profile agglayer-deploy up agglayer-contracts
   agglayer-contracts:
     image: europe-west2-docker.pkg.dev/prj-polygonlabs-devtools-dev/public/agglayer-contracts:v12.2.1
-    container_name: sequencer-poc-contracts
+    container_name: gasstorm-contracts
     profiles: ["agglayer-deploy"]
     depends_on:
       l1:
@@ -407,7 +421,7 @@ services:
   # Default prover, used when PROVER=sp1 or not set
   op-succinct:
     image: ghcr.io/agglayer/op-succinct/op-succinct-agglayer:v3.4.0-rc.1-agglayer
-    container_name: sequencer-poc-prover
+    container_name: gasstorm-prover
     profiles: ["prover-sp1"]
     depends_on:
       agglayer-db:
@@ -435,7 +449,7 @@ services:
   # Version: 0.4.4 with mock prover support
   agglayer:
     image: europe-west2-docker.pkg.dev/prj-polygonlabs-devtools-dev/public/agglayer:0.4.4-remove-agglayer-prover
-    container_name: sequencer-poc-agglayer
+    container_name: gasstorm-agglayer
     profiles: ["agglayer"]
     depends_on:
       l1:
@@ -467,7 +481,7 @@ services:
   # Version: 0.8.0-beta5
   aggkit:
     image: ghcr.io/agglayer/aggkit:0.8.0-beta5
-    container_name: sequencer-poc-aggkit
+    container_name: gasstorm-aggkit
     profiles: ["agglayer"]
     depends_on:
       agglayer:
@@ -487,7 +501,7 @@ services:
   # Bridge Service - Backend API for bridge operations
   bridge-service:
     image: ghcr.io/0xpolygon/zkevm-bridge-service:v0.6.4-RC1
-    container_name: sequencer-poc-bridge-svc
+    container_name: gasstorm-bridge-svc
     profiles: ["agglayer"]
     depends_on:
       agglayer-db:
@@ -512,7 +526,7 @@ services:
   # Bridge UI - Web interface for bridging assets
   bridge-ui:
     image: europe-west2-docker.pkg.dev/prj-polygonlabs-devtools-dev/public/zkevm-bridge-ui:0006445
-    container_name: sequencer-poc-bridge-ui
+    container_name: gasstorm-bridge-ui
     profiles: ["agglayer"]
     depends_on:
       bridge-service:
@@ -545,4 +559,4 @@ volumes:
 
 networks:
   default:
-    name: sequencer-poc
+    name: gasstorm

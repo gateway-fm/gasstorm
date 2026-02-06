@@ -1,6 +1,6 @@
 # System Architecture
 
-A high-level overview of the Sequencer PoC architecture, service boundaries, critical paths, and design patterns.
+A high-level overview of the GasStorm architecture, service boundaries, critical paths, and design patterns.
 
 ## Architecture Style
 
@@ -8,7 +8,7 @@ Modular monolith with capability-based execution layer abstraction. Services com
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           Sequencer PoC                                      │
+│                           GasStorm                                      │
 │  Preconfirmation sequencer proof-of-concept with sub-second block times      │
 └─────────────────────────────────────────────────────────────────────────────┘
                                       │

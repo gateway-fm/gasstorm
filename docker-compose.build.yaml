@@ -6,7 +6,7 @@
 services:
   block-builder:
     build:
-      context: ../blockbuilder-standalone
+      context: ../blockbuilder
       dockerfile: Dockerfile
 
   load-generator:

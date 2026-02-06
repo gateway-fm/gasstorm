@@ -1,7 +1,7 @@
 # Flashblocks Analysis & Block Builder Comparison
 
 **Date**: 2025-01-06
-**Purpose**: Evaluate Base's Flashblocks approach and identify learnings for our OP Stack sequencer POC
+**Purpose**: Evaluate Base's Flashblocks approach and identify learnings for our OP Stack sequencer (GasStorm)
 
 ---
 

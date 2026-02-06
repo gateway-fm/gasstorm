@@ -44,9 +44,9 @@ get_sender_address() {
 # Get warp route contract addresses from deployment artifacts
 get_warp_addresses() {
     # First priority: Check Docker container for addresses (from hyperlane-init)
-    if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "sequencer-poc-relayer"; then
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "gasstorm-relayer"; then
         local docker_addrs
-        docker_addrs=$(docker exec sequencer-poc-relayer cat /config/addresses.json 2>/dev/null || true)
+        docker_addrs=$(docker exec gasstorm-relayer cat /config/addresses.json 2>/dev/null || true)
         if [ -n "$docker_addrs" ]; then
             L1_WARP_ADDRESS=$(echo "$docker_addrs" | jq -r '.l1.warpRoute // empty' 2>/dev/null || true)
             L2_WARP_ADDRESS=$(echo "$docker_addrs" | jq -r '.l2.warpRoute // empty' 2>/dev/null || true)

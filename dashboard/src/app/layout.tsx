@@ -18,7 +18,7 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Gateway R&D Test Rig",
-  description: "Reth Sequencer PoC | Engine API Block Builder | Load Testing",
+  description: "GasStorm | Engine API Block Builder | Load Testing",
 };
 
 export default function RootLayout({

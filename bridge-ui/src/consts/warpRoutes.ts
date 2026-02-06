@@ -1,6 +1,6 @@
 import { TokenStandard, WarpCoreConfig } from '@hyperlane-xyz/sdk';
 
-// Warp Route configuration for Sequencer PoC local chains
+// Warp Route configuration for GasStorm local chains
 // L1 (Anvil) <-> L2 (op-reth) native ETH bridging
 //
 // NOTE: These are DEFAULT addresses used as fallback when dynamic loading fails.

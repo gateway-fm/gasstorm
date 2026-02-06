@@ -1,4 +1,16 @@
-# Sequencer PoC - TODO
+# GasStorm - TODO
+
+## Current Sprint
+
+### UI Test Stop Behavior (Bug Fix)
+- [ ] Dashboard continues showing live data after test stops - should freeze/stop streaming
+- [ ] Handle pending transactions when test run stops (show verification phase clearly)
+- [ ] Files: `dashboard/src/stores/go-load-test-store.ts`, `dashboard/src/app/load-test/page.tsx`
+
+### Split load-generator main.go (3844 lines -> separate packages) - DEFERRED
+60+ functions, would require significant effort to extract cleanly.
+
+---
 
 ## Pending
 

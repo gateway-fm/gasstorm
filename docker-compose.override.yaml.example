@@ -15,7 +15,7 @@ services:
   # Example: override block-builder with custom build args
   # block-builder:
   #   build:
-  #     context: ../blockbuilder-standalone
+  #     context: ../blockbuilder
   #     dockerfile: Dockerfile
   #     args:
   #       - BUILD_VERSION=dev

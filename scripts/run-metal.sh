@@ -173,7 +173,7 @@ kill_port() {
 main() {
     echo ""
     echo "=============================================="
-    echo "  Sequencer PoC - Native Metal Mode"
+    echo "  GasStorm - Native Metal Mode"
     echo "=============================================="
     echo ""
 
@@ -245,7 +245,7 @@ main() {
     log_info "Starting block-builder..."
 
     (
-        cd "$PROJECT_DIR/block-builder"
+        cd "$PROJECT_DIR/../blockbuilder"
         ENGINE_RPC_URL="http://localhost:$RETH_ENGINE_PORT" \
         L2_RPC_URL="http://localhost:$RETH_HTTP_PORT" \
         JWT_SECRET_PATH="$PROJECT_DIR/genesis/jwt.hex" \

@@ -1,6 +1,6 @@
 # Configuration
 
-Complete configuration reference for the sequencer PoC.
+Complete configuration reference for GasStorm.
 
 ## Environment Variables
 

@@ -1,4 +1,4 @@
-# Hyperlane Chain Metadata - L2 (Sequencer PoC)
+# Hyperlane Chain Metadata - L2 (GasStorm)
 # This file defines the L2 chain for Hyperlane CLI
 # Uses block-builder (port 13000) for transaction submission
 

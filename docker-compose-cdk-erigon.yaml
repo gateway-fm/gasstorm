@@ -13,7 +13,7 @@ services:
   # Layer 2 - CDK-Erigon (sequencer mode)
   l2-cdk-erigon:
     image: hermeznetwork/cdk-erigon:20251127001542-3aa1157
-    container_name: sequencer-poc-l2
+    container_name: gasstorm-l2
     depends_on:
       l1:
         condition: service_healthy
@@ -52,7 +52,7 @@ services:
   # Image from DockerHub: gatewayfm/loadgenerator
   load-generator:
     image: gatewayfm/loadgenerator:${LOADGENERATOR_VERSION:-latest}
-    container_name: sequencer-poc-loadgen
+    container_name: gasstorm-loadgen
     depends_on:
       - l2-cdk-erigon
     environment:
@@ -74,7 +74,7 @@ services:
     build:
       context: ./dashboard
       dockerfile: Dockerfile
-    container_name: sequencer-poc-dashboard
+    container_name: gasstorm-dashboard
     depends_on:
       - l1
       - l2-cdk-erigon

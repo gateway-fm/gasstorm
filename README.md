@@ -1,6 +1,10 @@
-# Sequencer PoC
+# GasStorm
 
-Preconfirmation sequencer proof-of-concept with sub-second block times.
+Blockchain sequencer load testing framework with sub-second block times.
+
+## What is GasStorm?
+
+GasStorm is a local-first blockchain sequencer testbed that orchestrates an op-reth node, an external block builder, and a high-throughput load generator via Docker Compose. It provides a dashboard UI for real-time metrics (MGas/s, TPS, latency), supports multiple execution layers and ZK prover backends, and is designed to validate sequencer performance at up to 25,000 tx/s. Use it to benchmark block production, test transaction ordering strategies, and experiment with preconfirmations.
 
 ## Quick Start
 
@@ -12,7 +16,7 @@ make run-reth
 make run-cdk-erigon
 
 # Fast blocks with preconfirmations
-make run-reth BLOCK_TIME_MS=250 ENABLE_PRECONFIRMATIONS=true
+BLOCK_TIME_MS=250 ENABLE_PRECONFIRMATIONS=true make run-reth
 
 # Open dashboard
 open http://localhost:18000/load-test/
@@ -28,7 +32,7 @@ open http://localhost:18000/load-test/
                              │ HTTP: eth_sendRawTransaction
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         Block Builder                               │
+│                    Block Builder (Docker image)                     │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────────┐ │
 │  │ TX Queue │→ │ TX Pool  │→ │ Filter   │→ │ Engine API (op-reth) │ │
 │  │ (100k)   │  │ (sharded)│  │ (nonces) │  │ FCU + GetPayload     │ │
@@ -44,16 +48,6 @@ open http://localhost:18000/load-test/
 │              (execution layer, block production)                    │
 └─────────────────────────────────────────────────────────────────────┘
 ```
-
-## Execution Layers
-
-| Mode | Block Builder | Preconfirmations | TX Port |
-|------|---------------|------------------|---------|
-| reth (default) | External | Yes | 13000 |
-| cdk-erigon | None (direct) | No | 18545 |
-| gravity-reth | None (direct) | No | 8545 |
-
-See [Execution Layers](./docs/execution-layers.md) for mode comparison and how to add new layers.
 
 ## Services
 
@@ -88,8 +82,6 @@ open http://localhost:18000/load-test/
 
 ## Configuration
 
-See [Configuration](./docs/configuration.md) for complete env var and Makefile reference.
-
 ```bash
 # Performance tuning
 BLOCK_TIME_MS=250       # Block interval (default: 1000ms)
@@ -100,26 +92,19 @@ TX_ORDERING=tip_desc    # fifo | tip_desc | tip_asc
 # Execution layer selection
 EXECUTION_LAYER=reth         # Default
 EXECUTION_LAYER=cdk-erigon   # Standalone sequencer
-
-# Prover selection (AggLayer)
-PROVER=sp1   # Default
-PROVER=zisk  # ZisK zkVM
 ```
+
+See [Configuration Reference](./docs/configuration.md) for the complete list of environment variables, Makefile targets, and Docker Compose profiles.
 
 ## Development
 
 ```bash
-# Run all tests
-make test
-
-# Run specific tests
-make test-block-builder
-make test-load-generator
-make test-dashboard
-
-# Development mode (local load-generator)
+# Development mode (local load-generator + dashboard with HMR)
 make dev              # reth mode
 make dev-cdk-erigon   # cdk-erigon mode
+
+# Run tests
+make test
 
 # View logs
 make logs
@@ -128,13 +113,23 @@ make logs
 make stop
 ```
 
+## Components
+
+| Component | Repository | Description |
+|-----------|-----------|-------------|
+| block-builder | [gateway-fm/blockbuilder](https://github.com/gateway-fm/blockbuilder) | Transaction pool, nonce management, Engine API block production |
+| load-generator | [gateway-fm/loadgenerator](https://github.com/gateway-fm/loadgenerator) | High-throughput TX sender, multiple TX types, REST API |
+| dashboard | `./dashboard` | Next.js UI for load test control and metrics |
+
 ## Documentation
 
 | Document | Description |
 |----------|-------------|
-| [Architecture](./docs/architecture.md) | Deep dive: nonce management, transaction lifecycle |
-| [Configuration](./docs/configuration.md) | Env vars, Makefile targets, docker profiles |
-| [Execution Layers](./docs/execution-layers.md) | reth/cdk-erigon/gravity-reth comparison |
+| [System Architecture](./docs/system-architecture.md) | Service map, critical paths, design patterns, nonce management |
+| [Configuration](./docs/configuration.md) | Env vars, Makefile targets, Docker Compose profiles |
+| [Execution Layers](./docs/execution-layers.md) | reth / cdk-erigon / gravity-reth comparison |
+| [Troubleshooting](./docs/TROUBLESHOOTING.md) | Common issues and solutions |
+| [Contributing](./CONTRIBUTING.md) | Development setup, testing, PR process |
 | [Block Builder](https://github.com/gateway-fm/blockbuilder) | Pipeline, nonce cache, Engine API (external repo) |
 | [Load Generator](https://github.com/gateway-fm/loadgenerator) | TX types, patterns, API reference (external repo) |
 | [Dashboard](./dashboard/README.md) | Pages, metrics, TypeScript types |
@@ -145,21 +140,6 @@ make stop
 - **200+ TPS**: Nonce batching becomes bottleneck
 - **Block rate**: ~4 blocks/sec at 250ms block time
 
-See [Architecture](./docs/architecture.md#performance-characteristics) for benchmarks and bottlenecks.
-
 ## Troubleshooting
 
-```bash
-# Invalid JWT errors
-openssl rand -hex 32 > config/jwt.hex
-docker compose restart l2-reth block-builder
-
-# No blocks being produced
-docker compose logs block-builder
-
-# Pipeline stuck
-make stop && make run-reth
-
-# Low throughput
-docker compose logs block-builder | grep -i latency
-```
+See [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md) for common issues including pipeline stuck, invalid JWT, low throughput, and Engine API SYNCING recovery.

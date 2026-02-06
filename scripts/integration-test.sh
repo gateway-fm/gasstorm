@@ -1,5 +1,5 @@
 #!/bin/bash
-# Integration test script for sequencer-poc
+# Integration test script for gasstorm
 # Spins up Docker Compose stack, runs E2E tests, tears down
 
 set -e
@@ -116,7 +116,7 @@ main() {
     local test_type="${1:-all}"
     local skip_startup="${2:-false}"
 
-    log_info "=== Sequencer PoC Integration Tests ==="
+    log_info "=== GasStorm Integration Tests ==="
     log_info "Test type: $test_type"
 
     # Trap to ensure cleanup on exit

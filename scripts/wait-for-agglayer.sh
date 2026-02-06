@@ -49,7 +49,7 @@ wait_for_postgres() {
     log_info "Waiting for PostgreSQL..."
 
     while [ $retries -lt $MAX_RETRIES ]; do
-        if docker exec sequencer-poc-postgres pg_isready -U op-succinct > /dev/null 2>&1; then
+        if docker exec gasstorm-postgres pg_isready -U op-succinct > /dev/null 2>&1; then
             log_ok "PostgreSQL is ready"
             return 0
         fi

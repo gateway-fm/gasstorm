@@ -7,7 +7,7 @@ set -e
 OUTPUT_DIR="${1:-./sbom}"
 mkdir -p "$OUTPUT_DIR"
 
-echo "Generating SBOM for sequencer-poc components..."
+echo "Generating SBOM for gasstorm components..."
 echo "Output directory: $OUTPUT_DIR"
 echo ""
 
@@ -15,9 +15,13 @@ echo ""
 if command -v syft &> /dev/null; then
     echo "Using syft for comprehensive SBOM generation..."
 
-    # Generate SBOM for block-builder
-    echo "  - block-builder..."
-    syft dir:./block-builder -o cyclonedx-json > "$OUTPUT_DIR/block-builder.sbom.json"
+    # Generate SBOM for block-builder (external repo)
+    if [ -d "../blockbuilder" ]; then
+        echo "  - block-builder..."
+        syft dir:../blockbuilder -o cyclonedx-json > "$OUTPUT_DIR/block-builder.sbom.json"
+    else
+        echo "  - block-builder (skipped: ../blockbuilder not found)"
+    fi
 
     # Generate SBOM for load-generator
     echo "  - load-generator..."
@@ -115,7 +119,11 @@ else
         fi
     }
 
-    generate_go_sbom "block-builder" "./block-builder"
+    if [ -d "../blockbuilder" ]; then
+        generate_go_sbom "block-builder" "../blockbuilder"
+    else
+        echo "  - block-builder (skipped: ../blockbuilder not found)"
+    fi
     generate_go_sbom "load-generator" "../loadgenerator"
     generate_go_sbom "zisk-prover" "./zisk-prover"
     generate_npm_sbom "dashboard" "./dashboard"

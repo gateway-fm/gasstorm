@@ -68,7 +68,7 @@ log_step "Starting base infrastructure (L1, L2, block-builder)..."
 docker compose up -d l1 l2-reth block-builder dashboard
 
 log_info "Waiting for L1 to be healthy..."
-until docker exec sequencer-poc-l1 cast chain-id --rpc-url http://localhost:8545 > /dev/null 2>&1; do
+until docker exec gasstorm-l1 cast chain-id --rpc-url http://localhost:8545 > /dev/null 2>&1; do
     sleep 2
 done
 log_ok "L1 is ready"
@@ -135,7 +135,7 @@ log_info "Waiting for services to initialize..."
 
 # Wait for PostgreSQL
 log_info "Waiting for PostgreSQL..."
-until docker exec sequencer-poc-postgres pg_isready -U agglayer > /dev/null 2>&1; do
+until docker exec gasstorm-postgres pg_isready -U agglayer > /dev/null 2>&1; do
     sleep 2
 done
 log_ok "PostgreSQL is ready"

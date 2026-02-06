@@ -13,7 +13,7 @@ services:
   # Layer 2 - op-reth with Engine API
   l2-reth:
     image: ghcr.io/paradigmxyz/op-reth:v1.9.3
-    container_name: sequencer-poc-l2
+    container_name: gasstorm-l2
     depends_on:
       l1:
         condition: service_healthy
@@ -81,7 +81,7 @@ services:
   # Override with BLOCKBUILDER_VERSION env var or docker-compose.override.yaml for local builds
   block-builder:
     image: gatewayfm/blockbuilder:${BLOCKBUILDER_VERSION:-latest}
-    container_name: sequencer-poc-builder
+    container_name: gasstorm-builder
     depends_on:
       - l2-reth
     environment:
@@ -122,7 +122,7 @@ services:
   # Image from DockerHub: gatewayfm/loadgenerator
   load-generator:
     image: gatewayfm/loadgenerator:${LOADGENERATOR_VERSION:-latest}
-    container_name: sequencer-poc-loadgen
+    container_name: gasstorm-loadgen
     depends_on:
       - block-builder
       - l2-reth
@@ -146,7 +146,7 @@ services:
     build:
       context: ./dashboard
       dockerfile: Dockerfile
-    container_name: sequencer-poc-dashboard
+    container_name: gasstorm-dashboard
     depends_on:
       - l1
       - l2-reth

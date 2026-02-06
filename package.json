@@ -1,5 +1,5 @@
 {
-  "name": "sequencer-poc",
+  "name": "gasstorm",
   "version": "1.0.0",
   "description": "A proof-of-concept sequencer using **reth** (op-reth) with the Engine API pattern, similar to how OP Stack works.",
   "main": "index.js",

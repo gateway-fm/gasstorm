@@ -1,7 +1,7 @@
 # Hyperlane Bridge Integration
 
 **Date**: 2026-01-21
-**Purpose**: Documentation for Hyperlane interchain messaging and ETH bridging in the sequencer PoC
+**Purpose**: Documentation for Hyperlane interchain messaging and ETH bridging in GasStorm
 
 ---
 

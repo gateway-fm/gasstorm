@@ -4,13 +4,16 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 L1_RPC="${L1_RPC:-http://localhost:18545}"
 L2_RPC="${L2_RPC:-http://localhost:13000}"
 
 # Get addresses from Docker container
 get_addresses() {
-    if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "sequencer-poc-relayer"; then
-        docker exec sequencer-poc-relayer cat /config/addresses.json 2>/dev/null
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "gasstorm-relayer"; then
+        docker exec gasstorm-relayer cat /config/addresses.json 2>/dev/null
     fi
 }
 
@@ -63,13 +66,13 @@ echo "L2 Warp balance: $(cast from-wei $L2_WARP_BAL) ETH"
 echo ""
 
 echo "=== Relayer Status ==="
-RELAYER_STATUS=$(docker compose -f /Users/max/claude/gateway/rnd/sequencer-poc/docker-compose.yml ps hyperlane-relayer --format '{{.State}}' 2>/dev/null || echo "unknown")
+RELAYER_STATUS=$(docker compose -f "$PROJECT_DIR/docker-compose.yml" ps hyperlane-relayer --format '{{.State}}' 2>/dev/null || echo "unknown")
 echo "Relayer container: $RELAYER_STATUS"
 
 # Check for recent errors
 echo ""
 echo "=== Recent Relayer Errors (last 50 lines) ==="
-docker compose -f /Users/max/claude/gateway/rnd/sequencer-poc/docker-compose.yml logs hyperlane-relayer --tail 50 2>&1 | grep -i -E "error|warn|fail" | tail -10 || echo "No recent errors"
+docker compose -f "$PROJECT_DIR/docker-compose.yml" logs hyperlane-relayer --tail 50 2>&1 | grep -i -E "error|warn|fail" | tail -10 || echo "No recent errors"
 
 echo ""
 echo "=== Recent Dispatch Events (L1 → L2) ==="

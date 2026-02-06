@@ -32,22 +32,12 @@ else
   PROVER_PROFILE := prover-sp1
 endif
 
-# =============================================================================
-# Polycli Configuration
-# =============================================================================
-POLYCLI_RPC ?= http://localhost:13000
-POLYCLI_TPS ?= 100
-POLYCLI_DURATION ?= 30
-POLYCLI_CONCURRENCY ?= 10
-POLYCLI_ACCOUNTS ?= 10
-# WARNING: This is a well-known Anvil test key (Account #0) - DO NOT use with real funds
-# Override via environment variable or .env file for different keys
-POLYCLI_PRIVATE_KEY ?= 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-POLYCLI_GAS_MULTIPLIER ?= 1.5
-POLYCLI_FUND_AMOUNT ?= 10000000000000000000
+# #############################################################################
+# CORE: Gas Storm (reth mode)
+# #############################################################################
 
 # =============================================================================
-# Default Configuration (uses .env or inline defaults)
+# Run Targets
 # =============================================================================
 
 # Start the system (pulls images) - uses .env configuration and EXECUTION_LAYER
@@ -56,44 +46,22 @@ POLYCLI_FUND_AMOUNT ?= 10000000000000000000
 run:
 	docker compose --profile $(COMPOSE_PROFILE) up -d
 
-# Build from local sibling repos (../blockbuilder-standalone, ../loadgenerator) and run
+# Build from local sibling repos (../blockbuilder, ../loadgenerator) and run
 run-build:
 	docker compose -f docker-compose.yml -f docker-compose.build.yaml --profile $(COMPOSE_PROFILE) up --build -d
-
-# Start with Hyperlane bridge enabled
-run-with-bridge:
-	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
-
-# Alias for run-with-bridge (includes Hyperlane)
-run-hyperlane:
-	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
 
 # Start with op-reth (block-builder + Engine API)
 run-reth:
 	docker compose --profile reth up --build -d
 
-# Start with cdk-erigon (standalone sequencer)
-run-cdk-erigon:
-	docker compose --profile cdk-erigon up --build -d
-
-# Start with gravity-reth (high-performance parallel EVM, standalone sequencer)
-# First build takes 15-25 minutes (Rust compilation from source)
-run-gravity-reth:
-	docker compose -f docker-compose-base.yaml -f docker-compose-gravity-reth.yaml up --build -d
+# Start with logs attached
+run-attached:
+	docker compose --profile $(COMPOSE_PROFILE) up --build
 
 # Start in native "Metal" mode (no Docker, maximum performance)
 # Requires: op-reth, go, node installed locally
 run-metal:
 	./scripts/run-metal.sh
-
-# Clean Metal mode data directory
-clean-metal:
-	rm -rf ./data/metal
-	@echo "Metal mode data cleaned"
-
-# Start with logs attached
-run-attached:
-	docker compose --profile $(COMPOSE_PROFILE) up --build
 
 # =============================================================================
 # Performance Profiles (uses current EXECUTION_LAYER)
@@ -137,6 +105,10 @@ run-flashblocks:
 	ENABLE_PRECONFIRMATIONS=true \
 	docker compose --profile $(COMPOSE_PROFILE) up --build -d
 
+# =============================================================================
+# Lifecycle (stop, restart, logs, status, clean, build)
+# =============================================================================
+
 # Stop all services (stops all profiles)
 stop:
 	docker compose --profile reth --profile cdk-erigon --profile bridge down 2>/dev/null || true
@@ -164,6 +136,11 @@ clean:
 	docker compose --profile reth --profile cdk-erigon down -v 2>/dev/null || true
 	docker compose -f docker-compose-base.yaml -f docker-compose-gravity-reth.yaml down -v 2>/dev/null || true
 	docker system prune -f
+
+# Clean Metal mode data directory
+clean-metal:
+	rm -rf ./data/metal
+	@echo "Metal mode data cleaned"
 
 # Build without starting
 build:
@@ -245,18 +222,201 @@ test-tx:
 balance:
 	cast balance 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 --rpc-url http://localhost:13000
 
-# Start with AggLayer profile (uses PROVER env var: sp1 or zisk)
-run-agglayer:
-	@echo "Starting AggLayer with $(PROVER) prover..."
-	docker compose --profile reth --profile agglayer --profile $(PROVER_PROFILE) up --build -d
+# =============================================================================
+# Local Development (HMR)
+# =============================================================================
 
-# Stop AggLayer
-stop-agglayer:
-	docker compose --profile agglayer --profile prover-sp1 --profile prover-zisk down
+# Start just the blockchain infrastructure in Docker (L1 + L2 + block-builder)
+dev-infra:
+	docker compose --profile reth up -d l1 l2-reth block-builder
+	@echo "Waiting for L1, L2, and block-builder to be ready..."
+	@sleep 5
+	@echo "Infrastructure ready. L1: localhost:18545, L2 (via block-builder): localhost:13000"
+
+# Run load-generator locally (requires dev-infra and sibling loadgenerator repo)
+dev-loadgen:
+	cd ../loadgenerator && \
+	BUILDER_RPC_URL=http://localhost:13000 \
+	L2_RPC_URL=http://localhost:13000 \
+	PRECONF_WS_URL=ws://localhost:13002/ws/preconfirmations \
+	LISTEN_ADDR=:13001 \
+	DATABASE_PATH=./loadgen-dev.db \
+	go run ./cmd/loadgen
+
+# Run dashboard with HMR (requires dev-loadgen for API calls)
+dev-dashboard:
+	cd dashboard && npm run dev
+
+# Stop dev infrastructure
+dev-stop:
+	docker compose --profile reth --profile cdk-erigon stop l1 l2-reth l2-cdk-erigon block-builder 2>/dev/null || true
+	@echo "Dev infrastructure stopped"
+
+# Full local dev: run load-generator and dashboard locally, infrastructure in Docker
+# Requires sibling loadgenerator repo at ../loadgenerator
+dev:
+	@echo "=== Starting Local Development Mode ==="
+	@echo "Killing any processes on ports 3000, 13001..."
+	@-lsof -ti :3000 | xargs kill -9 2>/dev/null || true
+	@-lsof -ti :13001 | xargs kill -9 2>/dev/null || true
+	@if [ -f .env ]; then echo "Loading .env file..."; set -a; . ./.env; set +a; fi
+	@docker compose --profile reth up -d l1 l2-reth block-builder
+	@echo "Waiting for L1/L2/block-builder..."
+	@sleep 5
+	@echo "Starting services... (Ctrl+C to stop all)"
+	@bash -c '\
+		if [ -f .env ]; then set -a; . ./.env; set +a; fi; \
+		cleanup() { \
+			echo ""; \
+			echo "Shutting down..."; \
+			kill $$LOADGEN_PID $$DASHBOARD_PID 2>/dev/null; \
+			wait $$LOADGEN_PID $$DASHBOARD_PID 2>/dev/null; \
+			docker compose --profile reth stop l1 l2-reth block-builder; \
+			echo "Done."; \
+			exit 0; \
+		}; \
+		trap cleanup INT TERM; \
+		\
+		( cd ../loadgenerator && \
+		  BUILDER_RPC_URL=http://localhost:13000 \
+		  L2_RPC_URL=http://localhost:18546 \
+		  PRECONF_WS_URL=ws://localhost:13002/ws/preconfirmations \
+		  LISTEN_ADDR=:13001 \
+		  DATABASE_PATH=./loadgen-dev.db \
+		  go run ./cmd/loadgen 2>&1 | sed "s/^/[loadgen] /" ) & \
+		LOADGEN_PID=$$!; \
+		sleep 1; \
+		\
+		( cd dashboard && npm run dev 2>&1 | sed "s/^/[dashboard] /" ) & \
+		DASHBOARD_PID=$$!; \
+		\
+		echo ""; \
+		echo "=== All services running ==="; \
+		echo "  Dashboard:      http://localhost:3000"; \
+		echo "  Block Builder:  http://localhost:13000 (Docker)"; \
+		echo "  Load Generator: http://localhost:13001"; \
+		echo ""; \
+		echo "Press Ctrl+C to stop all services"; \
+		echo ""; \
+		wait \
+	'
 
 # =============================================================================
-# Hyperlane Bridge
+# External Images
 # =============================================================================
+
+# Pull latest block-builder image from DockerHub
+pull-blockbuilder:
+	docker pull gatewayfm/blockbuilder:latest
+	@echo "Pulled gatewayfm/blockbuilder:latest"
+
+# Pull latest load-generator image from DockerHub
+pull-loadgenerator:
+	docker pull gatewayfm/loadgenerator:latest
+	@echo "Pulled gatewayfm/loadgenerator:latest"
+
+# =============================================================================
+# SBOM Generation
+# =============================================================================
+
+# Generate Software Bill of Materials for all components
+sbom:
+	@./scripts/generate-sbom.sh ./sbom
+
+# SBOM help
+sbom-help:
+	@echo "SBOM Generation:"
+	@echo "  make sbom               - Generate SBOM for all components"
+	@echo ""
+	@echo "Output: ./sbom/*.sbom.json (CycloneDX format)"
+	@echo ""
+	@echo "Components covered:"
+	@echo "  - block-builder (Go)"
+	@echo "  - load-generator (Go)"
+	@echo "  - zisk-prover (Go)"
+	@echo "  - dashboard (Node.js)"
+	@echo "  - bridge-ui (Node.js)"
+	@echo ""
+	@echo "For comprehensive SBOM with vulnerability data, install syft:"
+	@echo "  brew install syft (macOS)"
+	@echo "  https://github.com/anchore/syft (other platforms)"
+
+# #############################################################################
+# OVERHANGING: Other Execution Layers (cdk-erigon, gravity-reth)
+# #############################################################################
+
+# Start with cdk-erigon (standalone sequencer)
+run-cdk-erigon:
+	docker compose --profile cdk-erigon up --build -d
+
+# Start with gravity-reth (high-performance parallel EVM, standalone sequencer)
+# First build takes 15-25 minutes (Rust compilation from source)
+run-gravity-reth:
+	docker compose -f docker-compose-base.yaml -f docker-compose-gravity-reth.yaml up --build -d
+
+# CDK-Erigon dev mode: Start cdk-erigon in Docker, run load-generator and dashboard locally
+# Requires sibling loadgenerator repo at ../loadgenerator
+dev-cdk-erigon:
+	@echo "=== Starting CDK-Erigon Development Mode ==="
+	@echo "Killing any processes on ports 3000, 13001..."
+	@-lsof -ti :3000 | xargs kill -9 2>/dev/null || true
+	@-lsof -ti :13001 | xargs kill -9 2>/dev/null || true
+	@docker compose --profile cdk-erigon up -d l1 l2-cdk-erigon
+	@echo "Waiting for L1 and CDK-Erigon to be ready..."
+	@sleep 5
+	@echo "Starting load-generator and dashboard locally... (Ctrl+C to stop)"
+	@bash -c '\
+		cleanup() { \
+			echo ""; \
+			echo "Shutting down..."; \
+			kill $$LOADGEN_PID $$DASHBOARD_PID 2>/dev/null; \
+			wait $$LOADGEN_PID $$DASHBOARD_PID 2>/dev/null; \
+			docker compose --profile cdk-erigon stop l1 l2-cdk-erigon; \
+			echo "Done."; \
+			exit 0; \
+		}; \
+		trap cleanup INT TERM; \
+		\
+		( cd ../loadgenerator && \
+		  EXECUTION_LAYER=cdk-erigon \
+		  BUILDER_RPC_URL=http://localhost:18546 \
+		  L2_RPC_URL=http://localhost:18546 \
+		  L2_WS_URL=ws://localhost:18547 \
+		  PRECONF_WS_URL= \
+		  LISTEN_ADDR=:13001 \
+		  DATABASE_PATH=./loadgen-dev.db \
+		  go run ./cmd/loadgen 2>&1 | sed "s/^/[loadgen] /" ) & \
+		LOADGEN_PID=$$!; \
+		sleep 1; \
+		\
+		( cd dashboard && npm run dev 2>&1 | sed "s/^/[dashboard] /" ) & \
+		DASHBOARD_PID=$$!; \
+		\
+		echo ""; \
+		echo "=== CDK-Erigon mode running ==="; \
+		echo "  Dashboard:      http://localhost:3000"; \
+		echo "  CDK-Erigon RPC: http://localhost:18546"; \
+		echo "  Load Generator: http://localhost:13001"; \
+		echo ""; \
+		echo "Note: No block-builder in cdk-erigon mode (cdk-erigon is its own sequencer)"; \
+		echo "Note: No preconfirmations available in cdk-erigon mode"; \
+		echo ""; \
+		echo "Press Ctrl+C to stop all services"; \
+		echo ""; \
+		wait \
+	'
+
+# Start with Hyperlane bridge enabled
+run-with-bridge:
+	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
+
+# Alias for run-with-bridge (includes Hyperlane)
+run-hyperlane:
+	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
+
+# #############################################################################
+# OVERHANGING: Hyperlane Bridge
+# #############################################################################
 
 # Deploy Hyperlane core and warp route contracts
 bridge-deploy:
@@ -323,9 +483,80 @@ bridge-help:
 	@echo "Quick Start:"
 	@echo "  make run-with-bridge      # Starts everything automatically"
 
+# #############################################################################
+# OVERHANGING: AggLayer & Provers
+# #############################################################################
+
+# Start with AggLayer profile (uses PROVER env var: sp1 or zisk)
+run-agglayer:
+	@echo "Starting AggLayer with $(PROVER) prover..."
+	docker compose --profile reth --profile agglayer --profile $(PROVER_PROFILE) up --build -d
+
+# Stop AggLayer
+stop-agglayer:
+	docker compose --profile agglayer --profile prover-sp1 --profile prover-zisk down
+
+# Run with ZisK prover
+run-zisk:
+	PROVER=zisk $(MAKE) run-agglayer
+
+# Test ZisK prover
+test-zisk:
+	cd zisk-prover && go test -race -v ./...
+
+# Prover status (works for both sp1 and zisk on port 13337)
+prover-status:
+	@curl -s http://localhost:13337/status 2>/dev/null | jq . || \
+	curl -s http://localhost:13337/health 2>/dev/null | jq . || \
+	echo "Prover not running on port 13337"
+
+# Request a proof for a block (ZisK prover)
+prover-prove:
+	@if [ -z "$(BLOCK)" ]; then echo "Usage: make prover-prove BLOCK=<block_number>"; exit 1; fi
+	@curl -X POST http://localhost:13337/prove -H "Content-Type: application/json" -d '{"blockNumber": $(BLOCK)}' | jq .
+
+# List all proofs (ZisK prover)
+prover-proofs:
+	@curl -s http://localhost:13337/proofs | jq . 2>/dev/null || echo "Prover not running"
+
+# Prover help
+prover-help:
+	@echo "Prover Selection:"
+	@echo "  PROVER=sp1    - Use OP Succinct (SP1) prover (default)"
+	@echo "  PROVER=zisk   - Use ZisK prover"
+	@echo ""
+	@echo "Commands:"
+	@echo "  make run-agglayer           - Start with default prover (sp1)"
+	@echo "  PROVER=zisk make run-agglayer - Start with ZisK prover"
+	@echo "  make run-zisk               - Shortcut for PROVER=zisk run-agglayer"
+	@echo "  make prover-status          - Check prover status"
+	@echo "  make prover-prove BLOCK=1   - Request proof for block (ZisK)"
+	@echo "  make prover-proofs          - List all proofs (ZisK)"
+	@echo "  make test-zisk              - Run ZisK prover tests"
+	@echo ""
+	@echo "ZisK API Endpoints (port 13337):"
+	@echo "  GET  /status  - Service status"
+	@echo "  POST /prove   - Submit block for proving"
+	@echo "  GET  /proof/:id - Get proof result"
+	@echo "  GET  /proofs  - List all proofs"
+
+# #############################################################################
+# OVERHANGING: Polycli Load Testing
+# #############################################################################
+
 # =============================================================================
-# Polycli Load Testing
+# Polycli Configuration
 # =============================================================================
+POLYCLI_RPC ?= http://localhost:13000
+POLYCLI_TPS ?= 100
+POLYCLI_DURATION ?= 30
+POLYCLI_CONCURRENCY ?= 10
+POLYCLI_ACCOUNTS ?= 10
+# WARNING: This is a well-known Anvil test key (Account #0) - DO NOT use with real funds
+# Override via environment variable or .env file for different keys
+POLYCLI_PRIVATE_KEY ?= 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+POLYCLI_GAS_MULTIPLIER ?= 1.5
+POLYCLI_FUND_AMOUNT ?= 10000000000000000000
 
 # Install polygon-cli if not found
 polycli-install:
@@ -426,236 +657,24 @@ polycli-help:
 	@echo ""
 	@echo "Example: make polycli-eoa POLYCLI_TPS=500 POLYCLI_DURATION=60"
 
-# =============================================================================
-# Local Development (HMR)
-# =============================================================================
-
-# Start just the blockchain infrastructure in Docker (L1 + L2 + block-builder)
-dev-infra:
-	docker compose --profile reth up -d l1 l2-reth block-builder
-	@echo "Waiting for L1, L2, and block-builder to be ready..."
-	@sleep 5
-	@echo "Infrastructure ready. L1: localhost:18545, L2 (via block-builder): localhost:13000"
-
-# Run load-generator locally (requires dev-infra and sibling loadgenerator repo)
-dev-loadgen:
-	cd ../loadgenerator && \
-	BUILDER_RPC_URL=http://localhost:13000 \
-	L2_RPC_URL=http://localhost:13000 \
-	PRECONF_WS_URL=ws://localhost:13002/ws/preconfirmations \
-	LISTEN_ADDR=:13001 \
-	DATABASE_PATH=./loadgen-dev.db \
-	go run ./cmd/loadgen
-
-# Run dashboard with HMR (requires dev-loadgen for API calls)
-dev-dashboard:
-	cd dashboard && npm run dev
-
-# Stop dev infrastructure
-dev-stop:
-	docker compose --profile reth --profile cdk-erigon stop l1 l2-reth l2-cdk-erigon block-builder 2>/dev/null || true
-	@echo "Dev infrastructure stopped"
-
-# Pull latest block-builder image from DockerHub
-pull-blockbuilder:
-	docker pull gatewayfm/blockbuilder:latest
-	@echo "Pulled gatewayfm/blockbuilder:latest"
-
-# Pull latest load-generator image from DockerHub
-pull-loadgenerator:
-	docker pull gatewayfm/loadgenerator:latest
-	@echo "Pulled gatewayfm/loadgenerator:latest"
-
-# CDK-Erigon dev mode: Start cdk-erigon in Docker, run load-generator and dashboard locally
-# Requires sibling loadgenerator repo at ../loadgenerator
-dev-cdk-erigon:
-	@echo "=== Starting CDK-Erigon Development Mode ==="
-	@echo "Killing any processes on ports 3000, 13001..."
-	@-lsof -ti :3000 | xargs kill -9 2>/dev/null || true
-	@-lsof -ti :13001 | xargs kill -9 2>/dev/null || true
-	@docker compose --profile cdk-erigon up -d l1 l2-cdk-erigon
-	@echo "Waiting for L1 and CDK-Erigon to be ready..."
-	@sleep 5
-	@echo "Starting load-generator and dashboard locally... (Ctrl+C to stop)"
-	@bash -c '\
-		cleanup() { \
-			echo ""; \
-			echo "Shutting down..."; \
-			kill $$LOADGEN_PID $$DASHBOARD_PID 2>/dev/null; \
-			wait $$LOADGEN_PID $$DASHBOARD_PID 2>/dev/null; \
-			docker compose --profile cdk-erigon stop l1 l2-cdk-erigon; \
-			echo "Done."; \
-			exit 0; \
-		}; \
-		trap cleanup INT TERM; \
-		\
-		( cd ../loadgenerator && \
-		  EXECUTION_LAYER=cdk-erigon \
-		  BUILDER_RPC_URL=http://localhost:18546 \
-		  L2_RPC_URL=http://localhost:18546 \
-		  L2_WS_URL=ws://localhost:18547 \
-		  PRECONF_WS_URL= \
-		  LISTEN_ADDR=:13001 \
-		  DATABASE_PATH=./loadgen-dev.db \
-		  go run ./cmd/loadgen 2>&1 | sed "s/^/[loadgen] /" ) & \
-		LOADGEN_PID=$$!; \
-		sleep 1; \
-		\
-		( cd dashboard && npm run dev 2>&1 | sed "s/^/[dashboard] /" ) & \
-		DASHBOARD_PID=$$!; \
-		\
-		echo ""; \
-		echo "=== CDK-Erigon mode running ==="; \
-		echo "  Dashboard:      http://localhost:3000"; \
-		echo "  CDK-Erigon RPC: http://localhost:18546"; \
-		echo "  Load Generator: http://localhost:13001"; \
-		echo ""; \
-		echo "Note: No block-builder in cdk-erigon mode (cdk-erigon is its own sequencer)"; \
-		echo "Note: No preconfirmations available in cdk-erigon mode"; \
-		echo ""; \
-		echo "Press Ctrl+C to stop all services"; \
-		echo ""; \
-		wait \
-	'
-
-# Full local dev: run load-generator and dashboard locally, infrastructure in Docker
-# Requires sibling loadgenerator repo at ../loadgenerator
-dev:
-	@echo "=== Starting Local Development Mode ==="
-	@echo "Killing any processes on ports 3000, 13001..."
-	@-lsof -ti :3000 | xargs kill -9 2>/dev/null || true
-	@-lsof -ti :13001 | xargs kill -9 2>/dev/null || true
-	@if [ -f .env ]; then echo "Loading .env file..."; set -a; . ./.env; set +a; fi
-	@docker compose --profile reth up -d l1 l2-reth block-builder
-	@echo "Waiting for L1/L2/block-builder..."
-	@sleep 5
-	@echo "Starting services... (Ctrl+C to stop all)"
-	@bash -c '\
-		if [ -f .env ]; then set -a; . ./.env; set +a; fi; \
-		cleanup() { \
-			echo ""; \
-			echo "Shutting down..."; \
-			kill $$LOADGEN_PID $$DASHBOARD_PID 2>/dev/null; \
-			wait $$LOADGEN_PID $$DASHBOARD_PID 2>/dev/null; \
-			docker compose --profile reth stop l1 l2-reth block-builder; \
-			echo "Done."; \
-			exit 0; \
-		}; \
-		trap cleanup INT TERM; \
-		\
-		( cd ../loadgenerator && \
-		  BUILDER_RPC_URL=http://localhost:13000 \
-		  L2_RPC_URL=http://localhost:18546 \
-		  PRECONF_WS_URL=ws://localhost:13002/ws/preconfirmations \
-		  LISTEN_ADDR=:13001 \
-		  DATABASE_PATH=./loadgen-dev.db \
-		  go run ./cmd/loadgen 2>&1 | sed "s/^/[loadgen] /" ) & \
-		LOADGEN_PID=$$!; \
-		sleep 1; \
-		\
-		( cd dashboard && npm run dev 2>&1 | sed "s/^/[dashboard] /" ) & \
-		DASHBOARD_PID=$$!; \
-		\
-		echo ""; \
-		echo "=== All services running ==="; \
-		echo "  Dashboard:      http://localhost:3000"; \
-		echo "  Block Builder:  http://localhost:13000 (Docker)"; \
-		echo "  Load Generator: http://localhost:13001"; \
-		echo ""; \
-		echo "Press Ctrl+C to stop all services"; \
-		echo ""; \
-		wait \
-	'
-
-# =============================================================================
-# Prover Selection (PROVER=sp1 or PROVER=zisk)
-# =============================================================================
-
-# Run with ZisK prover
-run-zisk:
-	PROVER=zisk $(MAKE) run-agglayer
-
-# Test ZisK prover
-test-zisk:
-	cd zisk-prover && go test -race -v ./...
-
-# Prover status (works for both sp1 and zisk on port 13337)
-prover-status:
-	@curl -s http://localhost:13337/status 2>/dev/null | jq . || \
-	curl -s http://localhost:13337/health 2>/dev/null | jq . || \
-	echo "Prover not running on port 13337"
-
-# Request a proof for a block (ZisK prover)
-prover-prove:
-	@if [ -z "$(BLOCK)" ]; then echo "Usage: make prover-prove BLOCK=<block_number>"; exit 1; fi
-	@curl -X POST http://localhost:13337/prove -H "Content-Type: application/json" -d '{"blockNumber": $(BLOCK)}' | jq .
-
-# List all proofs (ZisK prover)
-prover-proofs:
-	@curl -s http://localhost:13337/proofs | jq . 2>/dev/null || echo "Prover not running"
-
-# Prover help
-prover-help:
-	@echo "Prover Selection:"
-	@echo "  PROVER=sp1    - Use OP Succinct (SP1) prover (default)"
-	@echo "  PROVER=zisk   - Use ZisK prover"
-	@echo ""
-	@echo "Commands:"
-	@echo "  make run-agglayer           - Start with default prover (sp1)"
-	@echo "  PROVER=zisk make run-agglayer - Start with ZisK prover"
-	@echo "  make run-zisk               - Shortcut for PROVER=zisk run-agglayer"
-	@echo "  make prover-status          - Check prover status"
-	@echo "  make prover-prove BLOCK=1   - Request proof for block (ZisK)"
-	@echo "  make prover-proofs          - List all proofs (ZisK)"
-	@echo "  make test-zisk              - Run ZisK prover tests"
-	@echo ""
-	@echo "ZisK API Endpoints (port 13337):"
-	@echo "  GET  /status  - Service status"
-	@echo "  POST /prove   - Submit block for proving"
-	@echo "  GET  /proof/:id - Get proof result"
-	@echo "  GET  /proofs  - List all proofs"
-
-# =============================================================================
-# SBOM Generation
-# =============================================================================
-
-# Generate Software Bill of Materials for all components
-sbom:
-	@./scripts/generate-sbom.sh ./sbom
-
-# SBOM help
-sbom-help:
-	@echo "SBOM Generation:"
-	@echo "  make sbom               - Generate SBOM for all components"
-	@echo ""
-	@echo "Output: ./sbom/*.sbom.json (CycloneDX format)"
-	@echo ""
-	@echo "Components covered:"
-	@echo "  - block-builder (Go)"
-	@echo "  - load-generator (Go)"
-	@echo "  - zisk-prover (Go)"
-	@echo "  - dashboard (Node.js)"
-	@echo "  - bridge-ui (Node.js)"
-	@echo ""
-	@echo "For comprehensive SBOM with vulnerability data, install syft:"
-	@echo "  brew install syft (macOS)"
-	@echo "  https://github.com/anchore/syft (other platforms)"
+# #############################################################################
+# Help
+# #############################################################################
 
 # Show help
 help:
 	@echo "Available commands:"
 	@echo ""
-	@echo "  Execution Layer (choose one):"
+	@echo "  ==== CORE: Gas Storm (reth mode) ===="
+	@echo ""
+	@echo "  Run:"
 	@echo "    make run              - Start with images from DockerHub (default: reth)"
 	@echo "    make run-build        - Build from local repos and start"
 	@echo "    make run-reth         - Start with op-reth (block-builder + Engine API)"
-	@echo "    make run-cdk-erigon   - Start with cdk-erigon (standalone sequencer)"
-	@echo "    make run-gravity-reth - Start with gravity-reth (high-perf parallel EVM)"
 	@echo "    make run-metal        - Native mode (no Docker, maximum performance)"
-	@echo "    make run-with-bridge  - Start with Hyperlane bridge enabled"
-	@echo ""
-	@echo "  Basic:"
 	@echo "    make run-attached     - Start system with logs"
+	@echo ""
+	@echo "  Lifecycle:"
 	@echo "    make stop             - Stop all services"
 	@echo "    make restart          - Restart all services"
 	@echo "    make logs             - Follow all logs"
@@ -664,41 +683,24 @@ help:
 	@echo "    make clean-metal      - Remove native mode data"
 	@echo "    make build            - Build without starting"
 	@echo ""
-	@echo "  Performance Profiles (uses current EXECUTION_LAYER):"
+	@echo "  Performance Profiles:"
 	@echo "    make run-high-throughput  - 1B gas, 100ms, pipelining (max TPS)"
 	@echo "    make run-fast-confirm     - 150M gas, 50ms blocks (low latency)"
-	@echo "    make run-experimental     - All features enabled"
 	@echo "    make run-conservative     - 30M gas, 2s blocks (stability)"
 	@echo "    make run-flashblocks      - 500M gas, 500ms + preconfirmations"
 	@echo ""
 	@echo "  Testing:"
 	@echo "    make test             - Run all tests (with race detector)"
-	@echo "    make test-load-generator - Test load-generator only"
-	@echo "    make test-dashboard      - Lint dashboard"
-	@echo "    make bench-load-generator - Run load-generator benchmarks"
+	@echo "    make test-dashboard   - Lint dashboard"
 	@echo "    make test-tx          - Send a test transaction"
 	@echo "    make balance          - Check test account balance"
-	@echo ""
-	@echo "  Integration Tests:"
 	@echo "    make test-contract    - API contract tests (no stack needed)"
 	@echo "    make test-e2e         - E2E tests (requires running stack)"
 	@echo "    make test-integration - Full integration suite (starts/stops stack)"
-	@echo "    make test-integration-quick - Integration tests (existing stack)"
 	@echo "    make test-smoke       - Quick smoke test (requires running stack)"
-	@echo ""
-	@echo "  AggLayer:"
-	@echo "    make run-agglayer     - Start with AggLayer stack"
-	@echo ""
-	@echo "  Prover Selection (PROVER=sp1|zisk):"
-	@echo "    make run-agglayer     - Start with default prover (sp1)"
-	@echo "    PROVER=zisk make run-agglayer - Start with ZisK"
-	@echo "    make run-zisk         - Shortcut for ZisK prover"
-	@echo "    make prover-status    - Check prover status"
-	@echo "    make prover-help      - Full prover options"
 	@echo ""
 	@echo "  Local Development (HMR):"
 	@echo "    make dev              - Run load-generator and dashboard locally (op-reth mode)"
-	@echo "    make dev-cdk-erigon   - Run with cdk-erigon in Docker, rest locally"
 	@echo "    make dev-infra        - Start L1/L2/block-builder in Docker"
 	@echo "    make dev-loadgen      - Run only load-generator locally"
 	@echo "    make dev-dashboard    - Run only dashboard with HMR"
@@ -710,14 +712,27 @@ help:
 	@echo "    BLOCKBUILDER_VERSION=v1.0.0 make run     - Use specific block-builder version"
 	@echo "    LOADGENERATOR_VERSION=v1.0.0 make run    - Use specific load-generator version"
 	@echo ""
-	@echo "  Polycli Load Testing:"
-	@echo "    make polycli-install  - Install polycli via go install"
+	@echo "  ==== OVERHANGING: Other Execution Layers ===="
+	@echo ""
+	@echo "    make run-cdk-erigon   - Start with cdk-erigon (standalone sequencer)"
+	@echo "    make run-gravity-reth - Start with gravity-reth (high-perf parallel EVM)"
+	@echo "    make dev-cdk-erigon   - Run with cdk-erigon in Docker, rest locally"
+	@echo ""
+	@echo "  ==== OVERHANGING: Hyperlane Bridge ===="
+	@echo ""
+	@echo "    make run-with-bridge  - Start with Hyperlane bridge enabled"
+	@echo "    make bridge-setup     - Full setup (deploy + start relayer)"
+	@echo "    make bridge-help      - Full bridge options"
+	@echo ""
+	@echo "  ==== OVERHANGING: AggLayer & Provers ===="
+	@echo ""
+	@echo "    make run-agglayer     - Start with AggLayer stack"
+	@echo "    make run-zisk         - Shortcut for ZisK prover"
+	@echo "    make prover-help      - Full prover options"
+	@echo ""
+	@echo "  ==== OVERHANGING: Polycli ===="
+	@echo ""
 	@echo "    make polycli-eoa      - EOA transfers (21k gas)"
-	@echo "    make polycli-erc20    - ERC20 transfers"
-	@echo "    make polycli-erc721   - ERC721 mints"
-	@echo "    make polycli-uniswap  - Uniswap V3 swaps"
-	@echo "    make polycli-store    - Storage writes"
-	@echo "    make polycli-mixed    - Mixed workload"
 	@echo "    make polycli-help     - Full polycli options"
 	@echo ""
 	@echo "  Configuration (.env file - sourced automatically):"

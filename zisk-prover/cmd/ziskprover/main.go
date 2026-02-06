@@ -10,9 +10,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/gateway/sequencer-poc/zisk-prover/internal/api"
-	"github.com/gateway/sequencer-poc/zisk-prover/internal/prover"
-	"github.com/gateway/sequencer-poc/zisk-prover/internal/witness"
+	"github.com/gateway-fm/gasstorm/zisk-prover/internal/api"
+	"github.com/gateway-fm/gasstorm/zisk-prover/internal/prover"
+	"github.com/gateway-fm/gasstorm/zisk-prover/internal/witness"
 )
 
 func main() {

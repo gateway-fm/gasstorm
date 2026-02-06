@@ -14,7 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 
-	ptypes "github.com/gateway/sequencer-poc/zisk-prover/pkg/types"
+	ptypes "github.com/gateway-fm/gasstorm/zisk-prover/pkg/types"
 )
 
 // Fetcher retrieves block witnesses from L2.

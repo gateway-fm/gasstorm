@@ -1,4 +1,4 @@
-module github.com/gateway/sequencer-poc/zisk-prover
+module github.com/gateway-fm/gasstorm/zisk-prover
 
 go 1.25
 

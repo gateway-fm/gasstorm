@@ -1,6 +1,8 @@
-# Sequencer PoC
+# GasStorm
 
-Preconfirmation sequencer proof-of-concept with sub-second block times.
+> This file is for Claude Code context. For user-facing docs, see [README.md](./README.md).
+
+Blockchain sequencer load testing framework with sub-second block times.
 
 **Task Tracking:** See [todo.md](./todo.md) for current tasks and priorities.
 
@@ -35,9 +37,11 @@ docker compose up --build -d
 
 Dev mode (`make dev`) expects the loadgenerator repo at `../loadgenerator`.
 
-## Execution Layer Selection
+## Execution Layer Selection [OVERHANGING]
 
 The project supports multiple execution layer backends via a **capability-based architecture**. Select via `EXECUTION_LAYER` environment variable.
+
+> **Note:** Only reth mode is core. cdk-erigon and gravity-reth are overhanging and will be extracted later.
 
 ### Capability-Based Architecture
 
@@ -62,99 +66,21 @@ type ExecutionLayerCapabilities struct {
 | `gravity-reth` | None (direct) | No | No | No |
 | `cdk-erigon` | None (direct) | No | No | No |
 
-### reth Mode (Default)
-Uses the custom block-builder with op-reth via Engine API. Supports preconfirmations.
-
-```
-load-generator → block-builder:13000 → op-reth Engine API:8551
-```
-
-### gravity-reth Mode
-High-performance parallel EVM with Grevm. Direct sequencer mode.
-
-```
-load-generator → gravity-reth:8545 (direct sequencer)
-```
-
-### cdk-erigon Mode
-Uses Polygon's cdk-erigon as a standalone sequencer. Block-builder is bypassed.
-
-```
-load-generator → cdk-erigon:8545 (direct sequencer)
-```
-
 ### Adding a New Execution Layer
 
-1. Add capability function in the loadgenerator repo (`internal/execnode/registry.go`):
-   ```go
-   func NewNodeCapabilities() *ExecutionLayerCapabilities {
-       return &ExecutionLayerCapabilities{
-           Name:                     "new-node",
-           HasExternalBlockBuilder:  false,  // or true if uses block-builder
-           SupportsPreconfirmations: false,
-           SupportsBuilderStatusAPI: false,
-           SupportsBlockMetricsWS:   false,
-       }
-   }
-   ```
+1. Add capability function in the loadgenerator repo (`internal/execnode/registry.go`)
 2. Register in `DefaultRegistry()`
 3. Create `docker-compose-new-node.yaml`
 4. Add Makefile target (optional)
 
 **No changes needed to:** load-generator logic, dashboard code, API handlers
 
-## Prover Selection
-
-The project supports two validity proof backends, selected via `PROVER` environment variable:
+## Prover Selection [OVERHANGING]
 
 | Prover | Description | Profile |
 |--------|-------------|---------|
 | `sp1` (default) | OP Succinct with SP1 zkVM | `prover-sp1` |
 | `zisk` | ZisK zkVM (Polygon) | `prover-zisk` |
-
-```bash
-# Start with SP1 prover (default)
-make run-agglayer
-
-# Start with ZisK prover
-PROVER=zisk make run-agglayer
-# or
-make run-zisk
-```
-
-| Aspect | SP1 (op-succinct) | ZisK |
-|--------|-------------------|------|
-| Architecture | RISC-V 32-bit | RISC-V 64-bit |
-| Precompiles | keccak, sha256, secp256k1 | keccak, sha256 (no secp256k1) |
-| Mode | Mock by default | Emulator by default |
-| Port | 13337 | 13337 |
-
-## Architecture (reth Mode)
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Load Generator                              │
-│  (transaction building, signing, sending via HTTP/WS)               │
-└────────────────────────────┬────────────────────────────────────────┘
-                             │ HTTP: eth_sendRawTransaction
-                             ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                    Block Builder (Docker image)                     │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────────┐ │
-│  │ TX Queue │→ │ TX Pool  │→ │ Filter   │→ │ Engine API (op-reth) │ │
-│  │ (100k)   │  │ (sharded)│  │ (nonces) │  │ FCU + GetPayload     │ │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────────────────┘ │
-│                     │                              │                 │
-│                     ▼                              ▼                 │
-│              Preconf Hub ────────────────→ WebSocket Events          │
-└─────────────────────────────────────────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                           op-reth                                   │
-│              (execution layer, block production)                    │
-└─────────────────────────────────────────────────────────────────────┘
-```
 
 ## Required Features & Metrics
 
@@ -175,32 +101,6 @@ make run-zisk
 - ALL JSON responses use **camelCase** field names (not PascalCase)
 - Go structs MUST have `json:"fieldName"` tags
 - TypeScript types in `dashboard/src/types/` define the contract
-
-## Quick Start
-
-```bash
-# Start with op-reth + block-builder (default)
-make run-reth
-
-# Start with cdk-erigon sequencer
-make run-cdk-erigon
-
-# Start with fast blocks and preconfirmations (reth mode only)
-BLOCK_TIME_MS=250 ENABLE_PRECONFIRMATIONS=true make run-reth
-
-# View logs
-make logs
-
-# Run load test via dashboard
-open http://localhost:18000/load-test/
-
-# Stop services
-make stop
-
-# Development mode (local load-generator and dashboard)
-make dev              # for reth
-make dev-cdk-erigon   # for cdk-erigon
-```
 
 ## Go Setup
 
@@ -329,38 +229,6 @@ make test-integration        # Full integration suite (starts/stops stack)
 cd ../loadgenerator && make bench  # Load generator benchmarks (external repo)
 ```
 
-## Common Issues
-
-### Pipeline Gets Stuck
-- **Symptom**: Blocks stop being produced, pending count grows
-- **Cause**: Engine API returned SYNCING, builder didn't recover
-- **Fix**: Restart the stack with `make stop && make run-reth`
-
-### Low Throughput (< 100 TPS)
-- Check Engine API latency in logs
-- Monitor pending count - if growing, nonce filtering is slow
-- Increase number of accounts to distribute nonces
-
-### Missing MGas/s in History
-- Time series must include `gasUsed` per sample
-- Go storage models must track block gas metrics
-- Dashboard reads from `timeSeries.mgasPerSec` array
-
-### API PascalCase Bug
-- Go structs without `json:"fieldName"` tags serialize as PascalCase
-- TypeScript expects camelCase
-- Always add json tags to storage/models.go structs
-
-## Glossary
-
-| Term | Definition |
-|------|------------|
-| **Preconfirmation** | Promise that TX will be included (before actual block confirmation) |
-| **FCU** | forkchoiceUpdated - Engine API call to set chain head and request new payload |
-| **GetPayload** | Engine API call to retrieve built block after FCU |
-| **Deposit TX** | L1→L2 system transaction, must be first in every block |
-| **RBF** | Replace-by-fee, requires 10% gas price bump to replace pending TX |
-
 ## Browser Automation Testing
 
 When using Chrome browser automation for testing the dashboard:
@@ -369,11 +237,3 @@ When using Chrome browser automation for testing the dashboard:
 2. **Screenshots**: Always capture full page to see all UI elements and metrics
 3. **Before Tests**: Clear localStorage to avoid stale state issues
 4. **After Actions**: Wait 2-3 seconds before taking screenshots to allow UI updates
-
-## Development Workflow
-
-1. Make changes to Go code
-2. Run `make test` to verify
-3. Rebuild with `docker compose build`
-4. Test with `make run` and dashboard
-5. Check logs with `make logs`
