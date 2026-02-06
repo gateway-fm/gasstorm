@@ -23,7 +23,9 @@ export interface WebSocketCallbacks {
   onDisconnected: () => void;
   isHistoricalMode: () => boolean;
   getChartTimeSeries: () => ChartTimeSeries;
-  stopPolling: () => void;
+  getCurrentStatus: () => LoadTestStatus;
+  onNewTestDetected: (metrics: GoLoadTestMetrics) => void;
+  onTestCompleted: () => void;
 }
 
 const MAX_CHART_POINTS = 600; // 2 minutes at 200ms intervals
@@ -185,9 +187,53 @@ export function createWebSocketManager(callbacks: WebSocketCallbacks) {
 
       ws.onmessage = (event) => {
         try {
+          const metrics: GoLoadTestMetrics = JSON.parse(event.data);
+          const currentStatus = callbacks.getCurrentStatus();
+          const incomingStatus = metrics.status;
+          const isActive = (s: string) =>
+            s === "initializing" || s === "running" || s === "verifying";
+
+          // 1. Detect new/reconnected test: incoming is active but we're not.
+          //    Fires for API-started tests AND page refreshes mid-test.
+          if (isActive(incomingStatus) && !isActive(currentStatus)) {
+            console.log("[LoadTest] New test detected via WebSocket (was %s)", currentStatus);
+            callbacks.onNewTestDetected(metrics);
+          }
+
+          // 2. Detect test completion: incoming is terminal but we were active.
+          //    Process this one final message, then freeze.
+          if (
+            (incomingStatus === "completed" || incomingStatus === "error") &&
+            isActive(currentStatus)
+          ) {
+            const { state, newTimeSeries } = parseMetricsMessage(
+              metrics,
+              callbacks.getChartTimeSeries()
+            );
+            // Flush immediately so the final state is guaranteed to land
+            if (pendingUpdate) {
+              callbacks.onStateUpdate(pendingUpdate);
+              pendingUpdate = null;
+              if (rafId !== null) {
+                cancelAnimationFrame(rafId);
+                rafId = null;
+              }
+            }
+            callbacks.onStateUpdate(newTimeSeries ? { ...state, chartTimeSeries: newTimeSeries } : state);
+            callbacks.onTestCompleted();
+            return;
+          }
+
+          // 3. Skip idle messages — nothing to display
+          if (incomingStatus === "idle") return;
+
+          // 4. Skip redundant terminal state updates (already processed in step 2)
+          if (incomingStatus === "completed" || incomingStatus === "error") return;
+
+          // 5. Skip if viewing DB-hydrated historical data
           if (callbacks.isHistoricalMode()) return;
 
-          const metrics: GoLoadTestMetrics = JSON.parse(event.data);
+          // 6. Process active test messages (initializing / running / verifying)
           const { state, newTimeSeries } = parseMetricsMessage(
             metrics,
             callbacks.getChartTimeSeries()
@@ -197,23 +243,6 @@ export function createWebSocketManager(callbacks: WebSocketCallbacks) {
             batchedUpdate({ ...state, chartTimeSeries: newTimeSeries });
           } else {
             batchedUpdate(state);
-          }
-
-          // Disconnect when test completes or errors (including init errors where txSent=0)
-          if (state.status === "completed" || state.status === "error") {
-            console.log("[LoadTest] Test finished, closing WebSocket");
-            // Flush any pending update immediately before disconnecting
-            // (disconnect() cancels pending RAF, which would lose the final state)
-            if (pendingUpdate) {
-              callbacks.onStateUpdate(pendingUpdate);
-              pendingUpdate = null;
-              if (rafId !== null) {
-                cancelAnimationFrame(rafId);
-                rafId = null;
-              }
-            }
-            disconnect();
-            callbacks.stopPolling();
           }
         } catch (err) {
           console.error("[LoadTest] Failed to parse WebSocket message:", err);

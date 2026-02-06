@@ -36,12 +36,15 @@ function formatGasPrice(gwei: number): string {
 }
 
 export function MetricsSnapshot() {
-  const { snapshot, blockMetrics, timeSeries, isHistoricalMode } = useMetricsStore();
+  const { snapshot, blockMetrics, timeSeries } = useMetricsStore();
   const {
+    status: goStatus,
+    isHistoricalMode: goIsHistorical,
     latestBaseFeeGwei,
     latestGasPriceGwei,
     txConfirmedCount,
     currentRate: goCurrentTps,
+    averageTps: goAverageTps,
     peakTps: goPeakTps,
     // Aggregate block metrics from Go load generator
     totalGasUsed: goTotalGasUsed,
@@ -51,17 +54,19 @@ export function MetricsSnapshot() {
     avgFillRate: goAvgFillRate,
   } = useGoLoadTestStore();
 
-  // In live mode, use metrics from go-load-test-store (which comes directly from the load generator)
-  // In historical mode, use snapshot values (which are hydrated from stored test data)
-  const totalTxs = isHistoricalMode ? snapshot.totalTransactions : txConfirmedCount;
+  // goIsHistorical = true ONLY when viewing DB-hydrated history (hydrateFromHistory).
+  // For data source branching: DB history → metricsStore snapshot, everything else → goLoadTestStore.
+  const isLiveRunning = goStatus === "running" || goStatus === "initializing" || goStatus === "verifying";
+
+  // DB-hydrated history → use metricsStore snapshot. Everything else → goLoadTestStore.
+  const totalTxs = goIsHistorical ? snapshot.totalTransactions : txConfirmedCount;
 
   // Check if we have block metrics from Go load generator (live mode) or from metrics-store
   const hasGoBlockMetrics = goBlockCount > 0 || goTotalGasUsed > 0;
   const hasBlockMetrics = blockMetrics.length > 0 || hasGoBlockMetrics;
 
-  // In historical mode, check if we have Mgas/s data either in time series OR in snapshot aggregates
-  // (On-chain fallback populates snapshot aggregates even when time series per-sample data is missing)
-  const hasHistoricalMgasData = isHistoricalMode && (
+  // In DB historical mode, check if we have Mgas/s data either in time series OR in snapshot aggregates
+  const hasHistoricalMgasData = goIsHistorical && (
     timeSeries.mgasPerSec.some(v => v > 0) ||
     snapshot.currentMgasPerSec > 0 ||
     snapshot.peakMgasPerSec > 0
@@ -73,21 +78,16 @@ export function MetricsSnapshot() {
   // Target block time - only relevant for live mode
   const targetBlockTimeMs = 2000;
 
-  // For historical mode: use showMgasMetrics to determine what to display
-  // This ensures label and value/unit are always consistent
-  const showMgasLabel = showMgasMetrics;
-
-  // In live mode, use Go load generator metrics; in historical mode, use hydrated snapshot values
-  // This ensures live and history views use the same data source (the Go load generator)
-  const peakMgasPerSec = isHistoricalMode ? snapshot.peakMgasPerSec : goPeakMgasPerSec;
-  const avgMgasPerSec = isHistoricalMode ? snapshot.currentMgasPerSec : goAvgMgasPerSec;
-  const avgFillRate = isHistoricalMode ? snapshot.averageFillRate : goAvgFillRate;
-  const blocksProduced = isHistoricalMode ? snapshot.blocksProduced : goBlockCount;
-  const totalGasUsed = isHistoricalMode ? snapshot.totalGasUsed : BigInt(goTotalGasUsed);
+  // DB history → metricsStore snapshot values. Live/completed → goLoadTestStore values.
+  const peakMgasPerSec = goIsHistorical ? snapshot.peakMgasPerSec : goPeakMgasPerSec;
+  const avgMgasPerSec = goIsHistorical ? snapshot.currentMgasPerSec : goAvgMgasPerSec;
+  const avgFillRate = goIsHistorical ? snapshot.averageFillRate : goAvgFillRate;
+  const blocksProduced = goIsHistorical ? snapshot.blocksProduced : goBlockCount;
+  const totalGasUsed = goIsHistorical ? snapshot.totalGasUsed : BigInt(goTotalGasUsed);
 
   const metrics = [
     {
-      label: isHistoricalMode ? "Avg" : "Now",
+      label: isLiveRunning ? "Now" : "Avg",
       value: showMgasMetrics ? avgMgasPerSec.toFixed(1) : snapshot.currentTxPerSec.toFixed(1),
       unit: showMgasMetrics ? "Mgas/s" : "tx/s",
       color: showMgasMetrics ? "text-info" : "text-primary",
@@ -99,9 +99,9 @@ export function MetricsSnapshot() {
       color: "text-success",
     },
     {
-      label: isHistoricalMode ? "Avg TPS" : "TPS",
+      label: isLiveRunning ? "TPS" : "Avg TPS",
       value: showMgasMetrics
-        ? (isHistoricalMode ? snapshot.currentTxPerSec : goCurrentTps).toFixed(0)
+        ? (isLiveRunning ? goCurrentTps : goAverageTps).toFixed(0)
         : snapshot.totalTransactions.toLocaleString(),
       unit: showMgasMetrics ? "" : "txs",
       color: "text-primary",
@@ -109,7 +109,7 @@ export function MetricsSnapshot() {
     {
       label: "Peak TPS",
       value: showMgasMetrics
-        ? (isHistoricalMode ? snapshot.peakTxPerSec : goPeakTps).toFixed(0)
+        ? goPeakTps.toFixed(0)
         : snapshot.totalTransactions > 0 ? "100%" : "-",
       unit: "",
       color: showMgasMetrics ? "text-primary" : "text-success",
@@ -140,15 +140,15 @@ export function MetricsSnapshot() {
     },
     {
       label: "Base Fee",
-      value: formatGasPrice(isHistoricalMode ? snapshot.baseFeeGwei ?? 0 : latestBaseFeeGwei),
-      unit: (isHistoricalMode ? (snapshot.baseFeeGwei ?? 0) > 0 : latestBaseFeeGwei > 0) ? "gwei" : "",
-      color: (isHistoricalMode ? (snapshot.baseFeeGwei ?? 0) : latestBaseFeeGwei) > 1.5 ? "text-destructive" : ((isHistoricalMode ? (snapshot.baseFeeGwei ?? 0) : latestBaseFeeGwei) > 1.0 ? "text-warning" : "text-success"),
+      value: formatGasPrice(goIsHistorical ? snapshot.baseFeeGwei ?? 0 : latestBaseFeeGwei),
+      unit: (goIsHistorical ? (snapshot.baseFeeGwei ?? 0) > 0 : latestBaseFeeGwei > 0) ? "gwei" : "",
+      color: (goIsHistorical ? (snapshot.baseFeeGwei ?? 0) : latestBaseFeeGwei) > 1.5 ? "text-destructive" : ((goIsHistorical ? (snapshot.baseFeeGwei ?? 0) : latestBaseFeeGwei) > 1.0 ? "text-warning" : "text-success"),
     },
     {
       label: "Gas Price",
-      value: formatGasPrice(isHistoricalMode ? snapshot.gasPriceGwei ?? 0 : latestGasPriceGwei),
-      unit: (isHistoricalMode ? (snapshot.gasPriceGwei ?? 0) > 0 : latestGasPriceGwei > 0) ? "gwei" : "",
-      color: (isHistoricalMode ? (snapshot.gasPriceGwei ?? 0) : latestGasPriceGwei) > 2.0 ? "text-destructive" : ((isHistoricalMode ? (snapshot.gasPriceGwei ?? 0) : latestGasPriceGwei) > 1.5 ? "text-warning" : "text-success"),
+      value: formatGasPrice(goIsHistorical ? snapshot.gasPriceGwei ?? 0 : latestGasPriceGwei),
+      unit: (goIsHistorical ? (snapshot.gasPriceGwei ?? 0) > 0 : latestGasPriceGwei > 0) ? "gwei" : "",
+      color: (goIsHistorical ? (snapshot.gasPriceGwei ?? 0) : latestGasPriceGwei) > 2.0 ? "text-destructive" : ((goIsHistorical ? (snapshot.gasPriceGwei ?? 0) : latestGasPriceGwei) > 1.5 ? "text-warning" : "text-success"),
     },
     {
       label: "Total Gas",
@@ -168,7 +168,7 @@ export function MetricsSnapshot() {
     <Card>
       <CardHeader>
         <CardTitle className="text-base font-semibold font-mono">
-          {isHistoricalMode ? "Historical Metrics" : (hasBlockMetrics ? "Live Metrics" : "Test Metrics")}
+          {goIsHistorical ? "Historical Metrics" : isLiveRunning ? "Live Metrics" : (goStatus === "completed" || goStatus === "error") ? "Test Results" : "Test Metrics"}
         </CardTitle>
       </CardHeader>
       <CardContent>

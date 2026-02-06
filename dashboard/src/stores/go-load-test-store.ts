@@ -4,7 +4,7 @@
  */
 
 import { create } from "zustand";
-import type { LoadTestConfig, LoadTestStatus } from "@/types/load-test";
+import type { LoadTestConfig } from "@/types/load-test";
 import { DEFAULT_LOAD_TEST_CONFIG, DEFAULT_REALISTIC_CONFIG } from "@/types/load-test";
 import { useMetricsStore } from "./metrics-store";
 import { useChainStore } from "./chain-store";
@@ -99,14 +99,42 @@ function getInitialTargetTps(request: StartTestRequest): number {
 }
 
 export const useGoLoadTestStore = create<GoLoadTestStore>()((set, get) => {
-  // WebSocket manager instance
+  // WebSocket manager instance — stays connected for the lifetime of the page
   const wsManager = createWebSocketManager({
     onStateUpdate: (update) => set(update),
     onConnected: () => set({ wsConnected: true }),
     onDisconnected: () => set({ wsConnected: false }),
     isHistoricalMode: () => get().isHistoricalMode,
     getChartTimeSeries: () => get().chartTimeSeries,
-    stopPolling: () => set({ isPolling: false }),
+    getCurrentStatus: () => get().status,
+    onNewTestDetected: (metrics) => {
+      // A new test was started (possibly via API/MCP, not the UI).
+      // Reset all stores and sync config so the dashboard picks it up cleanly.
+      console.log("[LoadTest] Auto-resetting stores for new test");
+      useMetricsStore.getState().reset();
+      useChainStore.getState().clearLogs();
+      set({
+        ...getResetState(),
+        status: "initializing",
+        isHistoricalMode: false,
+        config: {
+          ...get().config,
+          pattern: metrics.pattern,
+          transactionType: metrics.transactionType,
+          duration: Math.floor(metrics.durationMs / 1000),
+        },
+        targetTps: metrics.targetTps,
+        durationSec: Math.floor(metrics.durationMs / 1000),
+      });
+    },
+    onTestCompleted: () => {
+      // Test finished. goLoadTestStore values are already frozen because the
+      // WebSocket handler stops processing after calling this.
+      // Do NOT set metricsStore.setHistoricalMode — that would cause the
+      // RealTimeChart to switch from accurate goLoadTestStore data to
+      // L2-derived metricsStore data.
+      console.log("[LoadTest] Test completed, state frozen");
+    },
   });
 
   return {
@@ -119,23 +147,25 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()((set, get) => {
 
     start: async () => {
       const state = get();
-      if (state.status === "running" || state.isStarting) {
+      const isActive = state.status === "initializing" || state.status === "running" || state.status === "verifying";
+      if (isActive || state.isStarting) {
         console.log("[LoadTest] Already running or starting");
         return;
       }
 
-      // Reset display values immediately to avoid showing stale data from previous test
-      set({
-        isStarting: true,
-        currentRate: 0,
-        averageTps: 0,
-        peakTps: 0,
-        txSentCount: 0,
-        txConfirmedCount: 0,
-        txFailedCount: 0,
-        elapsedTime: 0,
-      });
+      // Full reset BEFORE the POST.  Setting status to "initializing" here
+      // prevents the WebSocket onNewTestDetected callback from firing
+      // redundantly when the first message arrives (it only fires when the
+      // store status is NOT active).
       useMetricsStore.getState().reset();
+      useChainStore.getState().clearLogs();
+      set({
+        ...getResetState(),
+        isStarting: true,
+        status: "initializing",
+        isHistoricalMode: false,
+        initProgress: "Starting test...",
+      });
 
       const request = buildStartRequest(state.config);
       console.log("[LoadTest] Starting test with config:", JSON.stringify(request, null, 2));
@@ -150,18 +180,16 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()((set, get) => {
           throw new Error(await response.text());
         }
 
-        // Reset ALL fields first, then set starting-specific values
+        // POST succeeded — set metadata only.  Do NOT call getResetState()
+        // here because the WebSocket may have already delivered live data
+        // (currentRate, chartTimeSeries, etc.) while we awaited the POST.
         set({
-          ...getResetState(),
-          status: "initializing",
+          isStarting: false,
           startTime: Date.now(),
           targetTps: getInitialTargetTps(request),
           durationSec: request.durationSec,
-          isPolling: true,
           initProgress: "Starting initialization...",
         });
-
-        wsManager.connect();
       } catch (error) {
         console.error("[LoadTest] Start failed:", error);
         set({
@@ -173,8 +201,6 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()((set, get) => {
     },
 
     stop: async () => {
-      set({ isPolling: false });
-
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -191,15 +217,15 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()((set, get) => {
         clearTimeout(timeoutId);
       }
 
-      wsManager.disconnect();
-      useMetricsStore.getState().setHistoricalMode(true);
-      set({ status: "completed" });
+      // Don't disconnect WebSocket — stay connected for next test.
+      // The load generator will transition through verifying → completed,
+      // and the WebSocket will deliver those status updates.
     },
 
     reset: async () => {
       try {
         await fetchLoadGenAPI("/reset", { method: "POST" });
-        wsManager.disconnect();
+        // Don't disconnect WebSocket — stay connected for next test.
         useMetricsStore.getState().reset();
         useChainStore.getState().clearLogs();
         set(getResetState());
@@ -281,44 +307,12 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()((set, get) => {
       });
     },
 
-    checkAndReconnect: async () => {
-      if (get().isHistoricalMode) return;
+    connectWebSocket: () => {
+      wsManager.connect();
+    },
 
-      try {
-        const response = await fetchLoadGenAPI("/status");
-        if (!response.ok) return;
-
-        const metrics: GoLoadTestMetrics = await response.json();
-
-        if (metrics.status === "running" || metrics.status === "initializing" || metrics.status === "verifying") {
-          console.log("Reconnecting to", metrics.status, "load test...");
-          let status: LoadTestStatus = "running";
-          if (metrics.status === "initializing") status = "initializing";
-          else if (metrics.status === "verifying") status = "verifying";
-
-          const { state } = parseMetricsMessage(metrics, get().chartTimeSeries);
-          set({
-            ...state,
-            status,
-            config: {
-              ...get().config,
-              pattern: metrics.pattern,
-              duration: Math.floor(metrics.durationMs / 1000),
-            },
-            isPolling: true,
-          });
-          wsManager.connect();
-        } else if (metrics.status === "completed" || metrics.status === "error") {
-          const { state } = parseMetricsMessage(metrics, get().chartTimeSeries);
-          set({
-            ...state,
-            status: metrics.status === "completed" ? "completed" : "error",
-            isPolling: false,
-          });
-        }
-      } catch (error) {
-        console.debug("Load generator not available:", error);
-      }
+    disconnectWebSocket: () => {
+      wsManager.disconnect();
     },
   };
 });

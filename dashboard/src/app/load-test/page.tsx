@@ -21,7 +21,7 @@ import type { BlockMetrics, Statistics } from "@/types/metrics";
 import { calculateStatistics } from "@/lib/statistics";
 
 export default function LoadTestPage() {
-  const { status, checkAndReconnect, latencyStats: goLatencyStats, preconfLatencyStats: goPreconfLatencyStats } = useGoLoadTestStore();
+  const { status, connectWebSocket, disconnectWebSocket, latencyStats: goLatencyStats, preconfLatencyStats: goPreconfLatencyStats } = useGoLoadTestStore();
   const { addBlockMetrics, timeSeries } = useMetricsStore();
   const { builder } = useChainStore();
   const prevStatusRef = useRef(status);
@@ -35,10 +35,12 @@ export default function LoadTestPage() {
     statusRef.current = status;
   }, [status]);
 
-  // On mount, check if a test is already running and reconnect to it
+  // Maintain a persistent WebSocket connection to the load generator.
+  // This picks up tests started via API/MCP without polling.
   useEffect(() => {
-    checkAndReconnect();
-  }, [checkAndReconnect]);
+    connectWebSocket();
+    return () => disconnectWebSocket();
+  }, [connectWebSocket, disconnectWebSocket]);
 
   // Track status changes (Go load generator handles verification internally)
   useEffect(() => {

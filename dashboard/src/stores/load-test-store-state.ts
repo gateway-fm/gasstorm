@@ -89,7 +89,8 @@ export interface GoLoadTestActions {
   stop: () => Promise<void>;
   reset: () => Promise<void>;
   pollStatus: () => Promise<void>;
-  checkAndReconnect: () => Promise<void>;
+  connectWebSocket: () => void;
+  disconnectWebSocket: () => void;
   hydrateFromHistory: (run: HistoricalTestRun, timeSeries: HistoricalTimeSeriesPoint[]) => void;
   setHistoricalMode: (isHistorical: boolean) => void;
 }
