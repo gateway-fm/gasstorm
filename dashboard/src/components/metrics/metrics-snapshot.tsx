@@ -41,6 +41,8 @@ export function MetricsSnapshot() {
     latestBaseFeeGwei,
     latestGasPriceGwei,
     txConfirmedCount,
+    currentRate: goCurrentTps,
+    peakTps: goPeakTps,
     // Aggregate block metrics from Go load generator
     totalGasUsed: goTotalGasUsed,
     blockCount: goBlockCount,
@@ -98,14 +100,16 @@ export function MetricsSnapshot() {
     },
     {
       label: isHistoricalMode ? "Avg TPS" : "TPS",
-      value: showMgasMetrics ? snapshot.currentTxPerSec.toFixed(0) : snapshot.totalTransactions.toLocaleString(),
+      value: showMgasMetrics
+        ? (isHistoricalMode ? snapshot.currentTxPerSec : goCurrentTps).toFixed(0)
+        : snapshot.totalTransactions.toLocaleString(),
       unit: showMgasMetrics ? "" : "txs",
       color: "text-primary",
     },
     {
       label: "Peak TPS",
       value: showMgasMetrics
-        ? snapshot.peakTxPerSec.toFixed(0)
+        ? (isHistoricalMode ? snapshot.peakTxPerSec : goPeakTps).toFixed(0)
         : snapshot.totalTransactions > 0 ? "100%" : "-",
       unit: "",
       color: showMgasMetrics ? "text-primary" : "text-success",
