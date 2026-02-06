@@ -81,6 +81,11 @@ func registerLoadgenStart(s *server.MCPServer, client *httpClient) {
 		mcp.WithNumber("spike_duration", mcp.Description("Spike duration (seconds)")),
 		mcp.WithNumber("spike_interval", mcp.Description("Spike interval (seconds)")),
 		mcp.WithNumber("adaptive_initial_rate", mcp.Description("Initial TPS for adaptive")),
+		// Realistic pattern parameters
+		mcp.WithNumber("realistic_target_tps", mcp.Description("Target TPS for realistic pattern")),
+		mcp.WithNumber("realistic_min_tip_gwei", mcp.Description("Min tip in Gwei for realistic pattern (default: 1.0)")),
+		mcp.WithNumber("realistic_max_tip_gwei", mcp.Description("Max tip in Gwei for realistic pattern (default: 100.0)")),
+		mcp.WithString("realistic_tip_distribution", mcp.Description("Tip distribution for realistic pattern: exponential (default), power-law, uniform")),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		pattern, err := req.RequireString("pattern")
@@ -128,6 +133,30 @@ func registerLoadgenStart(s *server.MCPServer, client *httpClient) {
 		}
 		if v := req.GetInt("adaptive_initial_rate", 0); v > 0 {
 			payload["adaptiveInitialRate"] = v
+		}
+
+		// Build realisticConfig for realistic/adaptive-realistic patterns
+		if pattern == "realistic" || pattern == "adaptive-realistic" {
+			rc := map[string]any{
+				"targetTps":       req.GetInt("realistic_target_tps", 50),
+				"minTipGwei":      req.GetFloat("realistic_min_tip_gwei", 1.0),
+				"maxTipGwei":      req.GetFloat("realistic_max_tip_gwei", 100.0),
+				"tipDistribution": req.GetString("realistic_tip_distribution", "exponential"),
+				"txTypeRatios": map[string]any{
+					"ethTransfer":   40,
+					"erc20Transfer": 25,
+					"erc20Approve":  10,
+					"uniswapSwap":   10,
+					"storageWrite":  10,
+					"heavyCompute":  5,
+				},
+			}
+			if v := req.GetInt("num_accounts", 0); v > 0 {
+				rc["numAccounts"] = v
+			} else {
+				rc["numAccounts"] = 10
+			}
+			payload["realisticConfig"] = rc
 		}
 
 		_, err = client.post("/v1/start", payload)
@@ -214,7 +243,9 @@ func registerLoadgenTestDetail(s *server.MCPServer, client *httpClient) {
 		if err != nil {
 			return mcp.NewToolResultError("id is required"), nil
 		}
-		raw, err := client.get("/v1/history/" + id)
+		// Use /history/ (not /v1/history/) — the loadgen handler's TrimPrefix
+		// expects the path to start with /history/, which fails with the /v1/ prefix.
+		raw, err := client.get("/history/" + id)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Test detail failed: %v", err)), nil
 		}
@@ -224,14 +255,31 @@ func registerLoadgenTestDetail(s *server.MCPServer, client *httpClient) {
 		if run == nil {
 			return mcp.NewToolResultError("Test run not found"), nil
 		}
-		return mcp.NewToolResultText(joinLines(
+		lines := joinLines(
 			sectionf("Test Run: "+id),
 			kvf("Pattern", getString(run, "pattern")),
 			kvf("TX Type", getString(run, "transactionType")),
+			kvf("Duration", fmt.Sprintf("%.0fs", getFloat(run, "durationMs")/1000)),
 			kvf("TXs Sent", formatNumber(getFloat(run, "txSent"))),
 			kvf("TXs Confirmed", formatNumber(getFloat(run, "txConfirmed"))),
+			kvf("TXs Failed", formatNumber(getFloat(run, "txFailed"))),
 			kvf("Avg TPS", fmt.Sprintf("%.0f", getFloat(run, "averageTps"))),
-		)), nil
+			kvf("Peak TPS", fmt.Sprintf("%.0f", getFloat(run, "peakTps"))),
+		)
+		if lat, ok := run["latencyStats"].(map[string]any); ok {
+			lines += "\n\n" + joinLines(
+				sectionf("Latency"),
+				kvf("Min", formatMs(getFloat(lat, "min"))),
+				kvf("Avg", formatMs(getFloat(lat, "avg"))),
+				kvf("P50", formatMs(getFloat(lat, "p50"))),
+				kvf("P75", formatMs(getFloat(lat, "p75"))),
+				kvf("P90", formatMs(getFloat(lat, "p90"))),
+				kvf("P95", formatMs(getFloat(lat, "p95"))),
+				kvf("P99", formatMs(getFloat(lat, "p99"))),
+				kvf("Max", formatMs(getFloat(lat, "max"))),
+			)
+		}
+		return mcp.NewToolResultText(lines), nil
 	})
 }
 
@@ -249,7 +297,7 @@ func registerLoadgenTestTxs(s *server.MCPServer, client *httpClient) {
 		}
 		limit := req.GetInt("limit", 50)
 		offset := req.GetInt("offset", 0)
-		raw, err := client.get(fmt.Sprintf("/v1/history/%s/transactions?limit=%d&offset=%d", id, limit, offset))
+		raw, err := client.get(fmt.Sprintf("/history/%s/transactions?limit=%d&offset=%d", id, limit, offset))
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Test transactions failed: %v", err)), nil
 		}
@@ -273,7 +321,7 @@ func registerLoadgenDeleteRun(s *server.MCPServer, client *httpClient) {
 		if err != nil {
 			return mcp.NewToolResultError("id is required"), nil
 		}
-		_, err = client.delete("/v1/history/" + id)
+		_, err = client.delete("/history/" + id)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Delete failed: %v", err)), nil
 		}
