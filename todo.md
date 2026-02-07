@@ -384,17 +384,39 @@ Root cause: `filterExecutable` allocates per call:
 ### Remaining Opportunities
 - [ ] **Batch signature verification** - Amortize CGO overhead (2-5x potential, high complexity)
 
-## Stability
+### Metal Mode Load Test Results (2026-02-06)
 
-- [ ] **Engine API SYNCING recovery** - When op-reth returns SYNCING, builder gets stuck. Implement retry/backoff in `pipeline.go`
+Config: 150ms block time, 1.5 gigagas gas limit, 50k max txs/block, tip_desc ordering
 
-## Known Bottlenecks
+| Test | TPS | MGas/s Avg | MGas/s Peak | Latency p99 | Success |
+|------|-----|-----------|-------------|-------------|---------|
+| Constant 5k | 5,000 | 111 | 120 | 171ms | 100% |
+| Constant 25k | 25,000 | 528 | 627 | 258ms | 100% |
+| Constant 30k | 30,000 | 366 | 644 | 286ms | 74.9% |
+| Constant 50k | 50,000 | 54 | 678 | 853ms | <5% |
+| Realistic 10k (mixed) | 10,000 | 673 | 828 | 261ms | 89.2% |
+
+**Sustainable ceiling**: ~25k TPS constant rate (100% confirmation, <260ms p99 latency)
+
+### Optimizations Implemented (2026-02-06)
+
+| Optimization | Before | After | Improvement |
+|---|---|---|---|
+| **Loadgen TxFlowTracker** - delete on terminal states | 130MB heap, 15% GC CPU | 512KB heap, 4% GC CPU | 91% heap, 78% GC reduction |
+| **Builder pre-marshal batch JSON** - marshal once per batch | Per-client JSON encode | Single encode shared | 23% heap reduction |
+
+### Remaining Bottlenecks (2026-02-06)
 
 | Issue | Impact | Notes |
 |-------|--------|-------|
-| Engine API latency | FCU + GetPayload 100-500ms | Limits block rate |
-| Nonce batching | Limits >200 TPS | Per-account sequential nonces |
-| SYNCING state | Pipeline stuck | No recovery implemented |
+| Block build time | 83-92ms at 25-30k TPS | Uses 55-61% of 150ms block budget |
+| Nonce-sequential requeue | Millions of requeues at >30k TPS | Single-account nonce ordering limits parallelism |
+| WebSocket I/O | 23% of builder CPU | Fundamental I/O cost writing preconf events |
+| secp256k1 CGO | 7-8% CPU both services | Hardware-limited, batch verification could help |
+
+## Stability
+
+- [ ] **Engine API SYNCING recovery** - When op-reth returns SYNCING, builder gets stuck. Implement retry/backoff in `pipeline.go`
 
 ---
 
