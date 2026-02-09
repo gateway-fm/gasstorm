@@ -241,7 +241,7 @@ function HistoryDetailView({ testId }: { testId: string }) {
       </div>
 
       <div className="mb-6">
-        <VerificationSummary />
+        <VerificationSummary executionLayer={testRun.executionLayer} />
       </div>
 
       {testRun && (
@@ -263,7 +263,7 @@ function HistoryDetailView({ testId }: { testId: string }) {
       )}
 
       <div className="mb-6">
-        <LatencyHistogram />
+        <LatencyHistogram executionLayer={testRun.executionLayer} />
       </div>
 
       {(testRun?.pattern === "realistic" || testRun?.pattern === "adaptive-realistic") && (

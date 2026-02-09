@@ -165,6 +165,33 @@ make stop
 - **200+ TPS**: Nonce batching becomes bottleneck
 - **Block rate**: ~4 blocks/sec at 250ms block time
 
-## Troubleshooting
-
 See [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md) for common issues including pipeline stuck, invalid JWT, low throughput, and Engine API SYNCING recovery.
+
+## Metal Mode (Native Execution)
+
+GasStorm supports "Metal Mode", running all components directly on the host machine without Docker. This provides maximum performance and easier debugging.
+
+### Prerequisites
+- **Go**: 1.21+
+- **Node.js**: 18+
+- **Rust**: (for building reth if needed)
+- **Foundry**: `anvil` (for L1)
+- **op-reth**: Installed via cargo or binary
+- **Sibling Repos**: `../blockbuilder` and `../loadgenerator` must exist relative to this repo.
+
+### Running in Metal Mode
+
+1.  **Start the stack**:
+    ```bash
+    make run-metal
+    ```
+    This script checks for prerequisites, builds binaries, and starts: L1 (Anvil), op-reth, Block Builder, Load Generator, and Dashboard.
+
+2.  **Stop the stack**:
+    ```bash
+    make stop-metal
+    ```
+    Stops all services and cleans up PID files.
+
+3.  **Logs**:
+    Logs are written to `data/metal/logs/`.

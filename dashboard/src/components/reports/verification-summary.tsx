@@ -4,7 +4,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, XCircle, AlertTriangle, Clock, ArrowRight, ShieldAlert } from "lucide-react";
 import { useGoLoadTestStore } from "@/stores/go-load-test-store";
 
-export function VerificationSummary() {
+/** Execution layers that support preconfirmations */
+const PRECONF_LAYERS = new Set(["reth", "op-reth"]);
+
+interface VerificationSummaryProps {
+  /** Execution layer name - hides preconf sections when not supported */
+  executionLayer?: string;
+}
+
+export function VerificationSummary({ executionLayer }: VerificationSummaryProps = {}) {
   const {
     status,
     txSentCount,
@@ -18,6 +26,8 @@ export function VerificationSummary() {
     txRevokedCount,
     txDroppedCount,
   } = useGoLoadTestStore();
+
+  const showPreconf = !executionLayer || PRECONF_LAYERS.has(executionLayer);
 
   // Don't show if test hasn't run
   if (status === "idle") {
@@ -96,8 +106,8 @@ export function VerificationSummary() {
             )}
           </div>
 
-          {/* Preconfirmation Pipeline (Flashblocks-compliant) */}
-          {(txPendingCount > 0 || txPreconfirmedCount > 0) && (
+          {/* Preconfirmation Pipeline (Flashblocks-compliant) - only for preconf-capable layers */}
+          {showPreconf && (txPendingCount > 0 || txPreconfirmedCount > 0) && (
             <div className="mt-4 pt-3 border-t border-border/50">
               <div className="text-xs text-muted-foreground mb-2">Preconfirmation Pipeline</div>
               <div className="flex items-center justify-between text-xs gap-1">
@@ -128,8 +138,8 @@ export function VerificationSummary() {
             </div>
           )}
 
-          {/* Revoked Warning */}
-          {hasRevoked && (
+          {/* Revoked Warning - only for preconf-capable layers */}
+          {showPreconf && hasRevoked && (
             <div className="flex items-center gap-2 text-xs text-orange-400 bg-orange-400/10 rounded p-2 mt-2">
               <ShieldAlert className="h-3 w-3" />
               {txRevokedCount.toLocaleString()} preconfirmations were revoked (execution layer rejected)
@@ -142,8 +152,8 @@ export function VerificationSummary() {
             <span className="font-mono font-semibold">{confirmRate.toFixed(1)}%</span>
           </div>
 
-          {/* Preconfirmation Rate */}
-          {txPreconfirmedCount > 0 && (
+          {/* Preconfirmation Rate - only for preconf-capable layers */}
+          {showPreconf && txPreconfirmedCount > 0 && (
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Preconf Rate</span>
               <span className="font-mono font-semibold">{preconfRate.toFixed(1)}%</span>

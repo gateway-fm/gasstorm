@@ -248,8 +248,16 @@ export function HistoryItemCard({
           </span>
           <span className="flex items-center gap-1 font-mono">
             <Activity className="h-3 w-3 text-info" />
-            {(result.averageTps ?? 0).toFixed(1)} tx/s
+            {((result.averageTps ?? 0) > 0
+              ? (result.averageTps ?? 0).toFixed(0)
+              : ((result as TestRun).onChainTps ?? 0).toFixed(0)
+            )} tx/s
           </span>
+          {((result as TestRun).avgMgasPerSec ?? 0) > 0 && (
+            <span className="flex items-center gap-1 font-mono text-warning hidden sm:flex">
+              {((result as TestRun).avgMgasPerSec ?? 0).toFixed(0)} MGas/s
+            </span>
+          )}
           <span className="flex items-center gap-1">
             <CheckCircle className="h-3 w-3 text-success" />
             {getSuccessRate(result)}%
@@ -357,8 +365,10 @@ export function HistoryItemCard({
             </div>
           ) : null}
 
-          {/* Latency Stats */}
-          {result.preconfLatency && result.preconfLatency.count > 0 && (
+          {/* Latency Stats - only show preconf for preconf-capable layers */}
+          {(result as TestRun).executionLayer !== "cdk-erigon" &&
+           (result as TestRun).executionLayer !== "gravity-reth" &&
+           result.preconfLatency && result.preconfLatency.count > 0 && (
             <div className="flex items-center gap-2 p-2 bg-success/10 rounded">
               <Zap className="h-4 w-4 text-success" />
               <span className="text-success">Preconf:</span>

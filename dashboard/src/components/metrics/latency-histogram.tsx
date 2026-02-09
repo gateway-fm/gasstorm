@@ -138,12 +138,36 @@ function LatencyCard({ title, stats, barColors, emptyMessage }: LatencyCardProps
   );
 }
 
-export function LatencyHistogram() {
+/** Execution layers that support preconfirmations */
+const PRECONF_LAYERS = new Set(["reth", "op-reth"]);
+
+interface LatencyHistogramProps {
+  /** Execution layer name - hides preconf/pending cards when not supported */
+  executionLayer?: string;
+}
+
+export function LatencyHistogram({ executionLayer }: LatencyHistogramProps = {}) {
   const { latencyStats, preconfLatencyStats, pendingLatencyStats, status } = useGoLoadTestStore();
 
   // Don't show if test hasn't run
   if (status === "idle") {
     return null;
+  }
+
+  const showPreconf = !executionLayer || PRECONF_LAYERS.has(executionLayer);
+
+  if (!showPreconf) {
+    // Only show confirmation latency for non-preconf layers
+    return (
+      <div className="grid gap-4 md:grid-cols-1 max-w-md">
+        <LatencyCard
+          title="Confirmation Latency"
+          stats={latencyStats}
+          barColors={CONFIRM_BUCKET_COLORS}
+          emptyMessage="No confirmation latency data (on-chain verification only)"
+        />
+      </div>
+    );
   }
 
   return (

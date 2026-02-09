@@ -78,6 +78,7 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
                   durationSec: Math.round(run.durationMs / 1000),
                 },
                 txLoggingEnabled: run.txLoggingEnabled,
+                executionLayer: run.executionLayer,
                 customName: run.customName,
                 isFavorite: run.isFavorite,
               };

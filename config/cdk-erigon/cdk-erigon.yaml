@@ -1,5 +1,8 @@
 # CDK-Erigon Sequencer Configuration for Devnet
-# This config runs cdk-erigon as a standalone sequencer without L1 dependency
+# Fully sovereign mode with PMT, normalcy, and virtual counters disabled.
+# Based on elliothllm/dev-env templates + gasstorm-specific settings.
+#
+# CDK_ERIGON_SEQUENCER=1 env var activates sequencer mode.
 
 datadir: /data
 chain: dynamic-devnet
@@ -8,7 +11,7 @@ chain: dynamic-devnet
 http: true
 http.addr: "0.0.0.0"
 http.port: 8545
-http.api: ["eth", "net", "web3", "txpool", "zkevm"]
+http.api: ["eth", "debug", "net", "trace", "web3", "erigon", "txpool", "zkevm"]
 http.corsdomain: "*"
 http.vhosts: "*"
 
@@ -20,33 +23,68 @@ ws.port: 8546
 # Private API (internal gRPC)
 private.api.addr: "0.0.0.0:9091"
 
-# zkEVM Configuration
-zkevm:
-  l2-chain-id: 42069
+# External consensus layer
+externalcl: true
 
-  # Disable strict executor mode - allows running without prover/executor
-  executor-strict: false
-  executor-urls: ""
-
-  # No L1 sync for standalone devnet mode
-  l1-rpc-url: ""
-  l1-chain-id: 0
-
-  # Sequencer address (Anvil default account 0)
-  address-sequencer: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
-
-  # Disable features not needed for devnet
-  data-stream-port: 0
-  data-stream-host: ""
-
-# Logging
-log.console.verbosity: 3
+# Logging (3=info, 4=debug, 5=trace)
+log.console.verbosity: 4
 
 # Disable metrics for simplicity
 metrics: false
 
-# TxPool settings
-txpool.accountslots: 16
-txpool.globalslots: 10000
-txpool.accountqueue: 64
-txpool.globalqueue: 10000
+# TxPool settings (sized for high-throughput load testing)
+txpool.accountslots: 64
+txpool.globalslots: 100000
+txpool.accountqueue: 256
+txpool.globalqueue: 100000
+
+# zkEVM configuration (dotted notation)
+zkevm.l2-chain-id: 42069
+zkevm.l1-chain-id: 31337
+zkevm.l1-rpc-url: "http://l1:8545"
+zkevm.l1-rollup-id: 1
+zkevm.l1-first-block: 1
+zkevm.address-sequencer: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+zkevm.address-admin: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+zkevm.address-zkevm: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+zkevm.address-rollup: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+zkevm.address-ger-manager: "0x0000000000000000000000000000000000000001"
+zkevm.l1-matic-contract-address: "0x0000000000000000000000000000000000000001"
+
+zkevm.executor-strict: false
+zkevm.executor-urls: ""
+
+# Gas pricing
+zkevm.default-gas-price: 1000000000
+zkevm.max-gas-price: 10000000000000
+zkevm.allow-free-transactions: true
+zkevm.reject-low-gas-price-transactions: false
+
+# Data stream
+zkevm.data-stream-host: "0.0.0.0"
+zkevm.data-stream-port: 6900
+
+# Sequencer timing
+zkevm.sequencer-block-seal-time: "500ms"
+zkevm.sequencer-batch-seal-time: "6s"
+zkevm.sequencer-empty-block-seal-time: "2s"
+zkevm.sequencer-timeout-on-empty-tx-pool: "5ms"
+zkevm.sequencer-block-gas-limit: 1500000000
+zkevm.sequencer-batch-verification-timeout: "0s"
+
+# CRITICAL: Disable ZK virtual counters (normalcy mode)
+zkevm.disable-virtual-counters: true
+zkevm.virtual-counters-smt-reduction: 0.6
+zkevm.witness-full: false
+
+# L1 contract settings (minimal L1 setup)
+zkevm.l1-contract-address-check: false
+zkevm.l1-contract-address-retrieve: false
+zkevm.l1-highest-block-type: "latest"
+zkevm.pessimistic-fork-number: 12
+zkevm.l1-block-range: 1000
+zkevm.l1-query-delay: 500
+
+# Misc
+zkevm.allow-pre-eip155-transactions: true
+zkevm.rpc-ratelimit: 0

@@ -96,28 +96,27 @@ services:
   # OVERHANGING: CDK-Erigon (alternative execution layer)
   # ===========================================================================
 
-  # Layer 2 - CDK-Erigon (alternative execution layer - sequencer mode)
+  # Layer 2 - CDK-Erigon (alternative execution layer - sovereign sequencer mode)
   # When using cdk-erigon, the block-builder is NOT used - cdk-erigon is its own sequencer
   l2-cdk-erigon:
-    image: hermeznetwork/cdk-erigon:20251127001542-3aa1157
+    image: cdk-erigon:local
     container_name: gasstorm-cdk-erigon
     profiles: ["cdk-erigon"]
+    user: root
     depends_on:
       l1:
         condition: service_healthy
     environment:
       - CDK_ERIGON_SEQUENCER=1
+      # MDBX performance tuning (matching reth optimizations)
+      - NO_SYNC=true              # ~10x faster writes, async flushes (like reth's safe-no-sync)
+      - MDBX_DIRTY_SPACE_MB=2048  # 2GB dirty space buffer (default ~1/42 of RAM)
+    # Config-only approach (matching Gateway production pattern)
+    # All zkevm.* settings are in the YAML config file
+    # --db.read.concurrency increases roTxsLimiter (default: GOMAXPROCS*64, bottleneck at >3500 TPS)
     command: [
-      "--config=/config/cdk-erigon.yaml",
-      "--datadir=/data",
-      "--http",
-      "--http.addr=0.0.0.0",
-      "--http.port=8545",
-      "--http.api=eth,net,web3,txpool,zkevm",
-      "--http.corsdomain=*",
-      "--ws",
-      "--ws.addr=0.0.0.0",
-      "--ws.port=8546"
+      "--config", "/config/cdk-erigon.yaml",
+      "--db.read.concurrency", "9000"
     ]
     volumes:
       - ./config/cdk-erigon:/config:ro
@@ -125,14 +124,6 @@ services:
     ports:
       - "18546:8545"   # L2 RPC (same external port as op-reth for consistency)
       - "18547:8546"   # L2 WebSocket
-    deploy:
-      resources:
-        limits:
-          cpus: '4'
-          memory: 8G
-        reservations:
-          cpus: '2'
-          memory: 4G
     restart: unless-stopped
 
   # Dashboard with RPC proxy (Next.js static build) - for op-reth mode
@@ -260,6 +251,7 @@ services:
       - loadgen-data:/data
     ports:
       - "13001:3001"   # REST API for load test control
+      - "16061:6061"   # pprof for profiling
     restart: unless-stopped
 
   # Load Generator Service (Go) - for cdk-erigon mode (profile: cdk-erigon)
@@ -268,6 +260,10 @@ services:
     image: gatewayfm/loadgenerator:${LOADGENERATOR_VERSION:-latest}
     container_name: gasstorm-loadgen
     profiles: ["cdk-erigon"]
+    networks:
+      default:
+        aliases:
+          - load-generator
     depends_on:
       - l2-cdk-erigon
     environment:
