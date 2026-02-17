@@ -10,10 +10,10 @@ Complete configuration reference for GasStorm.
 |----------|---------|-------------|
 | `BLOCK_TIME_MS` | 1000 | Block interval in milliseconds |
 | `GAS_LIMIT` | 1000000000 | Block gas limit (1 gigagas) |
-| `MAX_TXS_PER_BLOCK` | 25000 | Maximum transactions per block |
-| `TX_ORDERING` | fifo | Transaction ordering: `fifo`, `tip_desc`, `tip_asc` |
+| `MAX_TXS_PER_BLOCK` | 50000 | Maximum transactions per block |
+| `TX_ORDERING` | tip_desc | Transaction ordering: `fifo`, `tip_desc`, `tip_asc` |
 | `ENABLE_PRECONFIRMATIONS` | true | WebSocket preconfirmation events |
-| `SKIP_EMPTY_BLOCKS` | false | Don't produce blocks without transactions |
+| `SKIP_EMPTY_BLOCKS` | true | Don't produce blocks without transactions |
 
 ### Load Generator
 
@@ -112,13 +112,11 @@ make stop
 make test
 
 # Specific test suites
-make test-block-builder
 make test-load-generator
 make test-dashboard
 make test-contract
 
 # Benchmarks
-make bench-block-builder
 make bench-load-generator
 
 # Integration tests
@@ -254,4 +252,4 @@ docker compose logs block-builder
 make stop && make run-reth
 ```
 
-See [Architecture](./architecture.md) for deep dive on nonce management and transaction lifecycle.
+See [System Architecture](./system-architecture.md) for deep dive on nonce management and transaction lifecycle.

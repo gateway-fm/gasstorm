@@ -86,7 +86,7 @@ open http://localhost:18000/load-test/
 # Performance tuning
 BLOCK_TIME_MS=250       # Block interval (default: 1000ms)
 GAS_LIMIT=1000000000    # Block gas limit (1 gigagas)
-MAX_TXS_PER_BLOCK=25000 # Max TXs per block
+MAX_TXS_PER_BLOCK=50000 # Max TXs per block
 TX_ORDERING=tip_desc    # fifo | tip_desc | tip_asc
 
 # Execution layer selection
@@ -185,37 +185,9 @@ The dashboard auto-detects blob-da and shows live online/offline status in the s
 
 ## Performance
 
-- **100 TPS**: 99% success rate, ~235ms avg latency
-- **200+ TPS**: Nonce batching becomes bottleneck
-- **Block rate**: ~4 blocks/sec at 250ms block time
+- **15K TPS** (realistic mixed load): 99.8% confirmed, 1327 MGas/s peak (Metal mode, 1s blocks)
+- **25K TPS** (ETH transfers): 100% confirmed, p99 preconf 385ms (Metal mode)
+- **12K TPS** (realistic, Docker): 99% confirmed, 458 MGas/s
+- Key bottleneck: ECDSA sig verification (~40% builder CPU at high TPS)
 
 See [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md) for common issues including pipeline stuck, invalid JWT, low throughput, and Engine API SYNCING recovery.
-
-## Metal Mode (Native Execution)
-
-GasStorm supports "Metal Mode", running all components directly on the host machine without Docker. This provides maximum performance and easier debugging.
-
-### Prerequisites
-- **Go**: 1.21+
-- **Node.js**: 18+
-- **Rust**: (for building reth if needed)
-- **Foundry**: `anvil` (for L1)
-- **op-reth**: Installed via cargo or binary
-- **Sibling Repos**: `../blockbuilder` and `../loadgenerator` must exist relative to this repo.
-
-### Running in Metal Mode
-
-1.  **Start the stack**:
-    ```bash
-    make run-metal
-    ```
-    This script checks for prerequisites, builds binaries, and starts: L1 (Anvil), op-reth, Block Builder, Load Generator, and Dashboard.
-
-2.  **Stop the stack**:
-    ```bash
-    make stop-metal
-    ```
-    Stops all services and cleans up PID files.
-
-3.  **Logs**:
-    Logs are written to `data/metal/logs/`.

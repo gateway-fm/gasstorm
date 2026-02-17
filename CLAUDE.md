@@ -37,11 +37,9 @@ docker compose up --build -d
 
 Dev mode (`make dev`) expects the loadgenerator repo at `../loadgenerator`.
 
-## Execution Layer Selection [OVERHANGING]
+## Execution Layer Selection
 
 The project supports multiple execution layer backends via a **capability-based architecture**. Select via `EXECUTION_LAYER` environment variable.
-
-> **Note:** Only reth mode is core. cdk-erigon and gravity-reth are overhanging and will be extracted later.
 
 ### Capability-Based Architecture
 
@@ -75,7 +73,7 @@ type ExecutionLayerCapabilities struct {
 
 **No changes needed to:** load-generator logic, dashboard code, API handlers
 
-## Prover Selection [OVERHANGING]
+## Prover Selection
 
 | Prover | Description | Profile |
 |--------|-------------|---------|
@@ -104,7 +102,7 @@ type ExecutionLayerCapabilities struct {
 
 ## Go Setup
 
-Go 1.25 is installed locally at `~/go-local/go/bin`. Just run `go` directly:
+Requires Go 1.25+.
 
 ```bash
 go test ./...
@@ -146,22 +144,22 @@ make clean-metal    # Remove data/metal/
 | `LOADGENERATOR_VERSION` | latest | Load generator Docker image tag |
 | `BLOCK_TIME_MS` | 1000 | Block interval in milliseconds (reth only) |
 | `GAS_LIMIT` | 1000000000 | Block gas limit (1 gigagas) |
-| `MAX_TXS_PER_BLOCK` | 25000 | Maximum transactions per block (reth only) |
-| `TX_ORDERING` | fifo | Transaction ordering: `fifo`, `tip_desc`, `tip_asc` |
+| `MAX_TXS_PER_BLOCK` | 50000 | Maximum transactions per block (reth only) |
+| `TX_ORDERING` | tip_desc | Transaction ordering: `fifo`, `tip_desc`, `tip_asc` |
 | `ENABLE_PRECONFIRMATIONS` | true | WebSocket preconf events (reth only) |
-| `SKIP_EMPTY_BLOCKS` | false | Don't produce blocks without transactions (reth only) |
+| `SKIP_EMPTY_BLOCKS` | true | Don't produce blocks without transactions (reth only) |
 
 ## Performance Characteristics
 
-### Tested Sustainable Throughput:
-- **100 TPS**: 99% success rate, ~235ms avg latency
-- **200+ TPS**: Nonce batching becomes bottleneck
-- **Block rate**: ~4 blocks/sec at 250ms block time
+### Tested Sustainable Throughput (Feb 2026):
+- **15K TPS** (realistic mixed load, Metal mode): 99.8% confirmed, 1327 MGas/s peak
+- **25K TPS** (ETH transfers, Metal mode): 100% confirmed, p99 preconf 385ms
+- **12K TPS** (realistic, Docker): 99% confirmed, 458 MGas/s
 
 ### Known Bottlenecks:
-1. **Engine API SYNCING** - If op-reth falls behind, builder gets stuck
-2. **Nonce filtering** - Each block can only include sequential nonces per account
-3. **Engine API latency** - FCU + GetPayload take 100-500ms
+1. **ECDSA sig verification** - ~40% builder CPU at high TPS (CGO secp256k1)
+2. **Reth GetPayload execution** - ~55us/realistic TX, ceiling for block production
+3. **Engine API SYNCING** - If op-reth falls behind, builder gets stuck
 
 ## Key Files
 
