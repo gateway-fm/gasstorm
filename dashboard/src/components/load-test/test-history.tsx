@@ -77,6 +77,7 @@ export function TestHistory({ fullPage = false }: TestHistoryProps) {
                   pattern: run.pattern,
                   durationSec: Math.round(run.durationMs / 1000),
                 },
+                environment: run.environment,
                 txLoggingEnabled: run.txLoggingEnabled,
                 executionLayer: run.executionLayer,
                 customName: run.customName,

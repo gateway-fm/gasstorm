@@ -27,9 +27,9 @@ export const NODE_POSITIONS = {
     loadGenerator: { x: 280, y: 80 },
     blockBuilder: { x: 280, y: 280 },
     execution: { x: 280, y: 480 },
-    // RIGHT: Bridge Services
     bridgeRelayer: { x: 530, y: 200 },
     bridgeUI: { x: 530, y: 400 },
+    blobDA: { x: 100, y: 280 },
   },
   // Direct sequencer layout (gravity-reth, cdk-erigon) - Three column layout
   directSequencer: {
@@ -41,6 +41,7 @@ export const NODE_POSITIONS = {
     // RIGHT: Bridge Services
     bridgeRelayer: { x: 530, y: 200 },
     bridgeUI: { x: 530, y: 400 },
+    blobDA: { x: 100, y: 550 },
   },
 } as const;
 
@@ -67,6 +68,10 @@ export const COLORS = {
   l1: {
     bg: "hsl(var(--chart-4))",
     border: "hsl(var(--chart-4))",
+  },
+  blobDA: {
+    bg: "hsl(var(--chart-5))",
+    border: "hsl(var(--chart-5))",
   },
   status: {
     online: "rgb(34, 197, 94)", // green-500

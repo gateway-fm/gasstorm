@@ -17,11 +17,18 @@ interface BridgeStatus {
   activeTransfers: number;
 }
 
+export interface BlobDAStatus {
+  isOnline: boolean;
+  latestBatch: number;
+  compression: string;
+}
+
 interface ChainState {
   l1: ChainStatus;
   l2: ChainStatus;
   builder: BuilderStatus;
   bridge: BridgeStatus;
+  blobDA: BlobDAStatus;
   accountL1Balance: bigint;
   accountL2Balance: bigint;
   logs: LogEntry[];
@@ -34,6 +41,7 @@ interface ChainActions {
   setL2Status: (status: Partial<ChainStatus>) => void;
   setBuilderStatus: (status: Partial<BuilderStatus>) => void;
   setBridgeStatus: (status: Partial<BridgeStatus>) => void;
+  setBlobDAStatus: (status: Partial<BlobDAStatus>) => void;
   setAccountBalances: (l1?: bigint, l2?: bigint) => void;
   setLastL1Block: (block: number) => void;
   setLastL2Block: (block: number) => void;
@@ -65,12 +73,19 @@ const initialBridgeStatus: BridgeStatus = {
   activeTransfers: 0,
 };
 
+const initialBlobDAStatus: BlobDAStatus = {
+  isOnline: false,
+  latestBatch: 0,
+  compression: "unknown",
+};
+
 export const useChainStore = create<ChainStore>((set) => ({
   // State
   l1: { ...initialChainStatus },
   l2: { ...initialChainStatus },
   builder: { ...initialBuilderStatus },
   bridge: { ...initialBridgeStatus },
+  blobDA: { ...initialBlobDAStatus },
   accountL1Balance: 0n,
   accountL2Balance: 0n,
   logs: [
@@ -103,6 +118,11 @@ export const useChainStore = create<ChainStore>((set) => ({
   setBridgeStatus: (status) =>
     set((state) => ({
       bridge: { ...state.bridge, ...status },
+    })),
+
+  setBlobDAStatus: (status) =>
+    set((state) => ({
+      blobDA: { ...state.blobDA, ...status },
     })),
 
   setAccountBalances: (l1, l2) =>

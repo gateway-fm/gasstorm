@@ -27,6 +27,13 @@ const COLORS = {
   axis: colors.axis,
 };
 
+interface ChartPoint {
+  time: string;
+  mgasPerSec: number;
+  txPerSec: number;
+  fillRate: number;
+}
+
 export function RealTimeChart() {
   const { timeSeries: historicalTimeSeries, snapshot: historicalSnapshot, isHistoricalMode } = useMetricsStore();
   const {
@@ -41,8 +48,6 @@ export function RealTimeChart() {
   } = useGoLoadTestStore();
 
   // Select data source based on mode
-  // Live mode: Use Go load generator data (sampled at 200ms)
-  // Historical mode: Use hydrated metrics-store data
   const timeSeries = useMemo(() => {
     return isHistoricalMode ? {
       timestamps: historicalTimeSeries.timestamps,
@@ -52,7 +57,9 @@ export function RealTimeChart() {
     } : liveTimeSeries;
   }, [isHistoricalMode, historicalTimeSeries, liveTimeSeries]);
 
-  // Snapshot values for header display
+  // Header snapshot — the WS manager's frozen flag already prevents store updates
+  // to these fields after the test duration is reached, so no component-level
+  // freeze is needed.
   const snapshot = isHistoricalMode ? historicalSnapshot : {
     currentMgasPerSec,
     currentTxPerSec: liveTxPerSec,
@@ -67,7 +74,6 @@ export function RealTimeChart() {
     (isHistoricalMode && (snapshot.currentMgasPerSec > 0 || snapshot.peakMgasPerSec > 0));
 
   const chartData = useMemo(() => {
-    // Maximum points to display on chart
     const maxDisplayPoints = 300;
     const totalPoints = timeSeries.timestamps.length;
 
@@ -84,34 +90,28 @@ export function RealTimeChart() {
       }
     }
 
-    // Use the first non-zero point as base for relative time
     const baseTimestamp = timeSeries.timestamps[startIndex] ?? 0;
 
-    // Determine the window of data to display:
-    // - If we have fewer points than maxDisplayPoints, show all
-    // - Otherwise, show the most recent maxDisplayPoints (sliding window)
     const availablePoints = totalPoints - startIndex;
     const windowStart = availablePoints <= maxDisplayPoints
       ? startIndex
       : totalPoints - maxDisplayPoints;
 
-    // Apply moving average smoothing to reduce zigzag noise
-    // Window size of 5 smooths out high-frequency noise while preserving trends
-    const smoothingWindow = 5;
-
+    // Trailing moving average (causal) — ~3 seconds at 200ms sample interval,
+    // matching the history view's smoothing for visual consistency.
+    const smoothingWindow = 15;
     const smooth = (arr: number[], idx: number): number => {
-      const half = Math.floor(smoothingWindow / 2);
+      const start = Math.max(0, idx - smoothingWindow + 1);
       let sum = 0;
       let count = 0;
-      for (let j = Math.max(0, idx - half); j <= Math.min(arr.length - 1, idx + half); j++) {
+      for (let j = start; j <= idx; j++) {
         sum += arr[j] ?? 0;
         count++;
       }
       return count > 0 ? sum / count : 0;
     };
 
-    // Build chart data from the window with smoothing applied
-    const chartPoints: { time: string; mgasPerSec: number; txPerSec: number; fillRate: number }[] = [];
+    const chartPoints: ChartPoint[] = [];
 
     for (let i = windowStart; i < totalPoints; i++) {
       const relativeSeconds = Math.round(timeSeries.timestamps[i] - baseTimestamp);
@@ -129,6 +129,116 @@ export function RealTimeChart() {
 
     return chartPoints;
   }, [timeSeries]);
+
+  // Memoize the entire Recharts tree so it doesn't re-render when unrelated
+  // store fields change (e.g. txConfirmedCount during verification).
+  // The WS manager's frozen flag stops updating chartTimeSeries after the test
+  // duration, so chartData is naturally stable after freeze.
+  const chartElement = useMemo(() => {
+    if (chartData.length === 0) return null;
+    return (
+      <ResponsiveContainer width="100%" height="100%" debounce={1}>
+        <LineChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} />
+          <XAxis
+            dataKey="time"
+            stroke={COLORS.axis}
+            fontSize={10}
+            tickLine={false}
+          />
+          {hasMgasData ? (
+            <>
+              <YAxis
+                yAxisId="left"
+                stroke={COLORS.mgas}
+                fontSize={10}
+                tickLine={false}
+                label={{
+                  value: "Mgas/s",
+                  angle: -90,
+                  position: "insideLeft",
+                  style: { fill: COLORS.mgas, fontSize: 10 },
+                }}
+              />
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                stroke={COLORS.tps}
+                fontSize={10}
+                tickLine={false}
+                label={{
+                  value: "tx/s",
+                  angle: 90,
+                  position: "insideRight",
+                  style: { fill: COLORS.tps, fontSize: 10 },
+                }}
+              />
+            </>
+          ) : (
+            <YAxis
+              yAxisId="left"
+              stroke={COLORS.tps}
+              fontSize={10}
+              tickLine={false}
+              label={{
+                value: "tx/s",
+                angle: -90,
+                position: "insideLeft",
+                style: { fill: COLORS.tps, fontSize: 10 },
+              }}
+            />
+          )}
+          <Tooltip
+            contentStyle={{
+              backgroundColor: colors.background,
+              border: `1px solid ${colors.border}`,
+              borderRadius: "8px",
+            }}
+            labelStyle={{ color: COLORS.axis }}
+          />
+          <Legend />
+          {hasMgasData && (
+            <>
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="mgasPerSec"
+                name="Mgas/s"
+                stroke={COLORS.mgas}
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 4 }}
+                isAnimationActive={false}
+              />
+              <Line
+                yAxisId="left"
+                type="monotone"
+                dataKey="fillRate"
+                name="Fill %"
+                stroke={COLORS.warning}
+                strokeWidth={1.5}
+                strokeDasharray="4 2"
+                dot={false}
+                activeDot={{ r: 3 }}
+                isAnimationActive={false}
+              />
+            </>
+          )}
+          <Line
+            yAxisId={hasMgasData ? "right" : "left"}
+            type="monotone"
+            dataKey="txPerSec"
+            name="tx/s"
+            stroke={COLORS.tps}
+            strokeWidth={2}
+            dot={false}
+            activeDot={{ r: 4 }}
+            isAnimationActive={false}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    );
+  }, [chartData, hasMgasData]);
 
   return (
     <Card className="col-span-2">
@@ -154,9 +264,13 @@ export function RealTimeChart() {
                 </span>
               </div>
               <div>
-                <span className="text-muted-foreground">Fill: </span>
-                <span className="font-mono font-semibold" style={{ color: COLORS.warning }}>
-                  {snapshot.averageFillRate.toFixed(1)}%
+                <span className="text-muted-foreground">TPS: </span>
+                <span className="font-mono font-semibold" style={{ color: COLORS.tps }}>
+                  {snapshot.currentTxPerSec.toFixed(0)}
+                </span>
+                <span className="text-muted-foreground"> / </span>
+                <span className="font-mono font-semibold" style={{ color: COLORS.tps }}>
+                  {snapshot.peakTxPerSec.toFixed(0)} peak
                 </span>
               </div>
             </>
@@ -180,105 +294,7 @@ export function RealTimeChart() {
       </CardHeader>
       <CardContent>
         <div className="h-[300px] min-w-0 w-full">
-          {chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%" debounce={1}>
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke={COLORS.grid} />
-                <XAxis
-                  dataKey="time"
-                  stroke={COLORS.axis}
-                  fontSize={10}
-                  tickLine={false}
-                />
-                {hasMgasData ? (
-                  <>
-                    <YAxis
-                      yAxisId="left"
-                      stroke={COLORS.mgas}
-                      fontSize={10}
-                      tickLine={false}
-                      label={{
-                        value: "Mgas/s",
-                        angle: -90,
-                        position: "insideLeft",
-                        style: { fill: COLORS.mgas, fontSize: 10 },
-                      }}
-                    />
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      stroke={COLORS.tps}
-                      fontSize={10}
-                      tickLine={false}
-                      label={{
-                        value: "tx/s",
-                        angle: 90,
-                        position: "insideRight",
-                        style: { fill: COLORS.tps, fontSize: 10 },
-                      }}
-                    />
-                  </>
-                ) : (
-                  <YAxis
-                    yAxisId="left"
-                    stroke={COLORS.tps}
-                    fontSize={10}
-                    tickLine={false}
-                    label={{
-                      value: "tx/s",
-                      angle: -90,
-                      position: "insideLeft",
-                      style: { fill: COLORS.tps, fontSize: 10 },
-                    }}
-                  />
-                )}
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: colors.background,
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: "8px",
-                  }}
-                  labelStyle={{ color: COLORS.axis }}
-                />
-                <Legend />
-                {hasMgasData && (
-                  <>
-                    <Line
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="mgasPerSec"
-                      name="Mgas/s"
-                      stroke={COLORS.mgas}
-                      strokeWidth={2}
-                      dot={false}
-                      activeDot={{ r: 4 }}
-                    />
-                    <Line
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="fillRate"
-                      name="Fill %"
-                      stroke={COLORS.warning}
-                      strokeWidth={1.5}
-                      strokeDasharray="4 2"
-                      dot={false}
-                      activeDot={{ r: 3 }}
-                    />
-                  </>
-                )}
-                <Line
-                  yAxisId={hasMgasData ? "right" : "left"}
-                  type="monotone"
-                  dataKey="txPerSec"
-                  name="tx/s"
-                  stroke={COLORS.tps}
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
+          {chartElement ?? (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
               {liveStatus === "completed" || liveStatus === "error" ? (
                 <>

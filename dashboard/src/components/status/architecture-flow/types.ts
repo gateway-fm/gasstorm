@@ -57,6 +57,12 @@ export interface BridgeUINodeData extends BaseNodeData {
   port: number;
 }
 
+// Blob DA node data
+export interface BlobDANodeData extends BaseNodeData {
+  latestBatch: number;
+  compression: string;
+}
+
 // Typed nodes using xyflow Node type
 export type LoadGeneratorNode = Node<LoadGeneratorNodeData, "loadGenerator">;
 export type BlockBuilderNode = Node<BlockBuilderNodeData, "blockBuilder">;
@@ -64,6 +70,7 @@ export type ExecutionNode = Node<ExecutionNodeData, "execution">;
 export type L1Node = Node<L1NodeData, "l1">;
 export type BridgeRelayerNode = Node<BridgeRelayerNodeData, "bridgeRelayer">;
 export type BridgeUINode = Node<BridgeUINodeData, "bridgeUI">;
+export type BlobDANode = Node<BlobDANodeData, "blobDA">;
 
 export type ArchitectureNode =
   | LoadGeneratorNode
@@ -71,7 +78,8 @@ export type ArchitectureNode =
   | ExecutionNode
   | L1Node
   | BridgeRelayerNode
-  | BridgeUINode;
+  | BridgeUINode
+  | BlobDANode;
 
 // Edge data for animation state
 export interface AnimatedEdgeData extends Record<string, unknown> {

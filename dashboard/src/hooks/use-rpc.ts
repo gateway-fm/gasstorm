@@ -1,13 +1,19 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { l1, l2, builder } from "@/lib/rpc-client";
+import { l1, l2, builder, blobDA } from "@/lib/rpc-client";
 import { TEST_ACCOUNT } from "@/types/chain";
 import { useChainStore } from "@/stores/chain-store";
 
+const COMPRESSION_NAMES: Record<number, string> = {
+  0: "none",
+  1: "brotli",
+  2: "zstd",
+};
+
 export function useChainData() {
   const [isLoading, setIsLoading] = useState(true);
-  const { setL1Status, setL2Status, setBuilderStatus, setAccountBalances, addLog } = useChainStore();
+  const { setL1Status, setL2Status, setBuilderStatus, setBlobDAStatus, setAccountBalances, addLog } = useChainStore();
 
   const fetchL1Data = useCallback(async () => {
     try {
@@ -65,6 +71,22 @@ export function useChainData() {
     }
   }, [setBuilderStatus]);
 
+  const fetchBlobDAData = useCallback(async () => {
+    try {
+      const blobs = await blobDA.getBlobs(1, 0);
+      const latest = blobs?.[0];
+      setBlobDAStatus({
+        isOnline: true,
+        latestBatch: latest ? latest.endBatch : 0,
+        compression: latest ? (COMPRESSION_NAMES[latest.compression] ?? "unknown") : "unknown",
+      });
+      return true;
+    } catch {
+      setBlobDAStatus({ isOnline: false });
+      return false;
+    }
+  }, [setBlobDAStatus]);
+
   const fetchBalances = useCallback(async () => {
     try {
       const [l1Balance, l2Balance] = await Promise.all([
@@ -79,9 +101,9 @@ export function useChainData() {
 
   const refreshAll = useCallback(async () => {
     setIsLoading(true);
-    await Promise.all([fetchL1Data(), fetchL2Data(), fetchBuilderStatus(), fetchBalances()]);
+    await Promise.all([fetchL1Data(), fetchL2Data(), fetchBuilderStatus(), fetchBlobDAData(), fetchBalances()]);
     setIsLoading(false);
-  }, [fetchL1Data, fetchL2Data, fetchBuilderStatus, fetchBalances]);
+  }, [fetchL1Data, fetchL2Data, fetchBuilderStatus, fetchBlobDAData, fetchBalances]);
 
   useEffect(() => {
     // Use microtask to avoid synchronous setState in effect body
@@ -101,6 +123,7 @@ export function useChainData() {
     fetchL1Data,
     fetchL2Data,
     fetchBuilderStatus,
+    fetchBlobDAData,
     fetchBalances,
   };
 }

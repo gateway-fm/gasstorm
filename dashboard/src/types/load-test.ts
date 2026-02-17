@@ -299,6 +299,7 @@ export interface TestResult {
     adaptiveRateStep?: number;
     realisticConfig?: RealisticTestConfig;
   };
+  environment?: EnvironmentSnapshot;
 }
 
 export const DEFAULT_LOAD_TEST_CONFIG: LoadTestConfig = {
@@ -368,6 +369,11 @@ export interface EnvironmentSnapshot {
   builderTxOrdering: TxOrdering;
   builderEnablePreconfs: boolean;
   builderSkipEmptyBlocks: boolean;
+  builderIncludeDepositTx?: boolean;
+  builderBlockAttestationEnabled?: boolean;
+  builderHsmProvider?: string;
+  builderHsmKeyIdActive?: string;
+  builderHsmFailoverEnabled?: boolean;
   // Load generator config
   loadGenGasTipCapGwei: number;
   loadGenGasFeeCapGwei: number;
@@ -429,6 +435,31 @@ export interface TxReceiptVerification {
   revertedTxs?: TxReceiptSample[]; // All reverted TXs (up to 100)
 }
 
+// Header attestation signature for a finalized block
+export interface HeaderAttestation {
+  schemaVersion?: number;
+  status?: "signed" | "failed" | string;
+  blockNumber: number;
+  blockHash?: string;
+  parentHash?: string;
+  stateRoot?: string;
+  receiptsRoot?: string;
+  timestamp?: number;
+  gasUsed?: number;
+  baseFeeWei?: string;
+  sequencer?: string;
+  digestHex?: string;
+  signatureHex?: string;
+  rHex?: string;
+  sHex?: string;
+  v?: number;
+  keyId?: string;
+  provider?: string;
+  failover?: boolean;
+  error?: string;
+  signedAt?: string;
+}
+
 // Overall verification result
 export interface VerificationResult {
   // On-chain metrics comparison
@@ -442,6 +473,10 @@ export interface VerificationResult {
   // Summary
   allChecksPass: boolean;
   warnings?: string[];
+  // Header attestation signatures (HSM / block attestation)
+  headerAttestationExpected?: number;
+  headerAttestationFound?: number;
+  headerAttestations?: HeaderAttestation[];
 }
 
 // Test run from persistent storage (enhanced version of TestResult)

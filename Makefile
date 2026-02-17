@@ -1,4 +1,4 @@
-.PHONY: run run-build run-reth run-cdk-erigon run-metal stop-metal restart-metal run-hyperlane stop restart logs status clean clean-metal build test test-load-generator test-dashboard test-tx bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help pull-blockbuilder pull-loadgenerator mcp-server mcp-build site-dev site-build
+.PHONY: run run-build run-reth run-cdk-erigon run-metal stop-metal restart-metal run-hyperlane stop restart logs status clean clean-metal build test test-load-generator test-dashboard test-tx bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-with-blob run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help pull-blockbuilder pull-loadgenerator mcp-server mcp-build site-dev site-build
 
 # =============================================================================
 # Configuration: Source .env file if it exists
@@ -131,7 +131,7 @@ run-flashblocks:
 
 # Stop all services (stops all profiles)
 stop:
-	docker compose --profile reth --profile cdk-erigon --profile bridge down 2>/dev/null || true
+	docker compose --profile reth --profile cdk-erigon --profile bridge --profile blob down 2>/dev/null || true
 	docker compose -f docker-compose-base.yaml -f docker-compose-gravity-reth.yaml down 2>/dev/null || true
 
 # Restart all services
@@ -148,12 +148,12 @@ logs-service:
 
 # Show status of all services
 status:
-	docker compose --profile reth --profile cdk-erigon ps 2>/dev/null || true
+	docker compose --profile reth --profile cdk-erigon --profile blob ps 2>/dev/null || true
 	docker compose -f docker-compose-base.yaml -f docker-compose-gravity-reth.yaml ps 2>/dev/null || true
 
 # Clean up volumes and rebuild
 clean:
-	docker compose --profile reth --profile cdk-erigon down -v 2>/dev/null || true
+	docker compose --profile reth --profile cdk-erigon --profile blob down -v 2>/dev/null || true
 	docker compose -f docker-compose-base.yaml -f docker-compose-gravity-reth.yaml down -v 2>/dev/null || true
 	docker system prune -f
 
@@ -425,6 +425,10 @@ dev-cdk-erigon:
 		echo ""; \
 		wait \
 	'
+
+# Start with Blob DA enabled
+run-with-blob:
+	docker compose --profile $(COMPOSE_PROFILE) --profile blob up --build -d
 
 # Start with Hyperlane bridge enabled
 run-with-bridge:
@@ -756,6 +760,10 @@ help:
 	@echo "    make run-cdk-erigon   - Start with cdk-erigon (standalone sequencer)"
 	@echo "    make run-gravity-reth - Start with gravity-reth (high-perf parallel EVM)"
 	@echo "    make dev-cdk-erigon   - Run with cdk-erigon in Docker, rest locally"
+	@echo ""
+	@echo "  ==== OVERHANGING: Blob DA ===="
+	@echo ""
+	@echo "    make run-with-blob    - Start with Blob DA enabled"
 	@echo ""
 	@echo "  ==== OVERHANGING: Hyperlane Bridge ===="
 	@echo ""

@@ -6,10 +6,18 @@ import { useGoLoadTestStore } from "@/stores/go-load-test-store";
 import { formatGas, formatPercent } from "@/lib/statistics";
 
 // Format block time in ms with appropriate precision
+// Always returns a plain number string; the unit is handled separately
 function formatBlockTime(ms: number): string {
   if (ms === 0) return "N/A";
   if (ms < 1000) return `${Math.round(ms)}`;
-  return `${(ms / 1000).toFixed(2)}s`;
+  return `${(ms / 1000).toFixed(2)}`;
+}
+
+// Get the appropriate unit suffix for a block time value
+function getBlockTimeUnit(ms: number): string {
+  if (ms === 0) return "";
+  if (ms < 1000) return "ms";
+  return "s";
 }
 
 // Get color based on block time relative to target
@@ -52,6 +60,10 @@ export function MetricsSnapshot() {
     peakMgasPerSec: goPeakMgasPerSec,
     avgMgasPerSec: goAvgMgasPerSec,
     avgFillRate: goAvgFillRate,
+    blockAttestationEnabled,
+    hsmProvider,
+    hsmKeyIdActive,
+    hsmFailoverEnabled,
   } = useGoLoadTestStore();
 
   // goIsHistorical = true ONLY when viewing DB-hydrated history (hydrateFromHistory).
@@ -85,6 +97,18 @@ export function MetricsSnapshot() {
   const blocksProduced = goIsHistorical ? snapshot.blocksProduced : goBlockCount;
   const totalGasUsed = goIsHistorical ? snapshot.totalGasUsed : BigInt(goTotalGasUsed);
 
+  const attestationState = blockAttestationEnabled === null
+    ? "—"
+    : (blockAttestationEnabled ? "ON" : "OFF");
+  const attestationColor = blockAttestationEnabled === null
+    ? "text-muted-foreground"
+    : (blockAttestationEnabled ? "text-success" : "text-warning");
+  const hsmProviderLabel = hsmProvider || "—";
+  const hsmKeyIdLabel = hsmKeyIdActive || "—";
+  const hsmFailoverLabel = hsmFailoverEnabled === null
+    ? "—"
+    : (hsmFailoverEnabled ? "ON" : "OFF");
+
   const metrics = [
     {
       label: isLiveRunning ? "Now" : "Avg",
@@ -117,13 +141,13 @@ export function MetricsSnapshot() {
     {
       label: "Block",
       value: (blockMetrics.length > 0 || snapshot.currentBlockTimeMs > 0) ? formatBlockTime(snapshot.currentBlockTimeMs) : "—",
-      unit: (blockMetrics.length > 0 || snapshot.currentBlockTimeMs > 0) && snapshot.currentBlockTimeMs > 0 && snapshot.currentBlockTimeMs < 1000 ? "ms" : "",
+      unit: (blockMetrics.length > 0 || snapshot.currentBlockTimeMs > 0) ? getBlockTimeUnit(snapshot.currentBlockTimeMs) : "",
       color: (blockMetrics.length > 0 || snapshot.currentBlockTimeMs > 0) ? getBlockTimeColor(snapshot.currentBlockTimeMs, targetBlockTimeMs) : "text-muted-foreground",
     },
     {
       label: "Avg Block",
       value: (blockMetrics.length > 0 || snapshot.avgBlockTimeMs > 0) ? formatBlockTime(snapshot.avgBlockTimeMs) : "—",
-      unit: (blockMetrics.length > 0 || snapshot.avgBlockTimeMs > 0) && snapshot.avgBlockTimeMs > 0 && snapshot.avgBlockTimeMs < 1000 ? "ms" : "",
+      unit: (blockMetrics.length > 0 || snapshot.avgBlockTimeMs > 0) ? getBlockTimeUnit(snapshot.avgBlockTimeMs) : "",
       color: (blockMetrics.length > 0 || snapshot.avgBlockTimeMs > 0) ? getBlockTimeColor(snapshot.avgBlockTimeMs, targetBlockTimeMs) : "text-muted-foreground",
     },
     {
@@ -162,6 +186,30 @@ export function MetricsSnapshot() {
       unit: "",
       color: "text-warning",
     },
+    {
+      label: "Attestation",
+      value: attestationState,
+      unit: "",
+      color: attestationColor,
+    },
+    {
+      label: "HSM Provider",
+      value: hsmProviderLabel,
+      unit: "",
+      color: hsmProviderLabel === "—" ? "text-muted-foreground" : "text-info",
+    },
+    {
+      label: "HSM Key",
+      value: hsmKeyIdLabel,
+      unit: "",
+      color: hsmKeyIdLabel === "—" ? "text-muted-foreground" : "text-info",
+    },
+    {
+      label: "HSM Failover",
+      value: hsmFailoverLabel,
+      unit: "",
+      color: hsmFailoverLabel === "—" ? "text-muted-foreground" : (hsmFailoverLabel === "ON" ? "text-success" : "text-warning"),
+    },
   ];
 
   return (
@@ -174,14 +222,14 @@ export function MetricsSnapshot() {
       <CardContent>
         <div className="grid grid-cols-3 gap-2">
           {metrics.map((metric) => (
-            <div key={metric.label} className="rounded-lg border p-2 min-w-0 overflow-hidden">
+            <div key={metric.label} className="rounded-lg border p-2 min-w-0 overflow-hidden h-[68px]">
               <p className="text-[10px] text-muted-foreground font-mono truncate">{metric.label}</p>
               <p className={`text-base font-bold font-mono ${metric.color} truncate`}>
                 {metric.value}
               </p>
-              {metric.unit && (
-                <p className="text-[10px] text-muted-foreground font-mono truncate">{metric.unit}</p>
-              )}
+              <p className="text-[10px] text-muted-foreground font-mono truncate h-[14px]">
+                {metric.unit || "\u00A0"}
+              </p>
             </div>
           ))}
         </div>

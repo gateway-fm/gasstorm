@@ -48,6 +48,11 @@ const nextConfig: NextConfig = {
               source: "/ws/l1",
               destination: "http://localhost:18545/",
             },
+            // Blob DA RPC
+            {
+              source: "/rpc/blobda",
+              destination: "http://localhost:18125/",
+            },
             // L2 WebSocket
             {
               source: "/ws/l2",

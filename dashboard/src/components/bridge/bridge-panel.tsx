@@ -12,6 +12,8 @@ import { toast } from "sonner";
 import { l1, l2 } from "@/lib/rpc-client";
 import { RPC_ENDPOINTS, HYPERLANE_CONTRACTS, BRIDGE_ACCOUNT, WARP_ROUTE_ABI } from "@/types/chain";
 
+import { BridgeSelector } from "./BridgeSelector";
+
 // Dynamic addresses loaded from deployment
 interface HyperlaneAddresses {
   l1: {
@@ -192,6 +194,7 @@ export function BridgePanel() {
   });
   const [deploymentStatus, setDeploymentStatus] = useState<"success" | "failed" | "unknown" | "loading">("loading");
   const [loadedFromDynamic, setLoadedFromDynamic] = useState(false);
+  const [selectedBridge, setSelectedBridge] = useState("hyperlane");
 
   // Load addresses on mount
   useEffect(() => {
@@ -467,205 +470,211 @@ export function BridgePanel() {
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
-      {/* Balances Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Balances</CardTitle>
-          <CardDescription>Account: {BRIDGE_ACCOUNT.address}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-muted-foreground">L1 (Anvil)</Label>
-              <div className="text-2xl font-bold">{formatEth(l1Balance)} ETH</div>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-muted-foreground">L2 (op-reth)</Label>
-              <div className="text-2xl font-bold">{formatEth(l2Balance)} ETH</div>
-            </div>
-          </div>
+    <div className="space-y-6">
+      <BridgeSelector selected={selectedBridge} onSelect={setSelectedBridge} />
 
-          <Separator />
-
-          <div className="space-y-2">
-            <Label className="text-muted-foreground text-sm">Warp Route Collateral</Label>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-muted-foreground">L1 Warp: </span>
-                <span className="font-mono">{formatEth(l1WarpBalance)} ETH</span>
+      {selectedBridge === "hyperlane" && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Balances Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Balances</CardTitle>
+              <CardDescription>Account: {BRIDGE_ACCOUNT.address}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">L1 (Anvil)</Label>
+                  <div className="text-2xl font-bold">{formatEth(l1Balance)} ETH</div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">L2 (op-reth)</Label>
+                  <div className="text-2xl font-bold">{formatEth(l2Balance)} ETH</div>
+                </div>
               </div>
-              <div>
-                <span className="text-muted-foreground">L2 Warp: </span>
-                <span className="font-mono">{formatEth(l2WarpBalance)} ETH</span>
-              </div>
-            </div>
-          </div>
 
-          <Button variant="outline" size="sm" onClick={fetchBalances} className="w-full">
-            Refresh Balances
-          </Button>
-        </CardContent>
-      </Card>
+              <Separator />
 
-      {/* Bridge Actions Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Bridge ETH</CardTitle>
-          <CardDescription>Transfer ETH between L1 and L2 via Hyperlane</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Deposit (L1 -> L2) */}
-          <div className="space-y-3">
-            <Label>Deposit (L1 &rarr; L2)</Label>
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Amount in ETH"
-                value={depositAmount}
-                onChange={(e) => setDepositAmount(e.target.value)}
-                disabled={isDepositing}
-              />
-              <Button
-                onClick={handleDeposit}
-                disabled={isDepositing || !depositAmount}
-                className="min-w-[100px]"
-              >
-                {isDepositing ? "Sending..." : "Deposit"}
-              </Button>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Withdraw (L2 -> L1) */}
-          <div className="space-y-3">
-            <Label>Withdraw (L2 &rarr; L1)</Label>
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Amount in ETH"
-                value={withdrawAmount}
-                onChange={(e) => setWithdrawAmount(e.target.value)}
-                disabled={isWithdrawing}
-              />
-              <Button
-                onClick={handleWithdraw}
-                disabled={isWithdrawing || !withdrawAmount}
-                className="min-w-[100px]"
-              >
-                {isWithdrawing ? "Sending..." : "Withdraw"}
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Recent Transactions */}
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle>Recent Bridge Transactions</CardTitle>
-          <CardDescription>Track your bridge transfers</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {transactions.length === 0 ? (
-            <div className="text-center text-muted-foreground py-8">
-              No bridge transactions yet. Use the buttons above to bridge ETH.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {transactions.map((tx) => (
-                <div
-                  key={tx.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-                >
-                  <div className="flex items-center gap-4">
-                    <Badge variant={tx.direction === "deposit" ? "default" : "secondary"}>
-                      {tx.direction === "deposit" ? "L1 \u2192 L2" : "L2 \u2192 L1"}
-                    </Badge>
-                    <span className="font-mono">{tx.amount} ETH</span>
+              <div className="space-y-2">
+                <Label className="text-muted-foreground text-sm">Warp Route Collateral</Label>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">L1 Warp: </span>
+                    <span className="font-mono">{formatEth(l1WarpBalance)} ETH</span>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <Badge
-                      variant={
-                        tx.status === "completed" ? "default" :
-                        tx.status === "failed" ? "destructive" :
-                        "outline"
-                      }
-                      className={
-                        tx.status === "completed" ? "bg-green-500/20 text-green-400 border-green-500/30" :
-                        tx.status === "relaying" ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" :
-                        tx.status === "pending" ? "bg-blue-500/20 text-blue-400 border-blue-500/30" :
-                        ""
-                      }
-                    >
-                      {tx.status}
-                    </Badge>
-                    {tx.txHash && (
-                      <span className="text-xs text-muted-foreground font-mono">
-                        {tx.txHash}
-                      </span>
-                    )}
-                    <span className="text-xs text-muted-foreground">
-                      {tx.timestamp.toLocaleTimeString()}
-                    </span>
+                  <div>
+                    <span className="text-muted-foreground">L2 Warp: </span>
+                    <span className="font-mono">{formatEth(l2WarpBalance)} ETH</span>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              </div>
 
-      {/* Contract Info */}
-      <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle>Hyperlane Configuration</CardTitle>
-          <CardDescription className="flex items-center gap-2 flex-wrap">
-            Deployed contract addresses
-            {deploymentStatus === "loading" && (
-              <Badge variant="outline" className="text-xs">loading...</Badge>
-            )}
-            {deploymentStatus === "success" && loadedFromDynamic && (
-              <Badge variant="outline" className="text-xs bg-green-500/20 text-green-400 border-green-500/30">
-                ✓ dynamic
-              </Badge>
-            )}
-            {deploymentStatus === "unknown" && !loadedFromDynamic && (
-              <Badge variant="outline" className="text-xs bg-blue-500/20 text-blue-400 border-blue-500/30">
-                default
-              </Badge>
-            )}
-            {deploymentStatus === "failed" && (
-              <Badge variant="destructive" className="text-xs">
-                ✗ deployment failed
-              </Badge>
-            )}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-2 gap-4 text-sm">
-            <div className="space-y-2">
-              <Label className="text-muted-foreground">L1 (Domain: {addresses.l1DomainId})</Label>
-              <div className="space-y-1">
-                <div><span className="text-muted-foreground">Mailbox: </span><span className="font-mono text-xs">{addresses.l1Mailbox}</span></div>
-                <div><span className="text-muted-foreground">Warp Route: </span><span className="font-mono text-xs">{addresses.l1WarpRoute}</span></div>
+              <Button variant="outline" size="sm" onClick={fetchBalances} className="w-full">
+                Refresh Balances
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Bridge Actions Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Bridge ETH</CardTitle>
+              <CardDescription>Transfer ETH between L1 and L2 via Hyperlane</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Deposit (L1 -> L2) */}
+              <div className="space-y-3">
+                <Label>Deposit (L1 &rarr; L2)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Amount in ETH"
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                    disabled={isDepositing}
+                  />
+                  <Button
+                    onClick={handleDeposit}
+                    disabled={isDepositing || !depositAmount}
+                    className="min-w-[100px]"
+                  >
+                    {isDepositing ? "Sending..." : "Deposit"}
+                  </Button>
+                </div>
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-muted-foreground">L2 (Domain: {addresses.l2DomainId})</Label>
-              <div className="space-y-1">
-                <div><span className="text-muted-foreground">Mailbox: </span><span className="font-mono text-xs">{addresses.l2Mailbox}</span></div>
-                <div><span className="text-muted-foreground">Warp Route: </span><span className="font-mono text-xs">{addresses.l2WarpRoute}</span></div>
+
+              <Separator />
+
+              {/* Withdraw (L2 -> L1) */}
+              <div className="space-y-3">
+                <Label>Withdraw (L2 &rarr; L1)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Amount in ETH"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    disabled={isWithdrawing}
+                  />
+                  <Button
+                    onClick={handleWithdraw}
+                    disabled={isWithdrawing || !withdrawAmount}
+                    className="min-w-[100px]"
+                  >
+                    {isWithdrawing ? "Sending..." : "Withdraw"}
+                  </Button>
+                </div>
               </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+
+          {/* Recent Transactions */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Recent Bridge Transactions</CardTitle>
+              <CardDescription>Track your bridge transfers</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {transactions.length === 0 ? (
+                <div className="text-center text-muted-foreground py-8">
+                  No bridge transactions yet. Use the buttons above to bridge ETH.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {transactions.map((tx) => (
+                    <div
+                      key={tx.id}
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                    >
+                      <div className="flex items-center gap-4">
+                        <Badge variant={tx.direction === "deposit" ? "default" : "secondary"}>
+                          {tx.direction === "deposit" ? "L1 \u2192 L2" : "L2 \u2192 L1"}
+                        </Badge>
+                        <span className="font-mono">{tx.amount} ETH</span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <Badge
+                          variant={
+                            tx.status === "completed" ? "default" :
+                              tx.status === "failed" ? "destructive" :
+                                "outline"
+                          }
+                          className={
+                            tx.status === "completed" ? "bg-green-500/20 text-green-400 border-green-500/30" :
+                              tx.status === "relaying" ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" :
+                                tx.status === "pending" ? "bg-blue-500/20 text-blue-400 border-blue-500/30" :
+                                  ""
+                          }
+                        >
+                          {tx.status}
+                        </Badge>
+                        {tx.txHash && (
+                          <span className="text-xs text-muted-foreground font-mono">
+                            {tx.txHash}
+                          </span>
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {tx.timestamp.toLocaleTimeString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Contract Info */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Hyperlane Configuration</CardTitle>
+              <CardDescription className="flex items-center gap-2 flex-wrap">
+                Deployed contract addresses
+                {deploymentStatus === "loading" && (
+                  <Badge variant="outline" className="text-xs">loading...</Badge>
+                )}
+                {deploymentStatus === "success" && loadedFromDynamic && (
+                  <Badge variant="outline" className="text-xs bg-green-500/20 text-green-400 border-green-500/30">
+                    ✓ dynamic
+                  </Badge>
+                )}
+                {deploymentStatus === "unknown" && !loadedFromDynamic && (
+                  <Badge variant="outline" className="text-xs bg-blue-500/20 text-blue-400 border-blue-500/30">
+                    default
+                  </Badge>
+                )}
+                {deploymentStatus === "failed" && (
+                  <Badge variant="destructive" className="text-xs">
+                    ✗ deployment failed
+                  </Badge>
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 gap-4 text-sm">
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">L1 (Domain: {addresses.l1DomainId})</Label>
+                  <div className="space-y-1">
+                    <div><span className="text-muted-foreground">Mailbox: </span><span className="font-mono text-xs">{addresses.l1Mailbox}</span></div>
+                    <div><span className="text-muted-foreground">Warp Route: </span><span className="font-mono text-xs">{addresses.l1WarpRoute}</span></div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">L2 (Domain: {addresses.l2DomainId})</Label>
+                  <div className="space-y-1">
+                    <div><span className="text-muted-foreground">Mailbox: </span><span className="font-mono text-xs">{addresses.l2Mailbox}</span></div>
+                    <div><span className="text-muted-foreground">Warp Route: </span><span className="font-mono text-xs">{addresses.l2WarpRoute}</span></div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

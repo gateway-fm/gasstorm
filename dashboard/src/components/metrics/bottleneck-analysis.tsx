@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useGoLoadTestStore } from "@/stores/go-load-test-store";
 import { useMetricsStore } from "@/stores/metrics-store";
 import { useChainStore } from "@/stores/chain-store";
+import { useBuilderMetricsStore } from "@/stores/builder-metrics-store";
 
 type BottleneckType = "sender" | "block-builder" | "node" | "balanced";
 
@@ -29,6 +30,7 @@ export function BottleneckAnalysis() {
   const { status } = useGoLoadTestStore();
   const { blockMetrics, timeSeries } = useMetricsStore();
   const { builder } = useChainStore();
+  const { timing: builderTiming, connected: builderMetricsConnected } = useBuilderMetricsStore();
 
   // Don't show in historical mode (no block metrics available)
   const hasBlockMetrics = blockMetrics.length > 0;
@@ -269,12 +271,146 @@ export function BottleneckAnalysis() {
             ))}
           </div>
 
+          {/* Block Production Timing (from builder WS) */}
+          <BuildCycleTiming
+            timing={builderTiming}
+            targetBlockTimeMs={builder.blockTimeMs || 2000}
+            connected={builderMetricsConnected}
+          />
+
           {/* Recommendation */}
           <div className="text-sm text-muted-foreground border-l-2 border-primary/50 pl-3">
-            💡 {analysis.recommendation}
+            {analysis.recommendation}
           </div>
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// ---------- Build Cycle Timing sub-component ----------
+
+interface BuildCycleTimingProps {
+  timing: {
+    avgFilterMs: number;
+    avgEngineApiMs: number;
+    avgTotalBuildMs: number;
+    latestFilterMs: number;
+    latestEngineApiMs: number;
+    latestTotalBuildMs: number;
+    blockCount: number;
+  };
+  targetBlockTimeMs: number;
+  connected: boolean;
+}
+
+function BuildCycleTiming({ timing, targetBlockTimeMs, connected }: BuildCycleTimingProps) {
+  // Only show when we have actual timing data
+  if (timing.blockCount === 0) return null;
+
+  const combinedMs = timing.avgFilterMs + timing.avgEngineApiMs;
+  const budgetPct = targetBlockTimeMs > 0 ? (combinedMs / targetBlockTimeMs) * 100 : 0;
+  const overheadMs = timing.avgTotalBuildMs - combinedMs;
+
+  // Color coding based on how close to the block time budget we are
+  const getBudgetColor = (pct: number): string => {
+    if (pct >= 90) return "text-red-400";
+    if (pct >= 70) return "text-yellow-400";
+    return "text-green-400";
+  };
+
+  // Proportions for the stacked bar
+  const filterPct = targetBlockTimeMs > 0
+    ? (timing.avgFilterMs / targetBlockTimeMs) * 100
+    : 0;
+  const enginePct = targetBlockTimeMs > 0
+    ? (timing.avgEngineApiMs / targetBlockTimeMs) * 100
+    : 0;
+
+  return (
+    <div className="bg-background/50 rounded p-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-xs text-muted-foreground uppercase tracking-wider">
+          Block Production Timing
+        </div>
+        {connected && (
+          <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">
+            Live
+          </span>
+        )}
+      </div>
+
+      {/* Timing breakdown */}
+      <div className="grid grid-cols-3 gap-2 text-sm font-mono">
+        <div>
+          <div className="text-[10px] text-muted-foreground">Filter</div>
+          <div className="text-blue-400">{timing.avgFilterMs.toFixed(0)}ms</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-muted-foreground">GetPayload</div>
+          <div className="text-purple-400">{timing.avgEngineApiMs.toFixed(0)}ms</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-muted-foreground">Total Cycle</div>
+          <div className="text-foreground">{timing.avgTotalBuildMs.toFixed(0)}ms</div>
+        </div>
+      </div>
+
+      {/* Budget bar */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-muted-foreground">
+            Budget: {combinedMs.toFixed(0)}ms / {targetBlockTimeMs}ms
+            {overheadMs > 10 && (
+              <span className="text-muted-foreground/60"> (+{overheadMs.toFixed(0)}ms overhead)</span>
+            )}
+          </span>
+          <span className={getBudgetColor(budgetPct)}>
+            {budgetPct.toFixed(0)}%
+          </span>
+        </div>
+        <div className="h-2 bg-muted rounded-full overflow-hidden flex">
+          {/* Filter portion */}
+          <div
+            className="bg-blue-400 h-full transition-all duration-300"
+            style={{ width: `${Math.min(filterPct, 100)}%` }}
+          />
+          {/* Engine API portion */}
+          <div
+            className="bg-purple-400 h-full transition-all duration-300"
+            style={{ width: `${Math.min(enginePct, 100 - Math.min(filterPct, 100))}%` }}
+          />
+        </div>
+        <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-2 h-2 rounded-sm bg-blue-400" /> Filter
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block w-2 h-2 rounded-sm bg-purple-400" /> GetPayload (reth)
+          </span>
+        </div>
+      </div>
+
+      {/* Warning when near limit */}
+      {budgetPct >= 90 && (
+        <div className={`text-xs ${getBudgetColor(budgetPct)} border-l-2 border-current pl-2`}>
+          Build cycle is consuming {budgetPct.toFixed(0)}% of block time. Blocks may slip.
+        </div>
+      )}
+      {budgetPct >= 70 && budgetPct < 90 && (
+        <div className={`text-xs ${getBudgetColor(budgetPct)} border-l-2 border-current pl-2`}>
+          Build cycle approaching block time limit.
+          {timing.avgEngineApiMs > timing.avgFilterMs
+            ? " Reth execution is the dominant cost."
+            : " TX filtering is the dominant cost."}
+        </div>
+      )}
+
+      {/* Latest block timing (dimmed, for reference) */}
+      <div className="text-[10px] text-muted-foreground/60 font-mono">
+        Latest: filter {timing.latestFilterMs}ms | reth {timing.latestEngineApiMs}ms | total {timing.latestTotalBuildMs}ms
+        {timing.blockCount > 1 && ` (avg of ${timing.blockCount} blocks)`}
+      </div>
+    </div>
   );
 }

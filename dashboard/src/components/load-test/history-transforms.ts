@@ -1,5 +1,29 @@
 import type { TestRun, TimeSeriesPoint } from "@/types/load-test";
 
+// Normalize latency stats regardless of PascalCase/camelCase payload shape
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function transformLatencyStats(stats: any) {
+  if (!stats) return undefined;
+  const buckets = stats.Buckets || stats.buckets;
+  return {
+    count: stats.Count ?? stats.count ?? 0,
+    min: stats.Min ?? stats.min ?? 0,
+    max: stats.Max ?? stats.max ?? 0,
+    avg: stats.Avg ?? stats.avg ?? 0,
+    p50: stats.P50 ?? stats.p50 ?? 0,
+    p75: stats.P75 ?? stats.p75 ?? 0,
+    p90: stats.P90 ?? stats.p90 ?? 0,
+    p95: stats.P95 ?? stats.p95 ?? 0,
+    p99: stats.P99 ?? stats.p99 ?? 0,
+    buckets: Array.isArray(buckets)
+      ? buckets.map((b: { Label?: string; label?: string; Count?: number; count?: number }) => ({
+          label: b?.Label || b?.label || "",
+          count: b?.Count ?? b?.count ?? 0,
+        }))
+      : [],
+  };
+}
+
 // Transform Go API PascalCase to TypeScript camelCase for TestRun
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function transformTestRun(run: any): TestRun {
@@ -15,8 +39,9 @@ export function transformTestRun(run: any): TestRun {
     txFailed: run?.TxFailed || run?.txFailed || 0,
     averageTps: run?.AverageTPS || run?.averageTps || 0,
     peakTps: run?.PeakTPS || run?.peakTps || 0,
-    latencyStats: run?.LatencyStats || run?.latencyStats,
-    preconfLatency: run?.PreconfLatency || run?.preconfLatency,
+    latencyStats: transformLatencyStats(run?.LatencyStats || run?.latencyStats),
+    preconfLatency: transformLatencyStats(run?.PreconfLatency || run?.preconfLatency),
+    pendingLatency: transformLatencyStats(run?.PendingLatency || run?.pendingLatency),
     config: run?.Config || run?.config,
     status: run?.Status || run?.status || "completed",
     errorMessage: run?.ErrorMessage || run?.errorMessage,
@@ -31,6 +56,7 @@ export function transformTestRun(run: any): TestRun {
     // User metadata
     customName: run?.CustomName ?? run?.customName,
     isFavorite: run?.IsFavorite ?? run?.isFavorite ?? false,
+    environment: run?.Environment || run?.environment,
   };
 }
 

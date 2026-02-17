@@ -3,20 +3,12 @@ services:
   l1:
     image: ghcr.io/foundry-rs/foundry:latest
     container_name: gasstorm-l1
-    entrypoint: ["anvil"]
-    command: [
-      "--host", "0.0.0.0",
-      "--port", "8545",
-      "--block-time", "12",
-      "--accounts", "20",
-      "--balance", "100000",
-      "--chain-id", "31337",
-      "--gas-limit", "30000000"
-    ]
+    entrypoint: [ "anvil" ]
+    command: [ "--host", "0.0.0.0", "--port", "8545", "--block-time", "12", "--accounts", "20", "--balance", "100000", "--chain-id", "31337", "--gas-limit", "30000000" ]
     ports:
-      - "18545:8545"  # Changed from 8545 to avoid conflicts
+      - "18545:8545" # Changed from 8545 to avoid conflicts
     healthcheck:
-      test: ["CMD", "cast", "chain-id", "--rpc-url", "http://localhost:8545"]
+      test: [ "CMD", "cast", "chain-id", "--rpc-url", "http://localhost:8545" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -26,60 +18,86 @@ services:
   l2-reth:
     image: ghcr.io/paradigmxyz/op-reth:v1.9.3
     container_name: gasstorm-l2
-    profiles: ["reth"]
+    profiles: [ "reth" ]
     depends_on:
       l1:
         condition: service_healthy
-    command: [
-      "node",
-      "--chain", "/config/genesis.json",
-      "--datadir", "/data",
-      # RPC
-      "--http",
-      "--http.addr", "0.0.0.0",
-      "--http.port", "8545",
-      "--http.api", "eth,net,web3",
-      "--http.corsdomain", "*",
-      # WebSocket
-      "--ws",
-      "--ws.addr", "0.0.0.0",
-      "--ws.port", "8546",
-      "--ws.api", "eth,net,web3",
-      # Engine API (authenticated)
-      "--authrpc.addr", "0.0.0.0",
-      "--authrpc.port", "8551",
-      "--authrpc.jwtsecret", "/config/jwt.hex",
-      # Sequencer mode - external block builder handles all transactions
-      "--rollup.disable-tx-pool-gossip",
-      # Disable internal txpool (we use external block builder exclusively)
+    command:
+      [
+        "node",
+        "--chain",
+        "/config/genesis.json",
+        "--datadir",
+        "/data",
+        # RPC
+        "--http",
+        "--http.addr",
+        "0.0.0.0",
+        "--http.port",
+        "8545",
+        "--http.api",
+        "eth,net,web3",
+        "--http.corsdomain",
+        "*",
+        # WebSocket
+        "--ws",
+        "--ws.addr",
+        "0.0.0.0",
+        "--ws.port",
+        "8546",
+        "--ws.api",
+        "eth,net,web3",
+        # Engine API (authenticated)
+        "--authrpc.addr",
+        "0.0.0.0",
+        "--authrpc.port",
+        "8551",
+        "--authrpc.jwtsecret",
+        "/config/jwt.hex",
+        # Sequencer mode - external block builder handles all transactions
+        "--rollup.disable-tx-pool-gossip",
+        # Disable internal txpool (we use external block builder exclusively)
       # Setting counts to 1 effectively neuters the txpool while keeping reth happy
-      "--txpool.pending-max-count", "1",
-      "--txpool.basefee-max-count", "1",
-      "--txpool.queued-max-count", "1",
-      "--txpool.max-account-slots", "1",
-      # MDBX database performance tuning
-      "--db.sync-mode", "safe-no-sync",   # ~10x faster writes, async flushes, crash-safe
-      "--db.growth-step", "4GB",
-      "--db.max-readers", "512",
-      # State root / PMT performance tuning
-      "--engine.multiproof-chunking",
-      "--engine.multiproof-chunk-size", "100",
-      # Performance tuning for high TPS
-      "--rpc.max-connections", "1000",
-      "--rpc.max-request-size", "100",
-      "--rpc.max-response-size", "200",
-      "--rpc.max-tracing-requests", "50",
-      # Log level: -v (info), -vv (debug), -vvv (trace), -vvvv (trace all)
-      "--log.stdout.format", "terminal",
-      "-vvv"
-    ]
+        "--txpool.pending-max-count",
+        "1",
+        "--txpool.basefee-max-count",
+        "1",
+        "--txpool.queued-max-count",
+        "1",
+        "--txpool.max-account-slots",
+        "1",
+        # MDBX database performance tuning
+        "--db.sync-mode",
+        "safe-no-sync", # ~10x faster writes, async flushes, crash-safe
+        "--db.growth-step",
+        "4GB",
+        "--db.max-readers",
+        "512",
+        # State root / PMT performance tuning
+        "--engine.multiproof-chunking",
+        "--engine.multiproof-chunk-size",
+        "100",
+        # Performance tuning for high TPS
+        "--rpc.max-connections",
+        "1000",
+        "--rpc.max-request-size",
+        "100",
+        "--rpc.max-response-size",
+        "200",
+        "--rpc.max-tracing-requests",
+        "50",
+        # Log level: -v (info), -vv (debug), -vvv (trace), -vvvv (trace all)
+        "--log.stdout.format",
+        "terminal",
+        "-vvv"
+      ]
     volumes:
       - ./genesis:/config:ro
       - l2-data:/data
     ports:
-      - "18546:8545"   # L2 RPC (changed from 8546)
-      - "18547:8546"   # L2 WebSocket (changed from 8547)
-      - "18551:8551"   # Engine API (changed from 8551)
+      - "18546:8545" # L2 RPC (changed from 8546)
+      - "18547:8546" # L2 WebSocket (changed from 8547)
+      - "18551:8551" # Engine API (changed from 8551)
     # Resource limits for performance
     deploy:
       resources:
@@ -101,7 +119,7 @@ services:
   l2-cdk-erigon:
     image: cdk-erigon:local
     container_name: gasstorm-cdk-erigon
-    profiles: ["cdk-erigon"]
+    profiles: [ "cdk-erigon" ]
     user: root
     depends_on:
       l1:
@@ -109,21 +127,18 @@ services:
     environment:
       - CDK_ERIGON_SEQUENCER=1
       # MDBX performance tuning (matching reth optimizations)
-      - NO_SYNC=true              # ~10x faster writes, async flushes (like reth's safe-no-sync)
-      - MDBX_DIRTY_SPACE_MB=2048  # 2GB dirty space buffer (default ~1/42 of RAM)
+      - NO_SYNC=true # ~10x faster writes, async flushes (like reth's safe-no-sync)
+      - MDBX_DIRTY_SPACE_MB=2048 # 2GB dirty space buffer (default ~1/42 of RAM)
     # Config-only approach (matching Gateway production pattern)
     # All zkevm.* settings are in the YAML config file
     # --db.read.concurrency increases roTxsLimiter (default: GOMAXPROCS*64, bottleneck at >3500 TPS)
-    command: [
-      "--config", "/config/cdk-erigon.yaml",
-      "--db.read.concurrency", "9000"
-    ]
+    command: [ "--config", "/config/cdk-erigon.yaml", "--db.read.concurrency", "9000" ]
     volumes:
       - ./config/cdk-erigon:/config:ro
       - cdk-erigon-data:/data
     ports:
-      - "18546:8545"   # L2 RPC (same external port as op-reth for consistency)
-      - "18547:8546"   # L2 WebSocket
+      - "18546:8545" # L2 RPC (same external port as op-reth for consistency)
+      - "18547:8546" # L2 WebSocket
     restart: unless-stopped
 
   # Dashboard with RPC proxy (Next.js static build) - for op-reth mode
@@ -132,7 +147,7 @@ services:
       context: ./dashboard
       dockerfile: Dockerfile
     container_name: gasstorm-dashboard
-    profiles: ["reth"]
+    profiles: [ "reth" ]
     depends_on:
       - l1
       - l2-reth
@@ -140,7 +155,7 @@ services:
     volumes:
       - hyperlane-config:/usr/share/nginx/html/api/hyperlane:ro
     ports:
-      - "18000:80"  # Changed from 8000 to avoid conflicts
+      - "18000:80" # Changed from 8000 to avoid conflicts
     restart: unless-stopped
 
   # Dashboard for cdk-erigon mode
@@ -149,7 +164,7 @@ services:
       context: ./dashboard
       dockerfile: Dockerfile
     container_name: gasstorm-dashboard
-    profiles: ["cdk-erigon"]
+    profiles: [ "cdk-erigon" ]
     depends_on:
       - l1
       - l2-cdk-erigon
@@ -158,35 +173,40 @@ services:
     restart: unless-stopped
 
   # Block Builder Service (Go) - only used with op-reth (profile: reth)
-  # Image from DockerHub: gatewayfm/blockbuilder
-  # Override with BLOCKBUILDER_VERSION env var or docker-compose.override.yaml for local builds
+  # Build from local source for development/testing
   block-builder:
-    image: gatewayfm/blockbuilder:${BLOCKBUILDER_VERSION:-latest}
+    build:
+      context: ../blockbuilder
+      dockerfile: Dockerfile
+    image: gatewayfm/blockbuilder:local
     container_name: gasstorm-builder
-    profiles: ["reth"]
+    profiles: [ "reth" ]
     depends_on:
       - l2-reth
     environment:
-      - ENGINE_RPC_URL=http://l2-reth:8551  # Internal port (unchanged)
-      - L2_RPC_URL=http://l2-reth:8545      # Internal port (unchanged)
+      - ENGINE_RPC_URL=http://l2-reth:8551 # Internal port (unchanged)
+      - L2_RPC_URL=http://l2-reth:8545 # Internal port (unchanged)
       - JWT_SECRET_PATH=/config/jwt.hex
       - SEQUENCER_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
       - LISTEN_ADDR=:3000
       # Block production settings
       - BLOCK_TIME_MS=${BLOCK_TIME_MS:-150}
       - SKIP_EMPTY_BLOCKS=${SKIP_EMPTY_BLOCKS:-true}
-      - GAS_LIMIT=${GAS_LIMIT:-1500000000}            # 1.5 gigagas default
-      - MAX_TXS_PER_BLOCK=${MAX_TXS_PER_BLOCK:-50000} # Scale with gas limit
+      - GAS_LIMIT=${GAS_LIMIT:-3000000000} # 3 gigagas default
+      - MAX_TXS_PER_BLOCK=${MAX_TXS_PER_BLOCK:-100000} # Scale with gas limit
       # OP Stack settings
-      - INCLUDE_DEPOSIT_TX=${INCLUDE_DEPOSIT_TX:-false}  # Include L1 attributes deposit TX (off for PoC)
+      - INCLUDE_DEPOSIT_TX=${INCLUDE_DEPOSIT_TX:-false} # Include L1 attributes deposit TX (off for PoC)
       # Transaction ordering
-      - TX_ORDERING=${TX_ORDERING:-fifo}              # fifo, tip_desc, tip_asc
+      - TX_ORDERING=${TX_ORDERING:-fifo} # fifo, tip_desc, tip_asc
       # Preconfirmations
       - ENABLE_PRECONFIRMATIONS=${ENABLE_PRECONFIRMATIONS:-true}
       - PRECONF_LISTEN_ADDR=${PRECONF_LISTEN_ADDR:-:3001}
       - PRECONF_BUFFER_SIZE=${PRECONF_BUFFER_SIZE:-10000}
+      # Block attestation / HSM
+      - BLOCK_ATTESTATION_ENABLED=${BLOCK_ATTESTATION_ENABLED:-false}
       # Transaction pool settings
-      - MAX_REQUEUE_COUNT=${MAX_REQUEUE_COUNT:-15}
+      - MAX_REQUEUE_COUNT=${MAX_REQUEUE_COUNT:-100}
+      - MAX_PENDING_CAPACITY=${MAX_PENDING_CAPACITY:-1000000}
       # RPC timeouts
       - NONCE_TIMEOUT_MS=${NONCE_TIMEOUT_MS:-500}
       # Debug options
@@ -195,9 +215,9 @@ services:
     volumes:
       - ./genesis/jwt.hex:/config/jwt.hex:ro
     ports:
-      - "13000:3000"   # RPC for tx submission
-      - "13002:3001"   # Preconfirmation WebSocket (when enabled)
-      - "16060:6060"   # pprof for profiling
+      - "13000:3000" # RPC for tx submission
+      - "13002:3001" # Preconfirmation WebSocket (when enabled)
+      - "16060:6060" # pprof for profiling
     restart: unless-stopped
 
   # ===========================================================================
@@ -211,7 +231,7 @@ services:
       context: ./zisk-prover
       dockerfile: Dockerfile
     container_name: gasstorm-prover
-    profiles: ["prover-zisk"]
+    profiles: [ "prover-zisk" ]
     depends_on:
       - l2-reth
     environment:
@@ -220,38 +240,40 @@ services:
       # Emulator mode for development (no proving key required)
       - USE_EMULATOR=${ZISK_USE_EMULATOR:-true}
     ports:
-      - "13337:3000"   # Same port as op-succinct for compatibility
+      - "13337:3000" # Same port as op-succinct for compatibility
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:3000/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
     restart: unless-stopped
 
   # Load Generator Service (Go) - for op-reth mode (profile: reth)
-  # Image from DockerHub: gatewayfm/loadgenerator
-  # Override with docker-compose.override.yaml for local builds
+  # Build from local source for development/testing
   load-generator:
-    image: gatewayfm/loadgenerator:${LOADGENERATOR_VERSION:-latest}
+    build:
+      context: ../loadgenerator
+      dockerfile: Dockerfile
+    image: gatewayfm/loadgenerator:local
     container_name: gasstorm-loadgen
-    profiles: ["reth"]
+    profiles: [ "reth" ]
     depends_on:
       - block-builder
       - l2-reth
     environment:
       - EXECUTION_LAYER=reth
-      - BUILDER_RPC_URL=http://block-builder:3000  # Internal connection to builder
-      - L2_RPC_URL=http://block-builder:3000        # Route through block-builder for consistency
-      - L2_WS_URL=ws://l2-reth:8546                # L2 WebSocket for block metrics (newHeads)
-      - PRECONF_WS_URL=ws://block-builder:3001/ws/preconfirmations  # Preconfirmation WebSocket
+      - BUILDER_RPC_URL=http://block-builder:3000 # Internal connection to builder
+      - L2_RPC_URL=http://block-builder:3000 # Route through block-builder for consistency
+      - L2_WS_URL=ws://l2-reth:8546 # L2 WebSocket for block metrics (newHeads)
+      - PRECONF_WS_URL=ws://block-builder:3001/ws/preconfirmations # Preconfirmation WebSocket
       - LISTEN_ADDR=:3001
-      - DATABASE_PATH=/data/loadgen.db             # SQLite database for test history
-      - BLOCK_TIME_MS=${BLOCK_TIME_MS:-150}        # Must match block-builder for account scaling
+      - DATABASE_PATH=/data/loadgen.db # SQLite database for test history
+      - BLOCK_TIME_MS=${BLOCK_TIME_MS:-150} # Must match block-builder for account scaling
     volumes:
       - loadgen-data:/data
     ports:
-      - "13001:3001"   # REST API for load test control
-      - "16061:6061"   # pprof for profiling
+      - "13001:3001" # REST API for load test control
+      - "16061:6061" # pprof for profiling
     restart: unless-stopped
 
   # Load Generator Service (Go) - for cdk-erigon mode (profile: cdk-erigon)
@@ -259,7 +281,7 @@ services:
   load-generator-cdk:
     image: gatewayfm/loadgenerator:${LOADGENERATOR_VERSION:-latest}
     container_name: gasstorm-loadgen
-    profiles: ["cdk-erigon"]
+    profiles: [ "cdk-erigon" ]
     networks:
       default:
         aliases:
@@ -268,16 +290,16 @@ services:
       - l2-cdk-erigon
     environment:
       - EXECUTION_LAYER=cdk-erigon
-      - BUILDER_RPC_URL=http://l2-cdk-erigon:8545  # Direct to cdk-erigon RPC
-      - L2_RPC_URL=http://l2-cdk-erigon:8545       # Same as builder in this mode
-      - L2_WS_URL=ws://l2-cdk-erigon:8546          # L2 WebSocket for block metrics
-      - PRECONF_WS_URL=                            # No preconfirmations in cdk-erigon mode
+      - BUILDER_RPC_URL=http://l2-cdk-erigon:8545 # Direct to cdk-erigon RPC
+      - L2_RPC_URL=http://l2-cdk-erigon:8545 # Same as builder in this mode
+      - L2_WS_URL=ws://l2-cdk-erigon:8546 # L2 WebSocket for block metrics
+      - PRECONF_WS_URL= # No preconfirmations in cdk-erigon mode
       - LISTEN_ADDR=:3001
       - DATABASE_PATH=/data/loadgen.db
     volumes:
       - loadgen-data:/data
     ports:
-      - "13001:3001"   # REST API for load test control
+      - "13001:3001" # REST API for load test control
     restart: unless-stopped
 
   # ===========================================================================
@@ -291,7 +313,7 @@ services:
       context: .
       dockerfile: ./hyperlane-init/Dockerfile
     container_name: gasstorm-hyperlane-init
-    profiles: ["bridge"]
+    profiles: [ "bridge" ]
     depends_on:
       l1:
         condition: service_healthy
@@ -313,7 +335,7 @@ services:
   hyperlane-relayer:
     image: gcr.io/abacus-labs-dev/hyperlane-agent:agents-v1.3.0
     container_name: gasstorm-relayer
-    profiles: ["bridge"]
+    profiles: [ "bridge" ]
     depends_on:
       l1:
         condition: service_healthy
@@ -329,8 +351,8 @@ services:
       - hyperlane-relayer-data:/data
       - hyperlane-config:/config:ro
     ports:
-      - "19090:9090"  # Metrics
-    entrypoint: ["/app/relayer"]
+      - "19090:9090" # Metrics
+    entrypoint: [ "/app/relayer" ]
     command: []
     restart: unless-stopped
 
@@ -344,14 +366,14 @@ services:
         - NEXT_PUBLIC_WALLET_CONNECT_ID=${WALLET_CONNECT_ID:-00000000000000000000000000000000}
         - NEXT_PUBLIC_RPC_OVERRIDES={"l1local":{"http":"http://host.docker.internal:18545"},"l2local":{"http":"http://host.docker.internal:13000"}}
     container_name: gasstorm-hyperlane-bridge-ui
-    profiles: ["bridge"]
+    profiles: [ "bridge" ]
     depends_on:
       hyperlane-init:
         condition: service_completed_successfully
     volumes:
-      - hyperlane-config:/config:ro  # Mounted for Next.js API route to read
+      - hyperlane-config:/config:ro # Mounted for Next.js API route to read
     ports:
-      - "18001:3000"  # Hyperlane Bridge UI
+      - "18001:3000" # Hyperlane Bridge UI
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
@@ -367,7 +389,7 @@ services:
   agglayer-db:
     image: postgres:17.6
     container_name: gasstorm-postgres
-    profiles: ["agglayer"]
+    profiles: [ "agglayer" ]
     environment:
       - POSTGRES_USER=agglayer
       - POSTGRES_PASSWORD=agglayer
@@ -378,7 +400,7 @@ services:
     ports:
       - "15432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U agglayer -d agglayer"]
+      test: [ "CMD-SHELL", "pg_isready -U agglayer -d agglayer" ]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -389,7 +411,7 @@ services:
   agglayer-contracts:
     image: europe-west2-docker.pkg.dev/prj-polygonlabs-devtools-dev/public/agglayer-contracts:v12.2.1
     container_name: gasstorm-contracts
-    profiles: ["agglayer-deploy"]
+    profiles: [ "agglayer-deploy" ]
     depends_on:
       l1:
         condition: service_healthy
@@ -404,7 +426,7 @@ services:
     volumes:
       - ./output/contracts:/output
     working_dir: /app
-    entrypoint: ["/bin/sh", "-c"]
+    entrypoint: [ "/bin/sh", "-c" ]
     command:
       - |
         echo "Deploying AggLayer contracts to L1..."
@@ -418,7 +440,7 @@ services:
   op-succinct:
     image: ghcr.io/agglayer/op-succinct/op-succinct-agglayer:v3.4.0-rc.1-agglayer
     container_name: gasstorm-prover
-    profiles: ["prover-sp1"]
+    profiles: [ "prover-sp1" ]
     depends_on:
       agglayer-db:
         condition: service_healthy
@@ -446,7 +468,7 @@ services:
   agglayer:
     image: europe-west2-docker.pkg.dev/prj-polygonlabs-devtools-dev/public/agglayer:0.4.4-remove-agglayer-prover
     container_name: gasstorm-agglayer
-    profiles: ["agglayer"]
+    profiles: [ "agglayer" ]
     depends_on:
       l1:
         condition: service_healthy
@@ -455,18 +477,18 @@ services:
     volumes:
       - ./config/agglayer.toml:/etc/agglayer/agglayer-config.toml:ro
       - agglayer-data:/etc/agglayer/storage
-    entrypoint: ["/usr/local/bin/agglayer"]
-    command: ["run", "--cfg", "/etc/agglayer/agglayer-config.toml"]
+    entrypoint: [ "/usr/local/bin/agglayer" ]
+    command: [ "run", "--cfg", "/etc/agglayer/agglayer-config.toml" ]
     environment:
       - RUST_LOG=info
       - RUST_BACKTRACE=1
     ports:
-      - "15577:5577"   # RPC
-      - "14443:4443"   # gRPC
-      - "15578:5578"   # Admin
-      - "19092:9092"   # Prometheus metrics
+      - "15577:5577" # RPC
+      - "14443:4443" # gRPC
+      - "15578:5578" # Admin
+      - "19092:9092" # Prometheus metrics
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:5577/health"]
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:5577/health" ]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -478,7 +500,7 @@ services:
   aggkit:
     image: ghcr.io/agglayer/aggkit:0.8.0-beta5
     container_name: gasstorm-aggkit
-    profiles: ["agglayer"]
+    profiles: [ "agglayer" ]
     depends_on:
       agglayer:
         condition: service_healthy
@@ -487,7 +509,7 @@ services:
     volumes:
       - ./config/aggkit.toml:/etc/aggkit/config.toml:ro
       - aggkit-data:/data
-    command: ["run", "--cfg", "/etc/aggkit/config.toml", "--components", "aggsender,bridgesync,l1infotreesync"]
+    command: [ "run", "--cfg", "/etc/aggkit/config.toml", "--components", "aggsender,bridgesync,l1infotreesync" ]
     environment:
       - RUST_LOG=debug
     ports:
@@ -498,7 +520,7 @@ services:
   bridge-service:
     image: ghcr.io/0xpolygon/zkevm-bridge-service:v0.6.4-RC1
     container_name: gasstorm-bridge-svc
-    profiles: ["agglayer"]
+    profiles: [ "agglayer" ]
     depends_on:
       agglayer-db:
         condition: service_healthy
@@ -506,14 +528,14 @@ services:
         condition: service_healthy
     volumes:
       - ./config/bridge-service.toml:/etc/bridge/config.toml:ro
-    command: ["run", "--cfg", "/etc/bridge/config.toml"]
+    command: [ "run", "--cfg", "/etc/bridge/config.toml" ]
     environment:
       - BRIDGE_LOG_LEVEL=debug
     ports:
-      - "18080:8080"   # REST API
-      - "19090:9090"   # gRPC
+      - "18080:8080" # REST API
+      - "19090:9090" # gRPC
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8080/health" ]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -523,7 +545,7 @@ services:
   bridge-ui:
     image: europe-west2-docker.pkg.dev/prj-polygonlabs-devtools-dev/public/zkevm-bridge-ui:0006445
     container_name: gasstorm-bridge-ui
-    profiles: ["agglayer"]
+    profiles: [ "agglayer" ]
     depends_on:
       bridge-service:
         condition: service_healthy
@@ -542,6 +564,63 @@ services:
       - "18088:80"
     restart: unless-stopped
 
+  # ===========================================================================
+  # OVERHANGING: Blob DA
+  # ===========================================================================
+
+  # Blob DA Database (Postgres)
+  blob-da-db:
+    image: postgres:17.6
+    container_name: gasstorm-blob-da-db
+    profiles: [ "blob" ]
+    environment:
+      - POSTGRES_USER=blobda
+      - POSTGRES_PASSWORD=blobda
+      - POSTGRES_DB=blobda
+    volumes:
+      - blobda-db-data:/var/lib/postgresql/data
+    ports:
+      - "15435:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U blobda -d blobda" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Blob DA Service
+  blob-da:
+    build:
+      context: ../blob-da
+      dockerfile: Dockerfile
+    container_name: gasstorm-blob-da
+    profiles: [ "blob" ]
+    command: ["run"]
+    depends_on:
+      l1:
+        condition: service_healthy
+      l2-reth:
+        condition: service_started
+      blob-da-db:
+        condition: service_healthy
+    environment:
+      - L1URL=http://l1:8545
+      - L2URL=http://l2-reth:8545
+      - PRIVATEKEY=${BLOB_DA_PRIVATE_KEY:-0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80}
+      - DB_HOST=blob-da-db
+      - DB_PORT=5432
+      - DB_USER=blobda
+      - DB_PASSWORD=blobda
+      - DB_DATABASE=blobda
+      - SYNCER_RUN=true
+      - SYNCER_STANDARDMODE=true
+      - SYNCER_L1INTERACTIONS=true
+      - LOG_LEVEL=debug
+      - RPC_HOST=0.0.0.0
+    ports:
+      - "18125:8125" # RPC
+    restart: unless-stopped
+
 volumes:
   l2-data:
   cdk-erigon-data:
@@ -552,7 +631,10 @@ volumes:
   aggkit-data:
   hyperlane-relayer-data:
   hyperlane-config:
+  blobda-db-data:
+
 
 networks:
   default:
     name: gasstorm
+

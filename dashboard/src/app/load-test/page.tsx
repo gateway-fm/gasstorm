@@ -16,6 +16,11 @@ import { useL2NewHead } from "@/contexts/websocket-context";
 import { useGoLoadTestStore } from "@/stores/go-load-test-store";
 import { useMetricsStore } from "@/stores/metrics-store";
 import { useChainStore } from "@/stores/chain-store";
+import {
+  useBuilderMetricsStore,
+  connectBuilderMetricsWs,
+  disconnectBuilderMetricsWs,
+} from "@/stores/builder-metrics-store";
 import { l2 } from "@/lib/rpc-client";
 import type { BlockMetrics, Statistics } from "@/types/metrics";
 import { calculateStatistics } from "@/lib/statistics";
@@ -42,6 +47,12 @@ export default function LoadTestPage() {
     return () => disconnectWebSocket();
   }, [connectWebSocket, disconnectWebSocket]);
 
+  // Connect to the builder's block-metrics WebSocket for build cycle timing
+  useEffect(() => {
+    connectBuilderMetricsWs();
+    return () => disconnectBuilderMetricsWs();
+  }, []);
+
   // Track status changes (Go load generator handles verification internally)
   useEffect(() => {
     // Reset block arrival tracking when test ends OR when new test starts
@@ -51,6 +62,8 @@ export default function LoadTestPage() {
       (status === "initializing" && prevStatusRef.current !== "initializing")
     ) {
       lastBlockArrivalRef.current = null;
+      // Reset builder timing data for new test
+      useBuilderMetricsStore.getState().reset();
     }
     prevStatusRef.current = status;
   }, [status]);

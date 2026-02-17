@@ -12,8 +12,9 @@
 *.dylib
 *.test
 
-# MCP server binary
+# MCP server binaries
 mcp/mcp
+mcp/gasstorm-mcp
 
 # Go workspace
 go.work
@@ -83,8 +84,12 @@ cache/
 out/
 broadcast/
 
-# Claude Code
+# AI tool configs
 .claude/
+.codex/
+.gemini/
+.mcp.json
+opencode.json
 
 # Build output
 output/
@@ -92,7 +97,15 @@ output/
 # Runtime data (Metal mode, etc)
 data/
 
-# One-off scripts and analysis docs
+# Profiling data
+pprof.txt
+*.pb.gz
+
+# One-off scripts, plans, and analysis docs
+plans/
 screenshot*.js
 screenshot*.mjs
 gap-analysis.md
+
+# Age-encrypted files (MCP lexer DB, etc)
+*.age

@@ -137,12 +137,36 @@ make logs
 make stop
 ```
 
+## Optional Profiles
+
+GasStorm uses additive Docker Compose profiles for optional services. These run alongside the core stack without affecting block builder performance.
+
+```bash
+# Blob DA (EIP-4844 data availability)
+make run-with-blob
+
+# Hyperlane bridge
+make run-with-bridge
+```
+
+### Blob DA
+
+Syncs L2 batches, packs them into EIP-4844 blobs, and posts to L1. Requires the sibling repo at `../blob-da`.
+
+| Service | Port | Description |
+|---------|------|-------------|
+| blob-da | 18125 | JSON-RPC (`data_getOffChainBlobs`) |
+| blob-da-db | 15435 | Postgres (blob storage) |
+
+The dashboard auto-detects blob-da and shows live online/offline status in the system diagram.
+
 ## Components
 
 | Component | Repository | Description |
 |-----------|-----------|-------------|
 | block-builder | [gateway-fm/blockbuilder](https://github.com/gateway-fm/blockbuilder) | Transaction pool, nonce management, Engine API block production |
 | load-generator | [gateway-fm/loadgenerator](https://github.com/gateway-fm/loadgenerator) | High-throughput TX sender, multiple TX types, REST API |
+| blob-da | `../blob-da` | EIP-4844 blob packing and L1 posting (optional, `--profile blob`) |
 | dashboard | `./dashboard` | Next.js UI for load test control and metrics |
 
 ## Documentation

@@ -181,3 +181,17 @@ export const builder = {
     sendRawTransaction(RPC_ENDPOINTS.BUILDER_RPC, signedTx),
   getStatus: () => getBuilderStatus(),
 };
+
+export interface BlobDABlob {
+  id: number;
+  startBatch: number;
+  endBatch: number;
+  compression: number;
+  blobHash: string;
+  createdAt: string;
+}
+
+export const blobDA = {
+  getBlobs: (limit: number, offset: number) =>
+    rpcCall<BlobDABlob[]>(RPC_ENDPOINTS.BLOB_DA_RPC, "data_getOffChainBlobs", [limit, offset]),
+};

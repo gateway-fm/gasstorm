@@ -5,6 +5,30 @@ import type { TestRun, TestRunDetail, TimeSeriesPoint } from "@/types/load-test"
 
 const LOAD_GEN_API = "/api/loadgen";
 
+// Normalize latency stats regardless of PascalCase/camelCase payload shape
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function transformLatencyStats(stats: any) {
+  if (!stats) return undefined;
+  const buckets = stats.Buckets || stats.buckets;
+  return {
+    count: stats.Count ?? stats.count ?? 0,
+    min: stats.Min ?? stats.min ?? 0,
+    max: stats.Max ?? stats.max ?? 0,
+    avg: stats.Avg ?? stats.avg ?? 0,
+    p50: stats.P50 ?? stats.p50 ?? 0,
+    p75: stats.P75 ?? stats.p75 ?? 0,
+    p90: stats.P90 ?? stats.p90 ?? 0,
+    p95: stats.P95 ?? stats.p95 ?? 0,
+    p99: stats.P99 ?? stats.p99 ?? 0,
+    buckets: Array.isArray(buckets)
+      ? buckets.map((b: { Label?: string; label?: string; Count?: number; count?: number }) => ({
+          label: b?.Label || b?.label || "",
+          count: b?.Count ?? b?.count ?? 0,
+        }))
+      : [],
+  };
+}
+
 // Transform Go API PascalCase response to TypeScript camelCase
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function transformApiResponse(data: any): TestRunDetail {
@@ -25,8 +49,8 @@ function transformApiResponse(data: any): TestRunDetail {
     txDiscarded: run?.TxDiscarded || run?.txDiscarded || 0,
     averageTps: run?.AverageTPS || run?.averageTps || 0,
     peakTps: run?.PeakTPS || run?.peakTps || 0,
-    latencyStats: run?.LatencyStats || run?.latencyStats,
-    preconfLatency: run?.PreconfLatency || run?.preconfLatency,
+    latencyStats: transformLatencyStats(run?.LatencyStats || run?.latencyStats),
+    preconfLatency: transformLatencyStats(run?.PreconfLatency || run?.preconfLatency),
     config: run?.Config || run?.config,
     status: run?.Status || run?.status || "completed",
     errorMessage: run?.ErrorMessage || run?.errorMessage,
@@ -44,7 +68,7 @@ function transformApiResponse(data: any): TestRunDetail {
     // Realistic test specific metrics
     tipHistogram: run?.TipHistogram || run?.tipHistogram,
     txTypeMetrics: run?.TxTypeMetrics || run?.txTypeMetrics,
-    pendingLatency: run?.PendingLatency || run?.pendingLatency,
+    pendingLatency: transformLatencyStats(run?.PendingLatency || run?.pendingLatency),
     accountsActive: run?.AccountsActive || run?.accountsActive,
     accountsFunded: run?.AccountsFunded || run?.accountsFunded,
     // On-chain verification metrics

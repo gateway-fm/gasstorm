@@ -110,6 +110,11 @@ export interface GoLoadTestMetrics {
   // Current rolling metrics
   currentMgasPerSec?: number;
   currentFillRate?: number;
+  // HSM / block attestation (optional; present on newer builder/loadgen versions)
+  blockAttestationEnabled?: boolean;
+  hsmProvider?: string;
+  hsmKeyIdActive?: string;
+  hsmFailoverEnabled?: boolean;
 }
 
 // Request payload to Go load generator
@@ -175,6 +180,12 @@ export interface HistoricalTestRun {
   txTypeMetrics?: TxTypeMetrics[];
   accountsActive?: number;
   accountsFunded?: number;
+  environment?: {
+    builderBlockAttestationEnabled?: boolean;
+    builderHsmProvider?: string;
+    builderHsmKeyIdActive?: string;
+    builderHsmFailoverEnabled?: boolean;
+  };
 }
 
 export interface HistoricalTimeSeriesPoint {

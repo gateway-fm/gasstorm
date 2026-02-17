@@ -13,6 +13,7 @@ import type {
   L1NodeData,
   BridgeRelayerNodeData,
   BridgeUINodeData,
+  BlobDANodeData,
   ExecutionLayerType,
 } from "../types";
 import { getExecutionLayerConfig } from "../constants";
@@ -45,6 +46,9 @@ const POSITIONS = {
     // RIGHT: Bridge Services
     bridgeRelayer: { x: 520, y: 80 },
     bridgeUI:      { x: 520, y: 230 },
+
+    // LEFT: Blob DA
+    blobDA:        { x: 50, y: 280 },
   },
   directSequencer: {
     // CENTER: L2 Pipeline (no block builder)
@@ -57,6 +61,9 @@ const POSITIONS = {
     // RIGHT: Bridge Services
     bridgeRelayer: { x: 520, y: 80 },
     bridgeUI:      { x: 520, y: 230 },
+
+    // LEFT: Blob DA
+    blobDA:        { x: 50, y: 320 },
   },
 } as const;
 
@@ -65,6 +72,7 @@ export function useTopology() {
   const l2 = useChainStore((state) => state.l2);
   const builder = useChainStore((state) => state.builder);
   const bridge = useChainStore((state) => state.bridge);
+  const blobDA = useChainStore((state) => state.blobDA);
 
   const loadTestStatus = useGoLoadTestStore((state) => state.status);
   const currentRate = useGoLoadTestStore((state) => state.currentRate);
@@ -179,6 +187,21 @@ export function useTopology() {
       selectable: false,
     });
 
+    // Blob DA
+    nodes.push({
+      id: "blob-da",
+      type: "blobDA",
+      position: pos.blobDA,
+      data: {
+        label: "Blob DA",
+        status: toStatus(blobDA.isOnline),
+        latestBatch: blobDA.latestBatch,
+        compression: blobDA.compression,
+      } as BlobDANodeData,
+      draggable: false,
+      selectable: false,
+    });
+
     // Edges - Core pipeline only for now
     const edges: ArchitectureEdge[] = [];
 
@@ -220,6 +243,24 @@ export function useTopology() {
       data: { animated: false, tps: 0 },
     });
 
+    // LEFT: Execution → Blob DA
+    edges.push({
+      id: "exec-blobda",
+      source: "execution",
+      target: "blob-da",
+      type: "animated",
+      data: { animated: blobDA.isOnline, tps: 0 },
+    });
+
+    // LEFT: Blob DA → L1
+    edges.push({
+      id: "blobda-l1",
+      source: "blob-da",
+      target: "l1",
+      type: "animated",
+      data: { animated: blobDA.isOnline, tps: 0, label: "EIP-4844" },
+    });
+
     return { nodes, edges };
   }, [
     config,
@@ -241,6 +282,9 @@ export function useTopology() {
     l2.chainId,
     l1.isOnline,
     l1.blockNumber,
+    blobDA.isOnline,
+    blobDA.latestBatch,
+    blobDA.compression,
   ]);
 
   return { nodes, edges, config };

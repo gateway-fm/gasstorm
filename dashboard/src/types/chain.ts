@@ -36,6 +36,7 @@ export const RPC_ENDPOINTS = {
   L1_RPC: "/rpc/l1",
   L2_RPC: "/rpc/l2",
   BUILDER_RPC: "/rpc/builder",
+  BLOB_DA_RPC: "/rpc/blobda",
   L1_WS: "/ws/l1",
   L2_WS: "/ws/l2",
 } as const;

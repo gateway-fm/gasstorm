@@ -77,6 +77,11 @@ export interface GoLoadTestState {
   // Current rolling metrics
   currentMgasPerSec: number;
   currentFillRate: number;
+  // HSM / block attestation telemetry
+  blockAttestationEnabled: boolean | null;
+  hsmProvider: string;
+  hsmKeyIdActive: string;
+  hsmFailoverEnabled: boolean | null;
   // Time series for live chart
   chartTimeSeries: ChartTimeSeries;
   // Historical mode
@@ -160,6 +165,11 @@ export const INITIAL_STATE: GoLoadTestState = {
   // Current rolling metrics
   currentMgasPerSec: 0,
   currentFillRate: 0,
+  // HSM / block attestation telemetry
+  blockAttestationEnabled: null,
+  hsmProvider: "",
+  hsmKeyIdActive: "",
+  hsmFailoverEnabled: null,
   // Time series
   chartTimeSeries: {
     timestamps: [],
@@ -232,6 +242,11 @@ export function getResetState(): Partial<GoLoadTestState> {
     // Current rolling metrics
     currentMgasPerSec: 0,
     currentFillRate: 0,
+    // HSM / block attestation telemetry
+    blockAttestationEnabled: null,
+    hsmProvider: "",
+    hsmKeyIdActive: "",
+    hsmFailoverEnabled: null,
     // Time series
     chartTimeSeries: {
       timestamps: [],

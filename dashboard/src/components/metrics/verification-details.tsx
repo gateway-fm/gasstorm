@@ -1,6 +1,15 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   CheckCircle,
   XCircle,
@@ -8,6 +17,8 @@ import {
   Settings,
   Layers,
   Receipt,
+  Shield,
+  Copy,
 } from "lucide-react";
 import type {
   TestRun,
@@ -15,6 +26,7 @@ import type {
   EnvironmentSnapshot,
   TipOrderingResult,
   TxReceiptVerification,
+  HeaderAttestation,
 } from "@/types/load-test";
 
 interface VerificationDetailsProps {
@@ -306,6 +318,145 @@ function TxReceiptsCard({ result }: { result: TxReceiptVerification }) {
   );
 }
 
+function HeaderSignaturesModal({
+  attestations,
+  expectedCount,
+}: {
+  attestations: HeaderAttestation[];
+  expectedCount?: number;
+}) {
+  const onCopy = async (value: string) => {
+    if (!value || typeof navigator === "undefined") return;
+    await navigator.clipboard.writeText(value);
+  };
+
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" className="mt-2 w-full">
+          View Signatures ({attestations.length}{expectedCount ? `/${expectedCount}` : ""})
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-5xl max-h-[85vh] overflow-hidden">
+        <DialogHeader>
+          <DialogTitle>Header Signatures</DialogTitle>
+          <DialogDescription>
+            Block header attestations captured for this run.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="overflow-y-auto pr-1 space-y-2 max-h-[68vh]">
+          {attestations.map((sig) => (
+            <div key={`${sig.blockNumber}-${sig.digestHex || sig.signatureHex || "na"}`} className="rounded border p-2">
+              <div className="flex items-center justify-between gap-2 mb-1 text-xs">
+                <span className="font-mono">Block {sig.blockNumber.toLocaleString()}</span>
+                <span className="text-muted-foreground font-mono">{sig.status || "signed"}</span>
+              </div>
+              <div className="text-xs space-y-1">
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground">Key</span>
+                  <span className="font-mono truncate">{sig.keyId || "—"}</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground">Provider</span>
+                  <span className="font-mono">{sig.provider || "—"}</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground">Signed At</span>
+                  <span className="font-mono">{sig.signedAt ? new Date(sig.signedAt).toLocaleString() : "—"}</span>
+                </div>
+                <div className="pt-1">
+                  <div className="text-muted-foreground mb-0.5">Signature</div>
+                  <div className="flex items-start gap-2">
+                    <code className="font-mono text-[10px] break-all flex-1 bg-muted/40 rounded p-1.5">
+                      {sig.signatureHex || "—"}
+                    </code>
+                    {sig.signatureHex && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-6 w-6"
+                        onClick={() => onCopy(sig.signatureHex || "")}
+                        title="Copy signature"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function HsmOverviewCard({
+  env,
+  attestations,
+  expectedCount,
+}: {
+  env: EnvironmentSnapshot;
+  attestations: HeaderAttestation[];
+  expectedCount?: number;
+}) {
+  const attestationEnabled = env.builderBlockAttestationEnabled === true;
+  const provider = env.builderHsmProvider || "—";
+  const keyId = env.builderHsmKeyIdActive || "—";
+  const failoverLabel = typeof env.builderHsmFailoverEnabled === "boolean"
+    ? (env.builderHsmFailoverEnabled ? "ON" : "OFF")
+    : "—";
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+          <Shield className="h-4 w-4 text-emerald-400" />
+          HSM Overview
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-1 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Block Attestation</span>
+            <span className={`font-mono ${attestationEnabled ? "text-green-400" : "text-muted-foreground"}`}>
+              {attestationEnabled ? "ON" : "OFF"}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">HSM Provider</span>
+            <span className={`font-mono ${provider === "—" ? "text-muted-foreground" : "text-info"}`}>
+              {provider}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">HSM Key</span>
+            <span className={`font-mono ${keyId === "—" ? "text-muted-foreground" : "text-info"}`}>
+              {keyId}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Failover</span>
+            <span className={`font-mono ${failoverLabel === "ON" ? "text-green-400" : failoverLabel === "OFF" ? "text-warning" : "text-muted-foreground"}`}>
+              {failoverLabel}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Headers Signed</span>
+            <span className="font-mono">
+              {attestations.length.toLocaleString()}{expectedCount ? ` / ${expectedCount.toLocaleString()}` : ""}
+            </span>
+          </div>
+        </div>
+        {attestations.length > 0 && (
+          <HeaderSignaturesModal attestations={attestations} expectedCount={expectedCount} />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function VerificationSummaryCard({ result }: { result: VerificationResult }) {
   return (
     <Card className={result.allChecksPass ? "border-green-500/30" : "border-red-500/30"}>
@@ -376,6 +527,9 @@ function VerificationSummaryCard({ result }: { result: VerificationResult }) {
 export function VerificationDetails({ testRun }: VerificationDetailsProps) {
   const hasEnvironment = !!testRun.environment;
   const hasVerification = !!testRun.verification;
+  const hasHsmEnabled = testRun.environment?.builderBlockAttestationEnabled === true;
+  const headerAttestations = testRun.verification?.headerAttestations || [];
+  const headerAttestationExpected = testRun.verification?.headerAttestationExpected;
 
   if (!hasEnvironment && !hasVerification) {
     return null;
@@ -398,6 +552,14 @@ export function VerificationDetails({ testRun }: VerificationDetailsProps) {
 
         {testRun.verification?.txReceipts && (
           <TxReceiptsCard result={testRun.verification.txReceipts} />
+        )}
+
+        {hasEnvironment && testRun.environment && hasHsmEnabled && (
+          <HsmOverviewCard
+            env={testRun.environment}
+            attestations={headerAttestations}
+            expectedCount={headerAttestationExpected}
+          />
         )}
       </div>
     </div>

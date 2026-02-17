@@ -107,6 +107,8 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()((set, get) => {
     isHistoricalMode: () => get().isHistoricalMode,
     getChartTimeSeries: () => get().chartTimeSeries,
     getCurrentStatus: () => get().status,
+    getCurrentPeakTps: () => get().peakTps,
+    getElapsedTime: () => get().elapsedTime,
     onNewTestDetected: (metrics) => {
       // A new test was started (possibly via API/MCP, not the UI).
       // Reset all stores and sync config so the dashboard picks it up cleanly.
@@ -157,6 +159,7 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()((set, get) => {
       // prevents the WebSocket onNewTestDetected callback from firing
       // redundantly when the first message arrives (it only fires when the
       // store status is NOT active).
+      wsManager.resetForNewTest(); // Clear frozen flag from previous test
       useMetricsStore.getState().reset();
       useChainStore.getState().clearLogs();
       set({
@@ -226,6 +229,7 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()((set, get) => {
       try {
         await fetchLoadGenAPI("/reset", { method: "POST" });
         // Don't disconnect WebSocket — stay connected for next test.
+        wsManager.resetForNewTest(); // Clear frozen flag from previous test
         useMetricsStore.getState().reset();
         useChainStore.getState().clearLogs();
         set(getResetState());
@@ -244,7 +248,7 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()((set, get) => {
         if (!response.ok) return;
 
         const metrics: GoLoadTestMetrics = await response.json();
-        const { state } = parseMetricsMessage(metrics, get().chartTimeSeries);
+        const { state } = parseMetricsMessage(metrics, get().chartTimeSeries, get().peakTps);
         set(state);
       } catch (error) {
         console.debug("Failed to get load generator status:", error);
@@ -303,6 +307,10 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()((set, get) => {
         txTypeMetrics: run.txTypeMetrics ?? [],
         accountsActive: run.accountsActive ?? 0,
         accountsFunded: run.accountsFunded ?? 0,
+        blockAttestationEnabled: run.environment?.builderBlockAttestationEnabled ?? null,
+        hsmProvider: run.environment?.builderHsmProvider ?? "",
+        hsmKeyIdActive: run.environment?.builderHsmKeyIdActive ?? "",
+        hsmFailoverEnabled: run.environment?.builderHsmFailoverEnabled ?? null,
         isHistoricalMode: true,
       });
     },

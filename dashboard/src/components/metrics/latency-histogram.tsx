@@ -170,14 +170,24 @@ export function LatencyHistogram({ executionLayer }: LatencyHistogramProps = {})
     );
   }
 
+  const pendingCount = pendingLatencyStats?.count ?? 0;
+  const showPendingLatencyCard = status !== "completed" && status !== "error"
+    ? true
+    : pendingCount > 0;
+  const pendingEmptyMessage = status === "completed" || status === "error"
+    ? "No pending latency data captured for this run."
+    : "Waiting for pending events...";
+
   return (
-    <div className="grid gap-4 md:grid-cols-3">
-      <LatencyCard
-        title="Pending Latency"
-        stats={pendingLatencyStats}
-        barColors={PENDING_BUCKET_COLORS}
-        emptyMessage="Waiting for pending events..."
-      />
+    <div className={`grid gap-4 ${showPendingLatencyCard ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
+      {showPendingLatencyCard && (
+        <LatencyCard
+          title="Pending Latency"
+          stats={pendingLatencyStats}
+          barColors={PENDING_BUCKET_COLORS}
+          emptyMessage={pendingEmptyMessage}
+        />
+      )}
       <LatencyCard
         title="Preconfirmation Latency"
         stats={preconfLatencyStats}

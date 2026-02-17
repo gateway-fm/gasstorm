@@ -30,6 +30,9 @@ log_error() {
 }
 
 cleanup() {
+    if [ "${SHOULD_CLEANUP:-false}" != "true" ]; then
+        return 0
+    fi
     log_info "Cleaning up Docker Compose stack..."
     cd "$PROJECT_DIR"
     docker compose --profile reth down --volumes --remove-orphans 2>/dev/null || true
@@ -81,7 +84,7 @@ run_e2e_tests() {
     export L2_RPC_URL="http://localhost:18546"
     export PRECONF_WS_URL="ws://localhost:13002/ws/preconfirmations"
 
-    if go test -v -race -timeout ${TEST_TIMEOUT}s ./internal/integration/... -run "TestE2E"; then
+    if go test -v -race -tags=integration -timeout ${TEST_TIMEOUT}s ./internal/integration/... -run "TestE2E"; then
         log_info "E2E tests PASSED"
         return 0
     else
@@ -118,6 +121,7 @@ main() {
 
     log_info "=== GasStorm Integration Tests ==="
     log_info "Test type: $test_type"
+    SHOULD_CLEANUP=false
 
     # Trap to ensure cleanup on exit
     trap cleanup EXIT
@@ -137,12 +141,13 @@ main() {
     # Start Docker Compose stack
     if [ "$skip_startup" != "true" ]; then
         log_info "Starting Docker Compose stack..."
+        SHOULD_CLEANUP=true
         docker compose --profile reth down --volumes 2>/dev/null || true
         docker compose --profile reth up -d --build
 
         # Wait for services
-        wait_for_service "http://localhost:13000/health" "block-builder" "$STARTUP_TIMEOUT" || exit 1
-        wait_for_service "http://localhost:13001/api/status" "load-generator" "$STARTUP_TIMEOUT" || exit 1
+        wait_for_service "http://localhost:13000/status" "block-builder" "$STARTUP_TIMEOUT" || exit 1
+        wait_for_service "http://localhost:13001/status" "load-generator" "$STARTUP_TIMEOUT" || exit 1
         wait_for_service "http://localhost:18546" "op-reth" "$STARTUP_TIMEOUT" || exit 1
 
         log_info "All services ready"

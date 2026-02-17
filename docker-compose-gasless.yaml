@@ -1,0 +1,13 @@
+services:
+  l2-reth:
+    volumes:
+      - ./genesis/genesis-gasless.json:/config/genesis.json:ro
+
+  block-builder:
+    environment:
+      - ENABLE_GASLESS=true
+
+  load-generator:
+    environment:
+      - GAS_TIP_CAP=0
+      - GAS_FEE_CAP=0

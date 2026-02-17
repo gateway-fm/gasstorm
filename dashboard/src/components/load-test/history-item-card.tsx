@@ -234,6 +234,14 @@ export function HistoryItemCard({
           >
             {(result as TestRun).executionLayer || "reth"}
           </Badge>
+          {(result as TestRun).environment?.builderBlockAttestationEnabled === true && (
+            <Badge
+              variant="secondary"
+              className="font-mono text-xs bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+            >
+              HSM ON
+            </Badge>
+          )}
           <span className="text-sm text-muted-foreground hidden md:block">
             {formatDate(result.startedAt)}
           </span>

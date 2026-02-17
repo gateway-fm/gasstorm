@@ -72,6 +72,17 @@ export const colorSchemes = {
     icon: "bg-amber-500",
     accent: "amber",
   },
+  blobDA: {
+    gradient: "from-rose-500/15 via-red-500/10 to-rose-500/5",
+    border: "border-rose-500/40",
+    borderHover: "hover:border-rose-400/60",
+    glow: "shadow-rose-500/10",
+    glowHover: "hover:shadow-rose-500/20",
+    header: "text-rose-300",
+    headerBg: "bg-rose-500/10",
+    icon: "bg-rose-500",
+    accent: "rose",
+  },
 } as const;
 
 export type ColorSchemeKey = keyof typeof colorSchemes;

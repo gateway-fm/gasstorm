@@ -124,6 +124,9 @@ func registerStackUp(s *server.MCPServer, dir string) {
 		mcp.WithBoolean("metal",
 			mcp.Description("Start in Metal mode (no Docker). Requires op-reth, Go, Node.js, and sibling repos."),
 		),
+		mcp.WithBoolean("gasless",
+			mcp.Description("Enable gasless mode (0 base fee, 0 gas price). Restart required to take effect if already running."),
+		),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		if req.GetBool("metal", false) {
@@ -142,13 +145,42 @@ func registerStackUp(s *server.MCPServer, dir string) {
 		}
 
 		profile := req.GetString("profile", "reth")
-		out, err := runCompose(dir, "--profile", profile, "up", "-d")
+		gasless := req.GetBool("gasless", false)
+
+		args := []string{"--profile", profile}
+		if gasless {
+			args = append(args, "-f", "docker-compose.yml", "-f", "docker-compose-op-reth.yaml", "-f", "docker-compose-gasless.yaml")
+		}
+		args = append(args, "up", "-d")
+
+		// Note: when using -f overrides, we must specify all base files if we deviate from default behavior.
+		// However, runCompose appends 'compose' + args. Standard usage often just relies on COMPOSE_FILE env or default.
+		// If gasless is false, we just use defaults. If true, we need to be careful about which files to include.
+		// docker-compose.yml is base. docker-compose-op-reth.yaml is the profile logic usually activated by profile name?
+		// Actually, profiles are in the service definitions. We just need to add the override file if gasless.
+		// But docker compose merging rules require specifying the base file if you specify -f.
+
+		// If gasless is active, we reconstruct the file list explicitly to be safe + the override.
+		// Standard set usually implicitly picks up docker-compose.yml and docker-compose.override.yml
+
+		if gasless {
+			// Reset args to be explicit about files
+			args = []string{"--profile", profile, "-f", "docker-compose.yml", "-f", "docker-compose-op-reth.yaml", "-f", "docker-compose-gasless.yaml", "up", "-d"}
+		}
+
+		out, err := runCompose(dir, args...)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("stack_up failed: %v\n%s", err, out)), nil
 		}
+
+		statusMsg := fmt.Sprintf("Profile: %s", profile)
+		if gasless {
+			statusMsg += " (Gasless Mode Enabled)"
+		}
+
 		return mcp.NewToolResultText(joinLines(
 			sectionf("Stack Started (Docker)"),
-			kvf("Profile", profile),
+			statusMsg,
 			"",
 			out,
 		)), nil
