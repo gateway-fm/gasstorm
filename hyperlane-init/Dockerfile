@@ -2,7 +2,7 @@
 # Deploys Hyperlane core and warp route contracts on startup
 
 # Use glibc-based image for Foundry compatibility
-FROM --platform=linux/amd64 node:20-slim
+FROM node:20-slim
 
 # Install dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -15,13 +15,16 @@ RUN pip3 install --break-system-packages pycryptodome
 # Foundry version - pinned for reproducibility
 # Update version and checksum when upgrading
 ARG FOUNDRY_VERSION=nightly-5b7e4cb3c882b28f3c32ba580de27ce7381f415a
-# SHA256 checksum for foundry_nightly_linux_amd64.tar.gz
+# SHA256 checksum for the selected Foundry archive
 # Note: Foundry nightly releases don't provide official checksums.
 # Verify manually: curl -sL <url> | sha256sum
 ARG FOUNDRY_SHA256=skip
+ARG TARGETARCH
 
-# Install Foundry (forge, cast, anvil) directly from releases
-RUN curl -L https://github.com/foundry-rs/foundry/releases/download/${FOUNDRY_VERSION}/foundry_nightly_linux_amd64.tar.gz -o foundry.tar.gz && \
+# Install Foundry (forge, cast, anvil) directly from releases.
+# Select binary by build arch to avoid slow amd64 emulation on arm64 hosts.
+RUN if [ "${TARGETARCH}" = "arm64" ]; then FOUNDRY_ARCH=arm64; else FOUNDRY_ARCH=amd64; fi && \
+    curl -L "https://github.com/foundry-rs/foundry/releases/download/${FOUNDRY_VERSION}/foundry_nightly_linux_${FOUNDRY_ARCH}.tar.gz" -o foundry.tar.gz && \
     if [ "$FOUNDRY_SHA256" != "skip" ]; then \
         echo "${FOUNDRY_SHA256}  foundry.tar.gz" | sha256sum -c -; \
     fi && \

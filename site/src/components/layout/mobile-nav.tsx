@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { navigation } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 import { Github } from "lucide-react";
+import { MobileVersionBadge } from "./version-selector";
 
 interface MobileNavProps {
   onClose: () => void;
@@ -45,7 +46,8 @@ export function MobileNav({ onClose }: MobileNavProps) {
             </ul>
           </div>
         ))}
-        <div className="pt-2 border-t">
+        <div className="pt-2 border-t space-y-2">
+          <MobileVersionBadge />
           <a
             href="https://github.com/gateway-fm/gasstorm"
             target="_blank"

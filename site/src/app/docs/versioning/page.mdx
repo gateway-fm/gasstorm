@@ -1,0 +1,29 @@
+import { Callout } from "@/components/mdx/callout"
+
+export const metadata = {
+  title: "Versioning",
+  description: "How documentation versions work in GasStorm.",
+}
+
+# Versioning
+
+GasStorm documentation is versioned alongside the project. The version badge in the header shows which version you're reading.
+
+## Identifying Your Version
+
+The header displays a version badge (e.g. **v0.1.0**). This corresponds to the GasStorm release the documentation was written for.
+
+## URL Scheme
+
+| Version | URL Pattern |
+|---------|-------------|
+| Latest | `/docs/getting-started/` |
+| Archived | `/v/0.1/docs/getting-started/` |
+
+<Callout type="info">
+Archived versions are static snapshots. They reflect the state of the documentation at the time that version was released.
+</Callout>
+
+## Staying Up to Date
+
+The latest version is always served from the root URL. When a new version is released, the previous version is archived and accessible via the version dropdown in the header.

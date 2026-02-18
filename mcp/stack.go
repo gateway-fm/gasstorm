@@ -121,6 +121,15 @@ func registerStackUp(s *server.MCPServer, dir string) {
 		mcp.WithString("profile",
 			mcp.Description("Docker Compose profile: reth (default), cdk-erigon, gravity-reth"),
 		),
+		mcp.WithBoolean("bridge",
+			mcp.Description("Enable Hyperlane bridge infrastructure profile. Defaults to true for reth, false otherwise."),
+		),
+		mcp.WithBoolean("bridge_ui",
+			mcp.Description("Enable Hyperlane Warp UI profile (bridge-ui). Defaults to false."),
+		),
+		mcp.WithBoolean("blob",
+			mcp.Description("Enable Blob DA profile. Defaults to true for reth, false otherwise."),
+		),
 		mcp.WithBoolean("metal",
 			mcp.Description("Start in Metal mode (no Docker). Requires op-reth, Go, Node.js, and sibling repos."),
 		),
@@ -146,8 +155,25 @@ func registerStackUp(s *server.MCPServer, dir string) {
 
 		profile := req.GetString("profile", "reth")
 		gasless := req.GetBool("gasless", false)
+		enableBridge := req.GetBool("bridge", profile == "reth")
+		enableBridgeUI := req.GetBool("bridge_ui", false)
+		enableBlob := req.GetBool("blob", profile == "reth")
 
-		args := []string{"--profile", profile}
+		profiles := []string{profile}
+		if profile == "reth" && enableBridge {
+			profiles = append(profiles, "bridge")
+		}
+		if profile == "reth" && enableBridgeUI {
+			profiles = append(profiles, "bridge-ui")
+		}
+		if profile == "reth" && enableBlob {
+			profiles = append(profiles, "blob")
+		}
+
+		args := []string{}
+		for _, p := range profiles {
+			args = append(args, "--profile", p)
+		}
 		if gasless {
 			args = append(args, "-f", "docker-compose.yml", "-f", "docker-compose-op-reth.yaml", "-f", "docker-compose-gasless.yaml")
 		}
@@ -165,7 +191,11 @@ func registerStackUp(s *server.MCPServer, dir string) {
 
 		if gasless {
 			// Reset args to be explicit about files
-			args = []string{"--profile", profile, "-f", "docker-compose.yml", "-f", "docker-compose-op-reth.yaml", "-f", "docker-compose-gasless.yaml", "up", "-d"}
+			args = []string{}
+			for _, p := range profiles {
+				args = append(args, "--profile", p)
+			}
+			args = append(args, "-f", "docker-compose.yml", "-f", "docker-compose-op-reth.yaml", "-f", "docker-compose-gasless.yaml", "up", "-d")
 		}
 
 		out, err := runCompose(dir, args...)
@@ -173,7 +203,7 @@ func registerStackUp(s *server.MCPServer, dir string) {
 			return mcp.NewToolResultError(fmt.Sprintf("stack_up failed: %v\n%s", err, out)), nil
 		}
 
-		statusMsg := fmt.Sprintf("Profile: %s", profile)
+		statusMsg := fmt.Sprintf("Profiles: %s", strings.Join(profiles, ", "))
 		if gasless {
 			statusMsg += " (Gasless Mode Enabled)"
 		}

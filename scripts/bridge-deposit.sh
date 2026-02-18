@@ -192,10 +192,10 @@ bridge_deposit() {
     total_value=$(echo "$amount_wei + $gas_quote" | bc)
 
     # Encode recipient as bytes32 (LEFT-padded for Hyperlane compatibility)
-    # cast to-bytes32 right-pads, but Hyperlane expects left-padding
     local recipient_bytes32
-    local addr_no_prefix="${RECIPIENT#0x}"
-    recipient_bytes32="0x000000000000000000000000${addr_no_prefix,,}"
+    local addr_lower
+    addr_lower=$(echo "${RECIPIENT#0x}" | tr 'A-F' 'a-f')
+    recipient_bytes32="0x000000000000000000000000${addr_lower}"
 
     log_step "Sending bridge transaction..."
 

@@ -58,6 +58,16 @@ const nextConfig: NextConfig = {
               source: "/ws/l2",
               destination: "http://localhost:18547/",
             },
+            // Explorer API health
+            {
+              source: "/api/explorer/health",
+              destination: "http://localhost:18200/health",
+            },
+            // Privacy Proxy health
+            {
+              source: "/api/privacy/health",
+              destination: "http://localhost:18300/health",
+            },
           ];
         },
       }

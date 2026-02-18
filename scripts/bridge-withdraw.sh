@@ -43,6 +43,21 @@ get_sender_address() {
 
 # Get warp route contract addresses from deployment artifacts
 get_warp_addresses() {
+    # First priority: Check Docker container for addresses (from hyperlane-init)
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "gasstorm-relayer\|gasstorm-hyperlane-init"; then
+        local docker_addrs
+        docker_addrs=$(docker exec gasstorm-relayer cat /config/addresses.json 2>/dev/null || \
+                       docker exec gasstorm-hyperlane-init cat /output/addresses.json 2>/dev/null || true)
+        if [ -n "$docker_addrs" ]; then
+            L1_WARP_ADDRESS=$(echo "$docker_addrs" | jq -r '.l1.warpRoute // empty' 2>/dev/null || true)
+            L2_WARP_ADDRESS=$(echo "$docker_addrs" | jq -r '.l2.warpRoute // empty' 2>/dev/null || true)
+            if [ -n "$L2_WARP_ADDRESS" ]; then
+                log_info "Using addresses from Docker container"
+                return
+            fi
+        fi
+    fi
+
     # Check for warp route addresses in Hyperlane registry
     local hyperlane_dir="$HOME/.hyperlane"
 
@@ -168,8 +183,8 @@ bridge_withdraw() {
     # Get quote for interchain gas payment
     log_step "Getting interchain gas quote..."
 
-    # L1 domain ID
-    local dest_domain=1
+    # L1 domain ID (Anvil's domain, NOT chain ID)
+    local dest_domain=31337
 
     # Quote gas (simplified - 200k gas should be enough)
     local gas_quote
@@ -184,9 +199,11 @@ bridge_withdraw() {
     local total_value
     total_value=$(echo "$amount_wei + $gas_quote" | bc)
 
-    # Encode recipient as bytes32
+    # Encode recipient as bytes32 (LEFT-padded for Hyperlane compatibility)
     local recipient_bytes32
-    recipient_bytes32=$(cast to-bytes32 "$RECIPIENT")
+    local addr_lower
+    addr_lower=$(echo "${RECIPIENT#0x}" | tr 'A-F' 'a-f')
+    recipient_bytes32="0x000000000000000000000000${addr_lower}"
 
     log_step "Sending bridge transaction..."
 
