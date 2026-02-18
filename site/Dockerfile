@@ -15,6 +15,10 @@ RUN --mount=type=cache,target=/root/.npm \
 # Copy source files
 COPY . .
 
+# Allow overriding basePath (empty = serve from root, default = /gasstorm)
+ARG DOCS_BASE_PATH
+ENV DOCS_BASE_PATH=${DOCS_BASE_PATH}
+
 # Build the application with cache mount for Next.js
 RUN --mount=type=cache,target=/app/.next/cache \
     npm run build

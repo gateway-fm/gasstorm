@@ -6,7 +6,7 @@ const isDev = process.env.NODE_ENV === "development";
 const nextConfig: NextConfig = {
   pageExtensions: ["ts", "tsx", "md", "mdx"],
   ...(isDev ? {} : { output: "export" }),
-  basePath: process.env.DOCS_BASE_PATH || (isDev ? "" : "/gasstorm"),
+  basePath: process.env.DOCS_BASE_PATH !== undefined ? process.env.DOCS_BASE_PATH : (isDev ? "" : "/gasstorm"),
   trailingSlash: true,
   images: {
     unoptimized: true,

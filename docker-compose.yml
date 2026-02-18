@@ -146,6 +146,8 @@ services:
     build:
       context: ./site
       dockerfile: Dockerfile
+      args:
+        - DOCS_BASE_PATH=
     container_name: gasstorm-docs
     profiles: [ "reth" ]
     ports:
@@ -376,6 +378,7 @@ services:
     volumes:
       - hyperlane-config:/output
       - hyperlane-relayer-data:/relayer-data
+      - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
       test: ["CMD", "test", "-f", "/output/relayer.json"]
       interval: 10s
@@ -420,7 +423,7 @@ services:
         - NEXT_PUBLIC_WALLET_CONNECT_ID=${WALLET_CONNECT_ID:-00000000000000000000000000000000}
         - NEXT_PUBLIC_RPC_OVERRIDES={"l1local":{"http":"http://host.docker.internal:18545"},"l2local":{"http":"http://host.docker.internal:13000"}}
     container_name: gasstorm-hyperlane-bridge-ui
-    profiles: [ "bridge-ui" ]
+    profiles: [ "bridge" ]
     depends_on:
       hyperlane-init:
         condition: service_healthy
@@ -768,7 +771,7 @@ services:
 
   # --- Explorer L1 (Anvil) ---
 
-  # L1 Explorer Database (PostgreSQL)
+  # L1 Explorer Database (PostgreSQL) — port 15438 (15437 used by privacy-db)
   explorer-l1-db:
     image: postgres:16-alpine
     container_name: gasstorm-explorer-l1-db
@@ -780,7 +783,7 @@ services:
     volumes:
       - explorer-l1-db-data:/var/lib/postgresql/data
     ports:
-      - "15437:5432"
+      - "15438:5432"
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U explorer -d explorer" ]
       interval: 5s

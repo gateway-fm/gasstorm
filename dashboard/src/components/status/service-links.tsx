@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useChainStore } from "@/stores/chain-store";
 
 interface ServiceLink {
   name: string;
-  url: string;
+  href: string;
   getOnline: (state: ServiceState) => boolean;
 }
 
@@ -16,9 +17,10 @@ interface ServiceState {
 }
 
 const SERVICE_LINKS: ServiceLink[] = [
-  { name: "L2 Block Explorer", url: "http://localhost:18201", getOnline: (s) => s.explorerOnline },
-  { name: "L1 Block Explorer", url: "http://localhost:18203", getOnline: (s) => s.l1Online },
-  { name: "Privacy Dashboard", url: "http://localhost:18301/admin/dashboard", getOnline: (s) => s.privacyOnline },
+  { name: "L1 Block Explorer", href: "/explorer-l1", getOnline: (s) => s.l1Online },
+  { name: "L2 Block Explorer", href: "/explorer-l2", getOnline: (s) => s.explorerOnline },
+  { name: "Bridge UI", href: "/bridge-ui", getOnline: (s) => s.l2Online },
+  { name: "Privacy Dashboard", href: "/privacy", getOnline: (s) => s.privacyOnline },
 ];
 
 function StatusDot({ online }: { online: boolean }) {
@@ -48,17 +50,14 @@ export function ServiceLinks() {
       {SERVICE_LINKS.map((link) => {
         const online = link.getOnline(state);
         return (
-          <a
-            key={link.url}
-            href={link.url}
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            key={link.href}
+            href={link.href}
             className="flex items-center gap-2 text-sm text-blue-400 hover:underline"
-            title={link.url}
           >
             <StatusDot online={online} />
             {link.name}
-          </a>
+          </Link>
         );
       })}
     </div>

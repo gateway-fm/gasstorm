@@ -55,7 +55,7 @@ const cspHeader = `
   base-uri 'self';
   form-action 'self';
   frame-src 'self' ${FRAME_SRC_HOSTS.join(' ')};
-  frame-ancestors 'none';
+  frame-ancestors *;
   media-src 'self' ${MEDIA_SRC_HOSTS.join(' ')};
   ${!isDev ? 'block-all-mixed-content;' : ''}
   ${!isDev ? 'upgrade-insecure-requests;' : ''}
@@ -70,7 +70,7 @@ const securityHeaders = [
   },
   {
     key: 'X-Frame-Options',
-    value: 'DENY',
+    value: 'ALLOWALL',
   },
   {
     key: 'X-Content-Type-Options',

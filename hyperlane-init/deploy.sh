@@ -677,7 +677,7 @@ monitor_contracts() {
         if [ "$l1_code" = "0x" ] || [ ${#l1_code} -lt 10 ]; then
             log_warn "L1 contracts missing (chain restart detected), redeploying..."
 
-            # Clear relayer DB so it doesn't get confused by stale block references
+            # Clear relayer DB so it doesn't get confused by stale nonces/blocks
             if [ -d "/relayer-data/relayer-db" ]; then
                 log_info "Clearing stale relayer DB..."
                 rm -rf /relayer-data/relayer-db/* 2>/dev/null || true
@@ -685,6 +685,14 @@ monitor_contracts() {
 
             # Re-run deployment
             main "$@"
+
+            # Restart the relayer so it picks up fresh state
+            if [ -S "/var/run/docker.sock" ]; then
+                log_info "Restarting relayer to pick up fresh state..."
+                curl -s -X POST --unix-socket /var/run/docker.sock \
+                    "http://localhost/containers/gasstorm-relayer/restart?t=5" > /dev/null 2>&1 || \
+                    log_warn "Could not restart relayer via Docker API"
+            fi
 
             # Re-read the mailbox address (may be the same due to deterministic CREATE)
             if [ -f "$OUTPUT_DIR/addresses.json" ]; then

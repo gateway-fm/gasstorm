@@ -5,13 +5,50 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useWebSocketContext } from "@/contexts/websocket-context";
 
+interface NavItem {
+  label: string;
+  href: string;
+  match: (pathname: string) => boolean;
+}
+
+function matchExact(href: string) {
+  return (p: string) => p === href || p === `${href}/`;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { label: "Dashboard", href: "/", match: (p) => p === "/" || p === "" },
+  { label: "Load Test", href: "/load-test", match: matchExact("/load-test") },
+  { label: "History", href: "/load-test/history", match: (p) => p.startsWith("/load-test/history") },
+  { label: "Bridge", href: "/bridge", match: matchExact("/bridge") },
+];
+
+const SERVICE_ITEMS: NavItem[] = [
+  { label: "L1 Explorer", href: "/explorer-l1", match: matchExact("/explorer-l1") },
+  { label: "L2 Explorer", href: "/explorer-l2", match: matchExact("/explorer-l2") },
+  { label: "Bridge UI", href: "/bridge-ui", match: matchExact("/bridge-ui") },
+  { label: "Privacy", href: "/privacy", match: matchExact("/privacy") },
+  { label: "Docs", href: "/docs", match: matchExact("/docs") },
+];
+
+function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
+  return (
+    <Link
+      href={item.href}
+      className={cn(
+        "px-3 py-1.5 text-sm font-mono font-medium rounded-md transition-all duration-150 whitespace-nowrap",
+        item.match(pathname)
+          ? "bg-primary text-primary-foreground"
+          : "text-muted-foreground hover:text-foreground hover:bg-accent"
+      )}
+    >
+      {item.label}
+    </Link>
+  );
+}
+
 export function Header() {
   const pathname = usePathname();
   const { l1Connected, l2Connected, loadGenConnected } = useWebSocketContext();
-
-  const l1WsConnected = l1Connected;
-  const l2WsConnected = l2Connected;
-  const loadGenWsConnected = loadGenConnected;
 
   return (
     <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-50">
@@ -19,7 +56,6 @@ export function Header() {
         <div className="flex items-center justify-between">
           {/* Logo and Title */}
           <div className="flex items-center gap-3">
-            {/* Terminal prompt logo */}
             <div className="font-mono text-xl font-bold flex items-center select-none">
               <span className="text-primary">&gt;</span>
               <span className="text-foreground animate-cursor-blink">_</span>
@@ -36,50 +72,13 @@ export function Header() {
 
           {/* Navigation */}
           <nav className="flex items-center gap-1">
-            <Link
-              href="/"
-              className={cn(
-                "px-3 py-1.5 text-sm font-mono font-medium rounded-md transition-all duration-150",
-                pathname === "/" || pathname === ""
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
-              )}
-            >
-              Dashboard
-            </Link>
-            <Link
-              href="/load-test"
-              className={cn(
-                "px-3 py-1.5 text-sm font-mono font-medium rounded-md transition-all duration-150 whitespace-nowrap",
-                pathname === "/load-test" || pathname === "/load-test/"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
-              )}
-            >
-              Load Test
-            </Link>
-            <Link
-              href="/load-test/history"
-              className={cn(
-                "px-3 py-1.5 text-sm font-mono font-medium rounded-md transition-all duration-150",
-                pathname.startsWith("/load-test/history")
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
-              )}
-            >
-              History
-            </Link>
-            <Link
-              href="/bridge"
-              className={cn(
-                "px-3 py-1.5 text-sm font-mono font-medium rounded-md transition-all duration-150",
-                pathname === "/bridge" || pathname === "/bridge/"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
-              )}
-            >
-              Bridge
-            </Link>
+            {NAV_ITEMS.map((item) => (
+              <NavLink key={item.href} item={item} pathname={pathname} />
+            ))}
+            <span className="text-muted-foreground/30 select-none">|</span>
+            {SERVICE_ITEMS.map((item) => (
+              <NavLink key={item.href} item={item} pathname={pathname} />
+            ))}
           </nav>
 
           {/* Status indicators */}
@@ -88,7 +87,7 @@ export function Header() {
               <span
                 className={cn(
                   "h-2 w-2 rounded-full",
-                  l1WsConnected ? "bg-success animate-status-pulse" : "bg-destructive"
+                  l1Connected ? "bg-success animate-status-pulse" : "bg-destructive"
                 )}
               />
               <span>L1</span>
@@ -97,7 +96,7 @@ export function Header() {
               <span
                 className={cn(
                   "h-2 w-2 rounded-full",
-                  l2WsConnected ? "bg-success animate-status-pulse" : "bg-destructive"
+                  l2Connected ? "bg-success animate-status-pulse" : "bg-destructive"
                 )}
               />
               <span>L2</span>
@@ -106,7 +105,7 @@ export function Header() {
               <span
                 className={cn(
                   "h-2 w-2 rounded-full",
-                  loadGenWsConnected ? "bg-success animate-status-pulse" : "bg-destructive"
+                  loadGenConnected ? "bg-success animate-status-pulse" : "bg-destructive"
                 )}
               />
               <span>LoadGen</span>
