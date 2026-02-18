@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { MobileNav } from "./mobile-nav";
+import { VersionSelector } from "./version-selector";
 
 export function SiteHeader() {
   const pathname = usePathname();
@@ -73,6 +74,7 @@ export function SiteHeader() {
         <div className="flex-1" />
 
         <div className="hidden md:flex items-center gap-2">
+          <VersionSelector />
           <Button variant="ghost" size="icon" asChild>
             <a
               href="https://github.com/gateway-fm/gasstorm"

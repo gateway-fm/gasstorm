@@ -7,6 +7,7 @@ import { AccountCard } from "@/components/status/account-card";
 import { QuickActions } from "@/components/status/quick-actions";
 import { ActivityLog } from "@/components/status/activity-log";
 import { ArchitectureDiagram } from "@/components/status/architecture-diagram";
+import { ServiceLinks } from "@/components/status/service-links";
 import { useChainStore } from "@/stores/chain-store";
 import { useChainData } from "@/hooks/use-rpc";
 import { useL1NewHead, useL2NewHead } from "@/contexts/websocket-context";
@@ -82,6 +83,9 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-background">
 
       <main className="container mx-auto px-4 py-6">
+        {/* Service Endpoints */}
+        <ServiceLinks />
+
         {/* Status Cards Grid */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
           <ChainStatusCard

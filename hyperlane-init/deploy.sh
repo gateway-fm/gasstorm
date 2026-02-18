@@ -490,6 +490,34 @@ main() {
     log_info "L1 Warp Route: ${L1_WARP:-not found}"
     log_info "L2 Warp Route: ${L2_WARP:-not found}"
 
+    # Fund warp routes with ETH so they can pay out bridge transfers
+    # L2 warp route needs ETH for L1→L2 bridging, L1 for L2→L1
+    local FUND_AMOUNT="100ether"
+    if [ -n "$L2_WARP" ]; then
+        local l2_warp_balance=$(cast balance "$L2_WARP" --rpc-url "$L2_RPC" 2>/dev/null || echo "0")
+        if [ "$l2_warp_balance" = "0" ]; then
+            log_info "Funding L2 warp route with $FUND_AMOUNT..."
+            cast send "$L2_WARP" --value "$FUND_AMOUNT" \
+                --private-key "$DEPLOYER_PRIVATE_KEY" --rpc-url "$L2_RPC" > /dev/null 2>&1 || \
+                log_warn "Failed to fund L2 warp route"
+            log_info "L2 warp route funded: $(cast balance "$L2_WARP" --ether --rpc-url "$L2_RPC" 2>/dev/null) ETH"
+        else
+            log_info "L2 warp route already funded: $(cast balance "$L2_WARP" --ether --rpc-url "$L2_RPC" 2>/dev/null) ETH"
+        fi
+    fi
+    if [ -n "$L1_WARP" ]; then
+        local l1_warp_balance=$(cast balance "$L1_WARP" --rpc-url "$L1_RPC" 2>/dev/null || echo "0")
+        if [ "$l1_warp_balance" = "0" ]; then
+            log_info "Funding L1 warp route with $FUND_AMOUNT..."
+            cast send "$L1_WARP" --value "$FUND_AMOUNT" \
+                --private-key "$DEPLOYER_PRIVATE_KEY" --rpc-url "$L1_RPC" > /dev/null 2>&1 || \
+                log_warn "Failed to fund L1 warp route"
+            log_info "L1 warp route funded: $(cast balance "$L1_WARP" --ether --rpc-url "$L1_RPC" 2>/dev/null) ETH"
+        else
+            log_info "L1 warp route already funded: $(cast balance "$L1_WARP" --ether --rpc-url "$L1_RPC" 2>/dev/null) ETH"
+        fi
+    fi
+
     # Find the Hook addresses (deployed at nonce 1 on each chain)
     local L1_HOOK=$(find_hook_address "$L1_RPC" "$DEPLOYER_ADDRESS") || true
     local L2_HOOK=$(find_hook_address "$L2_RPC" "$DEPLOYER_ADDRESS") || true
@@ -506,6 +534,26 @@ main() {
 
     log_info "L1 Hook: $L1_HOOK"
     log_info "L2 Hook: $L2_HOOK"
+
+    # Set mailbox reference on hooks (idempotent - setMailbox reverts if already set)
+    if [ -n "$L1_HOOK" ] && [ "$L1_HOOK" != "$L1_MAILBOX" ]; then
+        local l1_hook_mailbox=$(cast call "$L1_HOOK" "mailbox()(address)" --rpc-url "$L1_RPC" 2>/dev/null || echo "")
+        if [ "$l1_hook_mailbox" = "0x0000000000000000000000000000000000000000" ]; then
+            log_info "Setting mailbox on L1 hook..."
+            cast send "$L1_HOOK" "setMailbox(address)" "$L1_MAILBOX" \
+                --private-key "$DEPLOYER_PRIVATE_KEY" --rpc-url "$L1_RPC" > /dev/null 2>&1 || \
+                log_warn "Failed to set L1 hook mailbox (may already be set)"
+        fi
+    fi
+    if [ -n "$L2_HOOK" ] && [ "$L2_HOOK" != "$L2_MAILBOX" ]; then
+        local l2_hook_mailbox=$(cast call "$L2_HOOK" "mailbox()(address)" --rpc-url "$L2_RPC" 2>/dev/null || echo "")
+        if [ "$l2_hook_mailbox" = "0x0000000000000000000000000000000000000000" ]; then
+            log_info "Setting mailbox on L2 hook..."
+            cast send "$L2_HOOK" "setMailbox(address)" "$L2_MAILBOX" \
+                --private-key "$DEPLOYER_PRIVATE_KEY" --rpc-url "$L2_RPC" > /dev/null 2>&1 || \
+                log_warn "Failed to set L2 hook mailbox (may already be set)"
+        fi
+    fi
 
     log_info "Generating relayer config..."
 
@@ -603,4 +651,48 @@ EOF
     fi
 }
 
+monitor_contracts() {
+    local check_interval="${MONITOR_INTERVAL:-30}"
+    local mailbox_addr=""
+
+    # Read mailbox address from generated config
+    if [ -f "$OUTPUT_DIR/addresses.json" ]; then
+        mailbox_addr=$(jq -r '.l1.mailbox // ""' "$OUTPUT_DIR/addresses.json" 2>/dev/null || echo "")
+    fi
+
+    if [ -z "$mailbox_addr" ] || [ "$mailbox_addr" = "null" ]; then
+        log_warn "No mailbox address found, skipping monitoring"
+        return
+    fi
+
+    log_info "Monitoring contracts every ${check_interval}s (L1 mailbox: $mailbox_addr)..."
+
+    while true; do
+        sleep "$check_interval"
+
+        # Quick check: does the L1 mailbox still exist?
+        local l1_code
+        l1_code=$(eth_get_code "$L1_RPC" "$mailbox_addr" 2>/dev/null || echo "0x")
+
+        if [ "$l1_code" = "0x" ] || [ ${#l1_code} -lt 10 ]; then
+            log_warn "L1 contracts missing (chain restart detected), redeploying..."
+
+            # Clear relayer DB so it doesn't get confused by stale block references
+            if [ -d "/relayer-data/relayer-db" ]; then
+                log_info "Clearing stale relayer DB..."
+                rm -rf /relayer-data/relayer-db/* 2>/dev/null || true
+            fi
+
+            # Re-run deployment
+            main "$@"
+
+            # Re-read the mailbox address (may be the same due to deterministic CREATE)
+            if [ -f "$OUTPUT_DIR/addresses.json" ]; then
+                mailbox_addr=$(jq -r '.l1.mailbox // ""' "$OUTPUT_DIR/addresses.json" 2>/dev/null || echo "")
+            fi
+        fi
+    done
+}
+
 main "$@"
+monitor_contracts "$@"

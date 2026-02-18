@@ -1,4 +1,4 @@
-.PHONY: run run-build run-reth run-cdk-erigon run-metal stop-metal restart-metal run-hyperlane stop restart logs status clean clean-metal build test test-load-generator test-dashboard test-tx bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-with-blob run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help pull-blockbuilder pull-loadgenerator mcp-server mcp-build site-dev site-build
+.PHONY: run run-build run-reth run-cdk-erigon run-metal stop-metal restart-metal run-hyperlane stop restart logs status resource-report clean clean-metal build test test-load-generator test-dashboard test-tx bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-with-blob run-with-explorer run-with-privacy run-with-explorer-privacy pull-explorer pull-privacy run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help pull-blockbuilder pull-loadgenerator mcp-server mcp-build site-dev site-build
 
 # =============================================================================
 # Configuration: Source .env file if it exists
@@ -14,10 +14,29 @@ EXECUTION_LAYER ?= reth
 # Derive docker compose profile from execution layer
 ifeq ($(EXECUTION_LAYER),cdk-erigon)
   COMPOSE_PROFILE := cdk-erigon
+  EXPLORER_PROFILE := explorer-cdk
+  PRIVACY_PROFILE := privacy-cdk
 else ifeq ($(EXECUTION_LAYER),gravity-reth)
   COMPOSE_PROFILE := gravity-reth
+  EXPLORER_PROFILE := explorer
+  PRIVACY_PROFILE := privacy
 else
   COMPOSE_PROFILE := reth
+  EXPLORER_PROFILE := explorer
+  PRIVACY_PROFILE := privacy
+endif
+
+# Hyperlane bridge defaults
+# Enable bridge services by default for reth mode only.
+ENABLE_HYPERLANE_BRIDGE ?= true
+ENABLE_BLOB_DA ?= true
+ifeq ($(COMPOSE_PROFILE),reth)
+  ifneq ($(ENABLE_HYPERLANE_BRIDGE),false)
+    BRIDGE_PROFILES := --profile bridge
+  endif
+  ifneq ($(ENABLE_BLOB_DA),false)
+    BLOB_PROFILE := --profile blob
+  endif
 endif
 
 # =============================================================================
@@ -40,23 +59,21 @@ endif
 # Run Targets
 # =============================================================================
 
-# Start the system (pulls images) - uses .env configuration and EXECUTION_LAYER
-# Note: Bridge profile excluded by default (saves ~3GB and 2-3min build time)
-# Use 'make run-with-bridge' if you need Hyperlane bridging
+# Start the full system: L1/L2, block-builder, load-generator, dashboard, docs, explorer, privacy, bridge(reth)
 run: mcp-build
-	docker compose --profile $(COMPOSE_PROFILE) up -d
+	docker compose --profile $(COMPOSE_PROFILE) --profile $(EXPLORER_PROFILE) --profile explorer-l1 --profile $(PRIVACY_PROFILE) $(BRIDGE_PROFILES) $(BLOB_PROFILE) up -d
 
-# Build from local sibling repos (../blockbuilder, ../loadgenerator) and run
+# Build from local sibling repos (../blockbuilder, ../loadgenerator) and run everything
 run-build: mcp-build
-	docker compose -f docker-compose.yml -f docker-compose.build.yaml --profile $(COMPOSE_PROFILE) up --build -d
+	docker compose -f docker-compose.yml -f docker-compose.build.yaml --profile $(COMPOSE_PROFILE) --profile $(EXPLORER_PROFILE) --profile explorer-l1 --profile $(PRIVACY_PROFILE) $(BRIDGE_PROFILES) $(BLOB_PROFILE) up --build -d
 
 # Start with op-reth (block-builder + Engine API)
 run-reth:
-	docker compose --profile reth up --build -d
+	docker compose --profile reth --profile bridge --profile blob up --build -d
 
-# Start with logs attached
+# Start with logs attached (all services)
 run-attached:
-	docker compose --profile $(COMPOSE_PROFILE) up --build
+	docker compose --profile $(COMPOSE_PROFILE) --profile $(EXPLORER_PROFILE) --profile $(PRIVACY_PROFILE) $(BRIDGE_PROFILES) $(BLOB_PROFILE) up --build
 
 # Start in native "Metal" mode (no Docker, maximum performance)
 # Requires: op-reth, go, node installed locally, sibling repos (../blockbuilder, ../loadgenerator)
@@ -80,7 +97,9 @@ mcp-build:
 
 # Run MCP server over stdio (for direct use; AI tools auto-discover via .mcp.json)
 mcp-server: mcp-build
-	BUILDER_URL=http://localhost:13000 LOADGEN_URL=http://localhost:13001 GASSTORM_DIR=$(CURDIR) \
+	BUILDER_URL=http://localhost:13000 LOADGEN_URL=http://localhost:13001 \
+	EXPLORER_URL=http://localhost:18200 PRIVACY_URL=http://localhost:18300 \
+	GASSTORM_DIR=$(CURDIR) \
 		./mcp/mcp
 
 # =============================================================================
@@ -92,14 +111,14 @@ run-high-throughput:
 	GAS_LIMIT=1000000000 \
 	MAX_TXS_PER_BLOCK=25000 \
 	BLOCK_TIME_MS=100 \
-	docker compose --profile $(COMPOSE_PROFILE) up --build -d
+	docker compose --profile $(COMPOSE_PROFILE) $(BRIDGE_PROFILES) $(BLOB_PROFILE) up --build -d
 
 # Fast confirmations: 150M gas, 50ms blocks
 run-fast-confirm:
 	GAS_LIMIT=150000000 \
 	MAX_TXS_PER_BLOCK=7000 \
 	BLOCK_TIME_MS=50 \
-	docker compose --profile $(COMPOSE_PROFILE) up --build -d
+	docker compose --profile $(COMPOSE_PROFILE) $(BRIDGE_PROFILES) $(BLOB_PROFILE) up --build -d
 
 # Preconfirmations enabled: 1 gigagas, 100ms blocks
 run-with-preconf:
@@ -107,7 +126,7 @@ run-with-preconf:
 	MAX_TXS_PER_BLOCK=25000 \
 	BLOCK_TIME_MS=100 \
 	ENABLE_PRECONFIRMATIONS=true \
-	docker compose --profile $(COMPOSE_PROFILE) up --build -d
+	docker compose --profile $(COMPOSE_PROFILE) $(BRIDGE_PROFILES) $(BLOB_PROFILE) up --build -d
 
 # Conservative: Smaller blocks, longer intervals (for stability testing)
 run-conservative:
@@ -115,7 +134,7 @@ run-conservative:
 	MAX_TXS_PER_BLOCK=1000 \
 	BLOCK_TIME_MS=2000 \
 	SKIP_EMPTY_BLOCKS=false \
-	docker compose --profile $(COMPOSE_PROFILE) up --build -d
+	docker compose --profile $(COMPOSE_PROFILE) $(BRIDGE_PROFILES) $(BLOB_PROFILE) up --build -d
 
 # Flashblocks-style: 500ms blocks with preconfirmations
 run-flashblocks:
@@ -123,7 +142,7 @@ run-flashblocks:
 	MAX_TXS_PER_BLOCK=25000 \
 	BLOCK_TIME_MS=500 \
 	ENABLE_PRECONFIRMATIONS=true \
-	docker compose --profile $(COMPOSE_PROFILE) up --build -d
+	docker compose --profile $(COMPOSE_PROFILE) $(BRIDGE_PROFILES) $(BLOB_PROFILE) up --build -d
 
 # =============================================================================
 # Lifecycle (stop, restart, logs, status, clean, build)
@@ -131,12 +150,12 @@ run-flashblocks:
 
 # Stop all services (stops all profiles)
 stop:
-	docker compose --profile reth --profile cdk-erigon --profile bridge --profile blob down 2>/dev/null || true
+	docker compose --profile reth --profile cdk-erigon --profile bridge --profile bridge-ui --profile blob --profile explorer --profile explorer-l1 --profile explorer-cdk --profile privacy --profile privacy-cdk down 2>/dev/null || true
 	docker compose -f docker-compose-base.yaml -f docker-compose-gravity-reth.yaml down 2>/dev/null || true
 
 # Restart all services
 restart:
-	docker compose --profile reth --profile cdk-erigon --profile bridge down && docker compose --profile $(COMPOSE_PROFILE) up --build -d
+	docker compose --profile reth --profile cdk-erigon --profile bridge --profile bridge-ui --profile blob down && docker compose --profile $(COMPOSE_PROFILE) $(BRIDGE_PROFILES) $(BLOB_PROFILE) up --build -d
 
 # View logs (follow mode)
 logs:
@@ -148,12 +167,28 @@ logs-service:
 
 # Show status of all services
 status:
-	docker compose --profile reth --profile cdk-erigon --profile blob ps 2>/dev/null || true
+	docker compose --profile reth --profile cdk-erigon --profile bridge --profile bridge-ui --profile blob --profile explorer --profile explorer-l1 --profile explorer-cdk --profile privacy --profile privacy-cdk ps 2>/dev/null || true
 	docker compose -f docker-compose-base.yaml -f docker-compose-gravity-reth.yaml ps 2>/dev/null || true
+
+# Resource usage snapshot (containers + disk)
+resource-report:
+	@echo "=== GasStorm Runtime Usage ==="
+	@ids=$$(docker compose ps -q); \
+	if [ -n "$$ids" ]; then \
+		docker stats --no-stream $$ids; \
+	else \
+		echo "No GasStorm containers are running."; \
+	fi
+	@echo ""
+	@echo "=== Docker Disk Usage ==="
+	@docker system df
+	@echo ""
+	@echo "=== Largest Local Images ==="
+	@docker images --format '{{.Repository}}:{{.Tag}} {{.Size}}' | head -20
 
 # Clean up volumes and rebuild
 clean:
-	docker compose --profile reth --profile cdk-erigon --profile blob down -v 2>/dev/null || true
+	docker compose --profile reth --profile cdk-erigon --profile bridge --profile bridge-ui --profile blob --profile explorer --profile explorer-l1 --profile explorer-cdk --profile privacy --profile privacy-cdk down -v 2>/dev/null || true
 	docker compose -f docker-compose-base.yaml -f docker-compose-gravity-reth.yaml down -v 2>/dev/null || true
 	docker system prune -f
 
@@ -335,6 +370,16 @@ pull-loadgenerator:
 	docker pull gatewayfm/loadgenerator:latest
 	@echo "Pulled gatewayfm/loadgenerator:latest"
 
+# Pull latest block-explorer image from DockerHub
+pull-explorer:
+	docker pull gatewayfm/block-explorer:latest
+	@echo "Pulled gatewayfm/block-explorer:latest"
+
+# Pull latest privacy-proxy image from DockerHub
+pull-privacy:
+	docker pull gatewayfm/privacy-proxy:latest
+	@echo "Pulled gatewayfm/privacy-proxy:latest"
+
 # =============================================================================
 # SBOM Generation
 # =============================================================================
@@ -430,13 +475,25 @@ dev-cdk-erigon:
 run-with-blob:
 	docker compose --profile $(COMPOSE_PROFILE) --profile blob up --build -d
 
-# Start with Hyperlane bridge enabled
+# Start with Hyperlane bridge enabled (includes Warp UI)
 run-with-bridge:
-	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
+	docker compose --profile $(COMPOSE_PROFILE) --profile bridge --profile bridge-ui up --build -d
 
 # Alias for run-with-bridge (includes Hyperlane)
 run-hyperlane:
-	docker compose --profile $(COMPOSE_PROFILE) --profile bridge up --build -d
+	docker compose --profile $(COMPOSE_PROFILE) --profile bridge --profile bridge-ui up --build -d
+
+# Start with block explorer enabled (indexes blocks/txs)
+run-with-explorer:
+	docker compose --profile $(COMPOSE_PROFILE) --profile $(EXPLORER_PROFILE) --profile explorer-l1 up --build -d
+
+# Start with privacy proxy enabled (RPC access control)
+run-with-privacy:
+	docker compose --profile $(COMPOSE_PROFILE) --profile $(PRIVACY_PROFILE) up --build -d
+
+# Start with both explorer and privacy proxy
+run-with-explorer-privacy:
+	docker compose --profile $(COMPOSE_PROFILE) --profile $(EXPLORER_PROFILE) --profile explorer-l1 --profile $(PRIVACY_PROFILE) up --build -d
 
 # #############################################################################
 # OVERHANGING: Hyperlane Bridge
@@ -490,7 +547,10 @@ bridge-setup: bridge-deploy bridge-relayer
 # Bridge help
 bridge-help:
 	@echo "Hyperlane Bridge Commands:"
-	@echo "  make run-with-bridge      - Start stack with bridge (recommended)"
+	@echo "  make run                  - Default reth stack (includes bridge infra)"
+	@echo "  ENABLE_HYPERLANE_BRIDGE=false make run - Run without bridge infra"
+	@echo "  ENABLE_BLOB_DA=false make run - Run without Blob DA"
+	@echo "  make run-with-bridge      - Start stack with bridge + Warp UI"
 	@echo "  make bridge-deploy        - Deploy Hyperlane contracts to L1 and L2"
 	@echo "  make bridge-relayer       - Start the Hyperlane relayer"
 	@echo "  make bridge-relayer-stop  - Stop the relayer"
@@ -505,7 +565,8 @@ bridge-help:
 	@echo "  - Dashboard Bridge:  http://localhost:18000/bridge  (test account)"
 	@echo ""
 	@echo "Quick Start:"
-	@echo "  make run-with-bridge      # Starts everything automatically"
+	@echo "  make run                  # Starts bridge infra automatically in reth mode"
+	@echo "  make run-with-bridge      # Also starts Warp UI"
 
 # #############################################################################
 # OVERHANGING: AggLayer & Provers
@@ -704,7 +765,7 @@ help:
 	@echo "  ==== CORE: Gas Storm (reth mode) ===="
 	@echo ""
 	@echo "  Run:"
-	@echo "    make run              - Start with images from DockerHub (default: reth)"
+	@echo "    make run              - Start full stack (reth includes bridge infra by default)"
 	@echo "    make run-build        - Build from local repos and start"
 	@echo "    make run-reth         - Start with op-reth (block-builder + Engine API)"
 	@echo "    make run-metal        - Native mode (no Docker, maximum performance)"
@@ -717,6 +778,7 @@ help:
 	@echo "    make restart          - Restart all services"
 	@echo "    make logs             - Follow all logs"
 	@echo "    make status           - Show service status"
+	@echo "    make resource-report  - Show runtime CPU/RAM and Docker disk usage"
 	@echo "    make clean            - Stop and remove volumes"
 	@echo "    make clean-metal      - Remove native mode data"
 	@echo "    make build            - Build without starting"
@@ -761,13 +823,27 @@ help:
 	@echo "    make run-gravity-reth - Start with gravity-reth (high-perf parallel EVM)"
 	@echo "    make dev-cdk-erigon   - Run with cdk-erigon in Docker, rest locally"
 	@echo ""
+	@echo "  ==== OVERHANGING: Block Explorer ===="
+	@echo ""
+	@echo "    make run-with-explorer          - Start with L1 + L2 block explorers"
+	@echo "    make run-with-explorer-privacy   - Start with explorers + privacy proxy"
+	@echo "    make pull-explorer              - Pull latest explorer image"
+	@echo "    L2 Explorer: http://localhost:18201  L1 Explorer: http://localhost:18203"
+	@echo ""
+	@echo "  ==== OVERHANGING: Privacy Proxy ===="
+	@echo ""
+	@echo "    make run-with-privacy           - Start with privacy proxy"
+	@echo "    make pull-privacy               - Pull latest privacy proxy image"
+	@echo ""
 	@echo "  ==== OVERHANGING: Blob DA ===="
 	@echo ""
 	@echo "    make run-with-blob    - Start with Blob DA enabled"
 	@echo ""
 	@echo "  ==== OVERHANGING: Hyperlane Bridge ===="
 	@echo ""
-	@echo "    make run-with-bridge  - Start with Hyperlane bridge enabled"
+	@echo "    make run-with-bridge  - Start with Hyperlane bridge + Warp UI"
+	@echo "    ENABLE_HYPERLANE_BRIDGE=false make run - Disable default bridge infra"
+	@echo "    ENABLE_BLOB_DA=false make run - Disable default Blob DA"
 	@echo "    make bridge-setup     - Full setup (deploy + start relayer)"
 	@echo "    make bridge-help      - Full bridge options"
 	@echo ""

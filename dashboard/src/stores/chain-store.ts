@@ -23,12 +23,22 @@ export interface BlobDAStatus {
   compression: string;
 }
 
+export interface ExplorerStatus {
+  isOnline: boolean;
+}
+
+export interface PrivacyProxyStatus {
+  isOnline: boolean;
+}
+
 interface ChainState {
   l1: ChainStatus;
   l2: ChainStatus;
   builder: BuilderStatus;
   bridge: BridgeStatus;
   blobDA: BlobDAStatus;
+  explorer: ExplorerStatus;
+  privacyProxy: PrivacyProxyStatus;
   accountL1Balance: bigint;
   accountL2Balance: bigint;
   logs: LogEntry[];
@@ -42,6 +52,8 @@ interface ChainActions {
   setBuilderStatus: (status: Partial<BuilderStatus>) => void;
   setBridgeStatus: (status: Partial<BridgeStatus>) => void;
   setBlobDAStatus: (status: Partial<BlobDAStatus>) => void;
+  setExplorerStatus: (status: Partial<ExplorerStatus>) => void;
+  setPrivacyProxyStatus: (status: Partial<PrivacyProxyStatus>) => void;
   setAccountBalances: (l1?: bigint, l2?: bigint) => void;
   setLastL1Block: (block: number) => void;
   setLastL2Block: (block: number) => void;
@@ -86,6 +98,8 @@ export const useChainStore = create<ChainStore>((set) => ({
   builder: { ...initialBuilderStatus },
   bridge: { ...initialBridgeStatus },
   blobDA: { ...initialBlobDAStatus },
+  explorer: { isOnline: false },
+  privacyProxy: { isOnline: false },
   accountL1Balance: 0n,
   accountL2Balance: 0n,
   logs: [
@@ -123,6 +137,16 @@ export const useChainStore = create<ChainStore>((set) => ({
   setBlobDAStatus: (status) =>
     set((state) => ({
       blobDA: { ...state.blobDA, ...status },
+    })),
+
+  setExplorerStatus: (status) =>
+    set((state) => ({
+      explorer: { ...state.explorer, ...status },
+    })),
+
+  setPrivacyProxyStatus: (status) =>
+    set((state) => ({
+      privacyProxy: { ...state.privacyProxy, ...status },
     })),
 
   setAccountBalances: (l1, l2) =>

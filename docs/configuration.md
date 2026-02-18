@@ -27,6 +27,23 @@ Complete configuration reference for GasStorm.
 | `CIRCUIT_BREAKER_FAILURE_THRESHOLD` | 0.05 | Failure rate threshold (5%) |
 | `CIRCUIT_BREAKER_REVOCATION_THRESHOLD` | 0.20 | Revocation rate threshold (20%) |
 
+### Block Explorer
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BLOCK_EXPLORER_VERSION` | local | Block explorer Docker image tag |
+| `EXPLORER_URL` | http://localhost:18200 | Explorer API URL (MCP server) |
+| `CATCHUP_WORKERS` | 10 | Parallel workers for indexer catch-up |
+| `RPC_WORKERS` | 50 | Concurrent RPC workers for indexer |
+| `RPC_RATE_LIMIT` | 500 | Max RPC requests/sec for indexer |
+
+### Privacy Proxy
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PRIVACY_PROXY_VERSION` | local | Privacy proxy Docker image tag |
+| `PRIVACY_URL` | http://localhost:18300 | Privacy proxy URL (MCP server) |
+
 ### Execution Layer Selection
 
 See [Execution Layers](./execution-layers.md) for detailed mode comparison.
@@ -156,7 +173,12 @@ polycli-help
 | `reth` | block-builder, l2-reth, l1-anvil | Default block-builder mode |
 | `cdk-erigon` | cdk-erigon, l1-anvil | Standalone sequencer |
 | `gravity-reth` | gravity-reth, l1-anvil | Parallel EVM sequencer |
-| `bridge` | bridge-ui, bridge-service | Hyperlane bridge UI |
+| `bridge` | hyperlane-init, hyperlane-relayer | Hyperlane bridge infrastructure |
+| `bridge-ui` | hyperlane-bridge-ui | Hyperlane Warp UI |
+| `explorer` | explorer-api, explorer-indexer, explorer-ui, explorer-db | Block explorer (reth mode) |
+| `explorer-cdk` | explorer-api-cdk, explorer-indexer-cdk, explorer-ui-cdk, explorer-db-cdk | Block explorer (cdk-erigon mode) |
+| `privacy` | privacy-proxy, privacy-ui, privacy-db | Privacy proxy (reth mode) |
+| `privacy-cdk` | privacy-proxy-cdk, privacy-ui-cdk, privacy-db-cdk | Privacy proxy (cdk-erigon mode) |
 | `prover-sp1` | op-succinct, agglayer-db | SP1 prover stack |
 | `prover-zisk` | zisk-prover, agglayer-db | ZisK prover stack |
 
@@ -168,6 +190,9 @@ docker compose --profile reth up -d
 
 # Multiple profiles
 docker compose --profile reth --profile bridge up -d
+
+# Bridge UI (optional)
+docker compose --profile reth --profile bridge --profile bridge-ui up -d
 
 # All prover profiles
 docker compose --profile prover-sp1 up -d
@@ -184,6 +209,12 @@ docker compose --profile prover-sp1 up -d
 | l1-anvil | 18545 | HTTP | L1 RPC |
 | l2-reth | 18546 | HTTP/WS | L2 RPC/WebSocket |
 | cdk-erigon | 18545 | HTTP/WS | L2 RPC (cdk-erigon mode) |
+| explorer-api | 18200 | HTTP | Block explorer REST API |
+| explorer-ui | 18201 | HTTP | Block explorer web UI |
+| explorer-db | 15436 | TCP | Explorer PostgreSQL |
+| privacy-proxy | 18300 | HTTP | Privacy proxy API |
+| privacy-ui | 18301 | HTTP | Privacy proxy UI |
+| privacy-db | 15437 | TCP | Privacy PostgreSQL |
 
 ### AggLayer Ports
 

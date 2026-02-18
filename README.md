@@ -9,8 +9,11 @@ GasStorm is a local-first blockchain sequencer testbed that orchestrates an op-r
 ## Quick Start
 
 ```bash
-# op-reth + block-builder (default)
-make run-reth
+# Default stack (op-reth + block-builder + Hyperlane bridge + Blob DA infra)
+make run
+
+# op-reth + block-builder only (disable default bridge + blob infra)
+ENABLE_HYPERLANE_BRIDGE=false ENABLE_BLOB_DA=false make run
 
 # cdk-erigon standalone sequencer
 make run-cdk-erigon
@@ -58,6 +61,10 @@ open http://localhost:18000/load-test/
 | block-builder | 13002 | Preconfirmation WebSocket |
 | load-generator | 13001 | Load test API |
 | l2-reth | 18546 | L2 RPC/WebSocket |
+| explorer-api | 18200 | Block explorer REST API (optional) |
+| explorer-ui | 18201 | Block explorer web UI (optional) |
+| privacy-proxy | 18300 | Privacy proxy API (optional) |
+| privacy-ui | 18301 | Privacy proxy UI (optional) |
 
 ## Load Testing
 
@@ -142,12 +149,41 @@ make stop
 GasStorm uses additive Docker Compose profiles for optional services. These run alongside the core stack without affecting block builder performance.
 
 ```bash
+# Block explorer
+make run-with-explorer
+
+# Privacy proxy (RPC access control)
+make run-with-privacy
+
+# Both explorer + privacy
+make run-with-explorer-privacy
+
 # Blob DA (EIP-4844 data availability)
 make run-with-blob
 
-# Hyperlane bridge
+# Hyperlane bridge + Warp UI
 make run-with-bridge
 ```
+
+### Block Explorer
+
+Indexes blocks and transactions from the RPC endpoint. Requires `../block-explorer`.
+
+| Service | Port | Description |
+|---------|------|-------------|
+| explorer-api | 18200 | REST API |
+| explorer-ui | 18201 | Web UI |
+| explorer-db | 15436 | PostgreSQL |
+
+### Privacy Proxy
+
+RPC access control with ZK-proof-based KYC and RBAC. Requires `../privacy-proxy`.
+
+| Service | Port | Description |
+|---------|------|-------------|
+| privacy-proxy | 18300 | Proxy API |
+| privacy-ui | 18301 | Management UI |
+| privacy-db | 15437 | PostgreSQL |
 
 ### Blob DA
 
@@ -167,6 +203,8 @@ The dashboard auto-detects blob-da and shows live online/offline status in the s
 | block-builder | [gateway-fm/blockbuilder](https://github.com/gateway-fm/blockbuilder) | Transaction pool, nonce management, Engine API block production |
 | load-generator | [gateway-fm/loadgenerator](https://github.com/gateway-fm/loadgenerator) | High-throughput TX sender, multiple TX types, REST API |
 | blob-da | `../blob-da` | EIP-4844 blob packing and L1 posting (optional, `--profile blob`) |
+| privacy-proxy | [gateway-fm/privacy-proxy](https://github.com/gateway-fm/privacy-proxy) | RPC access control with ZK proofs (optional, `--profile privacy`) |
+| block-explorer | [gateway-fm/block-explorer](https://github.com/gateway-fm/block-explorer) | Block/TX indexer with web UI (optional, `--profile explorer`) |
 | dashboard | `./dashboard` | Next.js UI for load test control and metrics |
 
 ## Documentation

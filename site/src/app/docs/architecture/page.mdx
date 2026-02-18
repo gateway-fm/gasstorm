@@ -179,6 +179,10 @@ sender.SendAsync(ctx, txData, func(err error) {
 | op-reth | 18551 | HTTP | Engine API (JWT auth) |
 | l1-anvil | 18545 | HTTP | L1 RPC |
 
+## Versioning
+
+The docs site supports versioned documentation. A version badge in the header shows the current version (e.g. `v0.1.0`). The version data model lives in `site/src/lib/versions.ts` and the adaptive selector component in `site/src/components/layout/version-selector.tsx`. When multiple versions exist, the badge becomes a dropdown linking to archived snapshots at `/v/<major>.<minor>/`. See the [Versioning](/docs/versioning) page for details.
+
 ## Glossary
 
 | Term | Definition |

@@ -18,6 +18,14 @@ func main() {
 	if loadgenURL == "" {
 		loadgenURL = "http://localhost:13001"
 	}
+	explorerURL := os.Getenv("EXPLORER_URL")
+	if explorerURL == "" {
+		explorerURL = "http://localhost:18200"
+	}
+	privacyURL := os.Getenv("PRIVACY_URL")
+	if privacyURL == "" {
+		privacyURL = "http://localhost:18300"
+	}
 	gasstormDir := os.Getenv("GASSTORM_DIR")
 	if gasstormDir == "" {
 		gasstormDir = "."
@@ -32,9 +40,13 @@ func main() {
 
 	builderClient := newHTTPClient(builderURL)
 	loadgenClient := newHTTPClient(loadgenURL)
+	explorerClient := newHTTPClient(explorerURL)
+	privacyClient := newHTTPClient(privacyURL)
 
 	registerBuilderTools(s, builderClient)
 	registerLoadgenTools(s, loadgenClient)
+	registerExplorerTools(s, explorerClient)
+	registerPrivacyTools(s, privacyClient)
 	registerStackTools(s, gasstormDir)
 
 	if err := server.ServeStdio(s); err != nil {

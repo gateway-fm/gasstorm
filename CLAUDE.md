@@ -21,11 +21,15 @@ Both the block-builder and load-generator are maintained in separate repositorie
 |-----------|-------|--------|
 | block-builder | `gatewayfm/blockbuilder` | [github.com/gateway-fm/blockbuilder](https://github.com/gateway-fm/blockbuilder) |
 | load-generator | `gatewayfm/loadgenerator` | [github.com/gateway-fm/loadgenerator](https://github.com/gateway-fm/loadgenerator) |
+| privacy-proxy | `gatewayfm/privacy-proxy` | [github.com/gateway-fm/privacy-proxy](https://github.com/gateway-fm/privacy-proxy) |
+| block-explorer | `gatewayfm/block-explorer` | [github.com/gateway-fm/block-explorer](https://github.com/gateway-fm/block-explorer) |
 
 To use specific versions:
 ```bash
 BLOCKBUILDER_VERSION=v1.0.0 make run-reth
 LOADGENERATOR_VERSION=v1.0.0 make run-reth
+BLOCK_EXPLORER_VERSION=v1.0.0 make run-with-explorer
+PRIVACY_PROXY_VERSION=v1.0.0 make run-with-privacy
 ```
 
 For local development with sibling repos:
@@ -118,6 +122,13 @@ go build ./...
 | op-reth | 18545 (HTTP), 18546 (WS) | L2 execution layer |
 | load-generator | 13001 | Load test API |
 | dashboard | 18000 (Docker) / 3000 (Metal) | Web UI for testing |
+| docs-site | 18002 | Documentation site |
+| explorer-api | 18200 | L2 block explorer REST API |
+| explorer-ui | 18201 | L2 block explorer web UI |
+| explorer-l1-api | 18202 | L1 block explorer REST API |
+| explorer-l1-ui | 18203 | L1 block explorer web UI |
+| privacy-proxy | 18300 | Privacy proxy API |
+| privacy-ui | 18301 | Privacy proxy UI |
 
 ### Metal Mode (Bare Metal)
 

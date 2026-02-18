@@ -13,7 +13,7 @@ const COMPRESSION_NAMES: Record<number, string> = {
 
 export function useChainData() {
   const [isLoading, setIsLoading] = useState(true);
-  const { setL1Status, setL2Status, setBuilderStatus, setBlobDAStatus, setAccountBalances, addLog } = useChainStore();
+  const { setL1Status, setL2Status, setBuilderStatus, setBlobDAStatus, setExplorerStatus, setPrivacyProxyStatus, setAccountBalances, addLog } = useChainStore();
 
   const fetchL1Data = useCallback(async () => {
     try {
@@ -87,6 +87,24 @@ export function useChainData() {
     }
   }, [setBlobDAStatus]);
 
+  const fetchExplorerHealth = useCallback(async () => {
+    try {
+      const resp = await fetch("/api/explorer/health", { signal: AbortSignal.timeout(5000) });
+      setExplorerStatus({ isOnline: resp.ok });
+    } catch {
+      setExplorerStatus({ isOnline: false });
+    }
+  }, [setExplorerStatus]);
+
+  const fetchPrivacyHealth = useCallback(async () => {
+    try {
+      const resp = await fetch("/api/privacy/health", { signal: AbortSignal.timeout(5000) });
+      setPrivacyProxyStatus({ isOnline: resp.ok });
+    } catch {
+      setPrivacyProxyStatus({ isOnline: false });
+    }
+  }, [setPrivacyProxyStatus]);
+
   const fetchBalances = useCallback(async () => {
     try {
       const [l1Balance, l2Balance] = await Promise.all([
@@ -101,9 +119,9 @@ export function useChainData() {
 
   const refreshAll = useCallback(async () => {
     setIsLoading(true);
-    await Promise.all([fetchL1Data(), fetchL2Data(), fetchBuilderStatus(), fetchBlobDAData(), fetchBalances()]);
+    await Promise.all([fetchL1Data(), fetchL2Data(), fetchBuilderStatus(), fetchBlobDAData(), fetchExplorerHealth(), fetchPrivacyHealth(), fetchBalances()]);
     setIsLoading(false);
-  }, [fetchL1Data, fetchL2Data, fetchBuilderStatus, fetchBlobDAData, fetchBalances]);
+  }, [fetchL1Data, fetchL2Data, fetchBuilderStatus, fetchBlobDAData, fetchExplorerHealth, fetchPrivacyHealth, fetchBalances]);
 
   useEffect(() => {
     // Use microtask to avoid synchronous setState in effect body
@@ -124,6 +142,8 @@ export function useChainData() {
     fetchL2Data,
     fetchBuilderStatus,
     fetchBlobDAData,
+    fetchExplorerHealth,
+    fetchPrivacyHealth,
     fetchBalances,
   };
 }
