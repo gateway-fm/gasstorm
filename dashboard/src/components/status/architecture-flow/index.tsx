@@ -7,7 +7,7 @@ export function ArchitectureFlow() {
   return (
     <Card className="border-0 bg-transparent shadow-none">
       <CardHeader className="px-0 pt-0 pb-4">
-        <CardTitle className="text-xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
+        <CardTitle className="text-xl font-bold text-foreground">
           System Architecture
         </CardTitle>
       </CardHeader>
