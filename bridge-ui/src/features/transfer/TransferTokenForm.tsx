@@ -192,7 +192,9 @@ function SwapChainsButton({
       width={20}
       height={20}
       title="Swap chains"
-      className={!disabled ? 'hover:rotate-180' : undefined}
+      className={`rounded-md border border-primary-300/45 bg-slate-900/70 p-1.5 transition duration-300 ${
+        !disabled ? 'hover:rotate-180 hover:bg-slate-800' : ''
+      }`}
       onClick={onClick}
       disabled={disabled}
     >
@@ -283,7 +285,10 @@ function TokenSection({
 }) {
   return (
     <div className="flex-1">
-      <label htmlFor="tokenIndex" className="block pl-0.5 text-sm text-gray-600">
+      <label
+        htmlFor="tokenIndex"
+        className="block pl-0.5 font-mono text-[11px] uppercase tracking-[0.12em] text-slate-300"
+      >
         Token
       </label>
       <TokenSelectField name="tokenIndex" disabled={isReview} setIsNft={setIsNft} />
@@ -303,7 +308,10 @@ function AmountSection({ isNft, isReview }: { isNft: boolean; isReview: boolean 
   return (
     <div className="flex-1">
       <div className="flex justify-between pr-1">
-        <label htmlFor="amount" className="block pl-0.5 text-sm text-gray-600">
+        <label
+          htmlFor="amount"
+          className="block pl-0.5 font-mono text-[11px] uppercase tracking-[0.12em] text-slate-300"
+        >
           Amount
         </label>
         <TokenBalance label="My balance" balance={balance} />
@@ -321,7 +329,7 @@ function AmountSection({ isNft, isReview }: { isNft: boolean; isReview: boolean 
             disabled={isReview}
           />
           {shouldShowPrice && !isLoading && (
-            <div className="absolute bottom-[-18px] left-1 max-w-52 overflow-hidden text-ellipsis whitespace-nowrap text-xxs text-gray-500">
+            <div className="absolute bottom-[-18px] left-1 max-w-52 overflow-hidden text-ellipsis whitespace-nowrap text-xxs text-slate-400">
               ≈$
               {totalTokenPrice.toLocaleString('en-US', {
                 minimumFractionDigits: 2,
@@ -344,7 +352,10 @@ function RecipientSection({ isReview }: { isReview: boolean }) {
   return (
     <div className="mt-4">
       <div className="flex justify-between pr-1">
-        <label htmlFor="recipient" className="block pl-0.5 text-sm text-gray-600">
+        <label
+          htmlFor="recipient"
+          className="block pl-0.5 font-mono text-[11px] uppercase tracking-[0.12em] text-slate-300"
+        >
           Recipient address
         </label>
         <TokenBalance label="Remote balance" balance={balance} />
@@ -368,7 +379,11 @@ function TokenBalance({ label, balance }: { label: string; balance?: TokenAmount
       maximumFractionDigits: 6,
       useGrouping: false,
     }) || '0';
-  return <div className="text-right text-xs text-gray-600">{`${label}: ${value}`}</div>;
+  return (
+    <div className="text-right font-mono text-[11px] uppercase tracking-[0.08em] text-slate-300">
+      {`${label}: ${value}`}
+    </div>
+  );
 }
 
 function ButtonSection({
@@ -504,7 +519,7 @@ function ButtonSection({
     return (
       <>
         <div
-          className={`mt-3 gap-2 bg-amber-400 px-4 text-sm ${
+          className={`mt-3 gap-2 rounded-lg border border-amber-300/40 bg-amber-400/20 px-4 text-sm ${
             showWarning ? 'max-h-38 py-2' : 'max-h-0'
           } overflow-hidden transition-all duration-500`}
         >
@@ -529,7 +544,7 @@ function ButtonSection({
   return (
     <>
       <div
-        className={`mt-3 gap-2 bg-amber-400 px-4 text-sm ${
+        className={`mt-3 gap-2 rounded-lg border border-amber-300/40 bg-amber-400/20 px-4 text-sm ${
           showWarning ? 'max-h-38 py-2' : 'max-h-0'
         } overflow-hidden transition-all duration-500`}
       >
@@ -708,8 +723,8 @@ function ReviewDetails({
           isReview ? 'max-h-screen duration-1000 ease-in' : 'max-h-0 duration-500'
         } overflow-hidden transition-all`}
       >
-        <label className="mt-4 block pl-0.5 text-sm text-gray-600">Transactions</label>
-        <div className="mt-1.5 space-y-2 break-all rounded border border-gray-400 bg-gray-150 px-2.5 py-2 text-sm">
+        <label className="mt-4 block pl-0.5 text-sm text-slate-300">Transactions</label>
+        <div className="mt-1.5 space-y-2 break-all rounded border border-primary-200/35 bg-slate-800/70 px-2.5 py-2 text-sm text-slate-200">
           {isLoading ? (
             <div className="flex items-center justify-center py-6">
               <SpinnerIcon className="h-5 w-5" />
@@ -719,7 +734,7 @@ function ReviewDetails({
               {isApproveRequired && (
                 <div>
                   <h4>Transaction 1: Approve Transfer</h4>
-                  <div className="ml-1.5 mt-1.5 space-y-1.5 border-l border-gray-300 pl-2 text-xs">
+                  <div className="ml-1.5 mt-1.5 space-y-1.5 border-l border-slate-600 pl-2 text-xs">
                     <p>{`Router Address: ${originToken?.addressOrDenom}`}</p>
                     {originToken?.collateralAddressOrDenom && (
                       <p>{`Collateral Address: ${originToken.collateralAddressOrDenom}`}</p>
@@ -729,7 +744,7 @@ function ReviewDetails({
               )}
               <div>
                 <h4>{`Transaction${isApproveRequired ? ' 2' : ''}: Transfer Remote`}</h4>
-                <div className="ml-1.5 mt-1.5 space-y-1.5 border-l border-gray-300 pl-2 text-xs">
+                <div className="ml-1.5 mt-1.5 space-y-1.5 border-l border-slate-600 pl-2 text-xs">
                   {destinationToken?.addressOrDenom && (
                     <p className="flex">
                       <span className="min-w-[7.5rem]">Remote Token</span>

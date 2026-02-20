@@ -37,7 +37,7 @@ export default function App({ Component, pageProps }: AppProps) {
   // Note, the font definition is required both here and in _document.tsx
   // Otherwise Next.js will not load the font
   return (
-    <div className={`${MAIN_FONT.variable} font-sans text-black`}>
+    <div className={`${MAIN_FONT.variable} font-sans text-slate-100`}>
       <ErrorBoundary>
         <QueryClientProvider client={reactQueryClient}>
           <WarpContextInitGate>

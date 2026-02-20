@@ -30,11 +30,11 @@ const footerLinks: FooterLink[] = [
 export function Footer() {
   const chatboxExist = !!INTERCOM_APP_ID;
   return (
-    <footer className="relative text-white">
-      <div className="relative bg-gradient-to-b from-primary-500/80 to-primary-700/90 px-8 pb-5 pt-4 sm:pt-3">
+    <footer className="relative px-2 pb-3 pt-2 text-slate-200 sm:px-6 lg:px-12">
+      <div className="relative mx-auto max-w-screen-xl rounded-2xl border border-primary-300/30 bg-slate-950/65 px-4 pb-4 pt-3 backdrop-blur-md sm:px-6">
         <div
           className={clsx(
-            'flex flex-col items-center gap-8 sm:flex-row sm:gap-10',
+            'flex flex-col items-center gap-6 sm:flex-row sm:gap-10',
             chatboxExist ? 'justify-end' : 'justify-between',
           )}
         >
@@ -52,9 +52,9 @@ function FooterLogo() {
       <div className="ml-2 h-12 w-12 sm:h-14 sm:w-14">
         <Image src={AppLogo} alt="Gateway" className="h-full w-full" />
       </div>
-      <div className="ml-6 space-y-1 text-lg font-medium sm:text-xl">
+      <div className="ml-4 space-y-1 text-base font-semibold sm:text-lg">
         <div>Gateway Bridge</div>
-        <div className="flex items-center text-sm text-gray-300">
+        <div className="flex items-center text-xs text-slate-300 sm:text-sm">
           <span>Powered by</span>
           <div className="ml-2 h-5 w-5">
             <HyperlaneLogo color={Color.white} />
@@ -68,12 +68,12 @@ function FooterLogo() {
 
 function FooterNav() {
   return (
-    <nav className="text-md font-medium">
+    <nav className="text-xs font-medium sm:text-sm">
       <ul style={{ gridTemplateColumns: 'auto auto auto' }} className="grid gap-x-7 gap-y-1.5">
         {footerLinks.map((item) => (
           <li key={item.title}>
             <Link
-              className="flex items-center capitalize underline-offset-2 hover:underline"
+              className="flex items-center font-mono uppercase tracking-[0.08em] text-slate-200 underline-offset-2 transition-colors hover:text-primary-200 hover:underline"
               target={item.external ? '_blank' : '_self'}
               href={item.url}
             >

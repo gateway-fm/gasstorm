@@ -30,4 +30,4 @@ export const TextInput = forwardRef(function _TextInput(
 });
 
 const defaultClassName =
-  'mt-1.5 px-2.5 py-2.5 text-sm rounded-lg border border-primary-300 focus:border-primary-500 disabled:bg-gray-150 outline-none transition-all duration-300';
+  'mt-1.5 w-full rounded-md border border-primary-300/45 bg-slate-900/70 px-2.5 py-2.5 text-sm text-slate-100 placeholder:text-slate-400 focus:border-primary-300 disabled:bg-slate-800 disabled:text-slate-400 outline-none transition-all duration-300';

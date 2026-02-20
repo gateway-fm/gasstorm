@@ -10,18 +10,20 @@ export function TipCard() {
   const [show, setShow] = useState(config.showTipBox);
   if (!show) return null;
   return (
-    <Card className="w-100 p-2 sm:w-[31rem]">
-      <h2 className="text-primary-500">Welcome to Gateway Bridge!</h2>
+    <Card className="w-full p-3 sm:w-[31rem]">
+      <h2 className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-primary-300">
+        Live Route Matrix
+      </h2>
       <div className="flex items-end justify-between">
-        <p className="mt-1 max-w-[75%] text-xs">
-          Bridge tokens seamlessly across chains with Gateway. Powered by Hyperlane for secure,
-          permissionless cross-chain transfers.
+        <p className="mt-1 max-w-[75%] text-xs text-slate-300">
+          High-speed, permissionless transfers between local L1 and L2. Use this panel to execute
+          and monitor route activity in real time.
         </p>
         <a
           href={links.docs}
           target="_blank"
           rel="noopener noreferrer"
-          className="ml-2 flex items-center rounded-lg bg-gray-100 px-3 py-1.5 text-xs text-primary-500 transition-all hover:bg-gray-200 active:bg-gray-300 sm:text-sm"
+          className="ml-2 flex items-center rounded-lg border border-primary-200/40 bg-primary-500/10 px-3 py-1.5 text-xs text-primary-200 transition-all hover:bg-primary-500/20 active:bg-primary-500/30 sm:text-sm"
         >
           <Image src={InfoCircle} width={12} alt="" />
           <span className="ml-1.5 hidden text-sm sm:inline">Learn More</span>

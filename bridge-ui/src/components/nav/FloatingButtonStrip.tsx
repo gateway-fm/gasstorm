@@ -53,5 +53,6 @@ export function FloatingButtonStrip() {
 
 const styles = {
   link: 'hover:opacity-70 active:opacity-60',
-  roundedCircle: 'rounded-full bg-white',
+  roundedCircle:
+    'rounded-md border border-primary-200/45 bg-slate-900/85 p-1.5 shadow-card backdrop-blur-sm',
 };

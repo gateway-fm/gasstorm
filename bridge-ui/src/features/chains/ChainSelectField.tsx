@@ -83,7 +83,10 @@ export function ChainSelectField({
             <ChainLogo chainName={field.value} size={32} />
           </div>
           <div className="flex flex-col items-start gap-1">
-            <label htmlFor={name} className="text-xs text-gray-600">
+            <label
+              htmlFor={name}
+              className="font-mono text-[10px] uppercase tracking-[0.12em] text-slate-400"
+            >
               {label}
             </label>
             {displayName}
@@ -113,9 +116,9 @@ export function ChainSelectField({
 }
 
 const styles = {
-  base: 'px-2 py-1.5 w-full flex items-center justify-between text-sm bg-white rounded-lg border border-primary-300 outline-none transition-colors duration-500',
-  enabled: 'hover:bg-gray-100 active:scale-95 focus:border-primary-500',
-  disabled: 'bg-gray-150 cursor-default',
+  base: 'w-full rounded-md border border-primary-300/45 bg-slate-900/70 px-2 py-1.5 text-sm text-slate-100 outline-none transition-colors duration-300',
+  enabled: 'hover:bg-slate-800 active:scale-[0.99] focus:border-primary-300',
+  disabled: 'cursor-default bg-slate-800/80 text-slate-400',
   addButton:
-    'flex text-xxs text-primary-500 hover:text-primary-600 disabled:text-gray-500 [&_path]:fill-primary-500 [&_path]:hover:fill-primary-600 [&_path]:disabled:fill-gray-500',
+    'flex text-xxs text-primary-300 hover:text-primary-200 disabled:text-slate-400 [&_path]:fill-primary-300 [&_path]:hover:fill-primary-200 [&_path]:disabled:fill-slate-400',
 };

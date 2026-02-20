@@ -119,7 +119,7 @@ function TokenButton({
 }
 
 const styles = {
-  base: 'mt-1.5 w-full px-2.5 py-2.5 flex items-center justify-between text-sm rounded-lg border border-primary-300 outline-none transition-colors duration-500',
-  enabled: 'hover:bg-gray-100 active:scale-95 focus:border-primary-500',
-  disabled: 'bg-gray-100 cursor-default',
+  base: 'mt-1.5 flex w-full items-center justify-between rounded-md border border-primary-300/45 bg-slate-900/70 px-2.5 py-2.5 text-sm text-slate-100 outline-none transition-colors duration-300',
+  enabled: 'hover:bg-slate-800 active:scale-[0.99] focus:border-primary-300',
+  disabled: 'cursor-default bg-slate-800/80 text-slate-400',
 };

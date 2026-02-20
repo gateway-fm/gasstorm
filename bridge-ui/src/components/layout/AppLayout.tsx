@@ -39,12 +39,12 @@ export function AppLayout({ children }: PropsWithChildren) {
         <title>{APP_NAME}</title>
       </Head>
       <div
-        style={styles.container}
+        style={{ backgroundColor: BACKGROUND_COLOR, backgroundImage: BACKGROUND_IMAGE }}
         id="app-content"
-        className="min-w-screen relative flex h-full min-h-screen w-full flex-col justify-between"
+        className="min-w-screen relative flex h-full min-h-screen w-full flex-col justify-between bg-cover bg-center bg-no-repeat"
       >
         <Header />
-        <div className="mx-auto flex max-w-screen-xl grow items-center sm:px-4">
+        <div className="mx-auto flex w-full max-w-screen-xl grow items-center px-2 sm:px-4 lg:px-8">
           <main className="my-4 flex w-full flex-1 items-center justify-center">{children}</main>
         </div>
         <Footer />
@@ -66,13 +66,3 @@ export function AppLayout({ children }: PropsWithChildren) {
     </>
   );
 }
-
-const styles = {
-  container: {
-    backgroundColor: BACKGROUND_COLOR,
-    backgroundImage: BACKGROUND_IMAGE,
-    backgroundSize: 'cover',
-    backgroundRepeat: 'no-repeat',
-    backgroundPosition: 'center',
-  },
-};

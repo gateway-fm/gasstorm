@@ -12,6 +12,12 @@ body {
   margin: 0;
 }
 
+body {
+  color: #e2e8f0;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+}
+
 a {
   outline: none;
   color: inherit;
@@ -47,11 +53,6 @@ Text and shadows
 Scrollbar Overrides
 ===================
 */
-
-body {
-  scroll-behavior: smooth;
-  scrollbar-width: thin;
-}
 
 /* phones */
 @media only screen and (max-width: 767px) {
@@ -142,28 +143,47 @@ Common animations
   }
 }
 
+@keyframes slowPan {
+  0% {
+    background-position: 0% 0%, 100% 0%, 50% 100%;
+  }
+  100% {
+    background-position: 10% 10%, 88% 8%, 50% 100%;
+  }
+}
+
+@keyframes sweep {
+  0% {
+    transform: translateY(-120%);
+  }
+  100% {
+    transform: translateY(140%);
+  }
+}
+
 /*
 Gateway Theme & Toasts
 ======================
 */
 :root {
   /* Gateway brand colors */
-  --gateway-primary: #8950FA;
-  --gateway-primary-light: #A478FC;
-  --gateway-primary-dark: #6B3DD4;
+  --gateway-primary: #06b6d4;
+  --gateway-primary-light: #22d3ee;
+  --gateway-primary-dark: #0e7490;
+  --gateway-accent: #f97316;
   --gateway-success: #22C55E;
   --gateway-warning: #EAB308;
   --gateway-error: #EF4444;
-  --gateway-background: #F1F5F9;
+  --gateway-background: #020617;
 
   /* Toast overrides */
-  --toastify-color-light: #ffffff;
-  --toastify-color-dark: #1A1A1A;
-  --toastify-color-info: #8950FA;
+  --toastify-color-light: #0b1220;
+  --toastify-color-dark: #020617;
+  --toastify-color-info: #06b6d4;
   --toastify-color-success: #22C55E;
-  --toastify-color-warning: #EAB308;
+  --toastify-color-warning: #f59e0b;
   --toastify-color-error: #EF4444;
-  --toastify-color-transparent: rgba(255, 255, 255, 0.7);
+  --toastify-color-transparent: rgba(2, 6, 23, 0.85);
 
   --toastify-icon-color-info: var(--toastify-color-info);
   --toastify-icon-color-success: var(--toastify-color-success);
@@ -171,13 +191,13 @@ Gateway Theme & Toasts
   --toastify-icon-color-error: var(--toastify-color-error);
 
   --toastify-toast-width: 300px;
-  --toastify-toast-background: #fff;
+  --toastify-toast-background: #0f172a;
   --toastify-toast-min-height: 64px;
   --toastify-toast-max-height: 800px;
-  --toastify-font-family: Inter, system-ui, sans-serif;
+  --toastify-font-family: var(--font-main), Segoe UI, sans-serif;
   --toastify-z-index: 9999;
 
-  --toastify-text-color-light: #0F0F0F;
+  --toastify-text-color-light: #e2e8f0;
   --toastify-text-color-dark: #fff;
 
   --toastify-text-color-info: #fff;
@@ -185,17 +205,17 @@ Gateway Theme & Toasts
   --toastify-text-color-warning: #0F0F0F;
   --toastify-text-color-error: #fff;
 
-  --toastify-spinner-color: #8950FA;
-  --toastify-spinner-color-empty-area: #E2E8F0;
+  --toastify-spinner-color: #06b6d4;
+  --toastify-spinner-color-empty-area: #334155;
 
   --toastify-color-progress-light: linear-gradient(
     to right,
-    #8950FA,
-    #A478FC,
-    #C4A8FD,
-    #22C55E
+    #06b6d4,
+    #22d3ee,
+    #f97316,
+    #22c55e
   );
-  --toastify-color-progress-dark: #8950FA;
+  --toastify-color-progress-dark: #06b6d4;
   --toastify-color-progress-info: var(--toastify-color-info);
   --toastify-color-progress-success: var(--toastify-color-success);
   --toastify-color-progress-warning: var(--toastify-color-warning);
@@ -208,12 +228,67 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(137, 80, 250, 0.2);
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.24);
 }
 
 /* Gateway primary button hover glow */
 button[class*="bg-primary"]:hover {
-  box-shadow: 0 0 20px rgba(137, 80, 250, 0.3);
+  box-shadow: 0 8px 24px rgba(6, 182, 212, 0.28);
+}
+
+::selection {
+  background: rgba(34, 211, 238, 0.24);
+}
+
+#app-content::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 8% 18%, rgba(34, 211, 238, 0.17), transparent 33%),
+    radial-gradient(circle at 92% 15%, rgba(249, 115, 22, 0.14), transparent 30%),
+    linear-gradient(180deg, rgba(2, 6, 23, 0.4), rgba(2, 6, 23, 0.8));
+  z-index: 0;
+  animation: slowPan 16s ease-in-out infinite alternate;
+}
+
+#app-content::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(6, 182, 212, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(6, 182, 212, 0.06) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: radial-gradient(circle at center, black, transparent 88%);
+  z-index: 0;
+}
+
+#app-content > * {
+  position: relative;
+  z-index: 1;
+}
+
+.ops-card {
+  border-radius: 12px;
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+}
+
+.ops-card::after {
+  content: '';
+  position: absolute;
+  inset: -120% 0 auto 0;
+  height: 120%;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(34, 211, 238, 0.12) 45%,
+    transparent 100%
+  );
+  animation: sweep 8s linear infinite;
 }
 
 /*
