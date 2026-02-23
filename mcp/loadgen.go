@@ -153,9 +153,9 @@ func registerLoadgenStart(s *server.MCPServer, client *httpClient) {
 			}
 			if v := req.GetInt("num_accounts", 0); v > 0 {
 				rc["numAccounts"] = v
-			} else {
-				rc["numAccounts"] = 10
 			}
+			// When num_accounts is not specified, omit numAccounts to let
+			// the load generator auto-calculate based on target TPS and block time
 			payload["realisticConfig"] = rc
 		}
 
