@@ -68,6 +68,21 @@ const nextConfig: NextConfig = {
               source: "/api/privacy/health",
               destination: "http://localhost:18300/health",
             },
+            // L1 Explorer health
+            {
+              source: "/api/explorer-l1/health",
+              destination: "http://localhost:18202/health",
+            },
+            // Bridge Relayer health (metrics endpoint returns 200)
+            {
+              source: "/api/bridge/relayer/health",
+              destination: "http://localhost:19090/metrics",
+            },
+            // Bridge UI health
+            {
+              source: "/api/bridge/ui/health",
+              destination: "http://localhost:18001/",
+            },
           ];
         },
       }

@@ -6,6 +6,7 @@ interface BuilderStatus {
   blockTimeMs: number;
   skipEmptyBlocks: boolean;
   pendingTxCount: number;
+  stressThresholdPct: number;
 }
 
 interface BridgeStatus {
@@ -31,6 +32,10 @@ export interface PrivacyProxyStatus {
   isOnline: boolean;
 }
 
+interface LoadgenStatus {
+  isOnline: boolean;
+}
+
 interface ChainState {
   l1: ChainStatus;
   l2: ChainStatus;
@@ -38,7 +43,9 @@ interface ChainState {
   bridge: BridgeStatus;
   blobDA: BlobDAStatus;
   explorer: ExplorerStatus;
+  explorerL1: ExplorerStatus;
   privacyProxy: PrivacyProxyStatus;
+  loadgen: LoadgenStatus;
   accountL1Balance: bigint;
   accountL2Balance: bigint;
   logs: LogEntry[];
@@ -53,7 +60,9 @@ interface ChainActions {
   setBridgeStatus: (status: Partial<BridgeStatus>) => void;
   setBlobDAStatus: (status: Partial<BlobDAStatus>) => void;
   setExplorerStatus: (status: Partial<ExplorerStatus>) => void;
+  setExplorerL1Status: (status: Partial<ExplorerStatus>) => void;
   setPrivacyProxyStatus: (status: Partial<PrivacyProxyStatus>) => void;
+  setLoadgenStatus: (status: Partial<LoadgenStatus>) => void;
   setAccountBalances: (l1?: bigint, l2?: bigint) => void;
   setLastL1Block: (block: number) => void;
   setLastL2Block: (block: number) => void;
@@ -71,9 +80,10 @@ const initialChainStatus: ChainStatus = {
 
 const initialBuilderStatus: BuilderStatus = {
   isOnline: false,
-  blockTimeMs: 2000,
+  blockTimeMs: 1000,
   skipEmptyBlocks: false,
   pendingTxCount: 0,
+  stressThresholdPct: 70,
 };
 
 const initialBridgeStatus: BridgeStatus = {
@@ -99,7 +109,9 @@ export const useChainStore = create<ChainStore>((set) => ({
   bridge: { ...initialBridgeStatus },
   blobDA: { ...initialBlobDAStatus },
   explorer: { isOnline: false },
+  explorerL1: { isOnline: false },
   privacyProxy: { isOnline: false },
+  loadgen: { isOnline: false },
   accountL1Balance: 0n,
   accountL2Balance: 0n,
   logs: [
@@ -144,9 +156,19 @@ export const useChainStore = create<ChainStore>((set) => ({
       explorer: { ...state.explorer, ...status },
     })),
 
+  setExplorerL1Status: (status) =>
+    set((state) => ({
+      explorerL1: { ...state.explorerL1, ...status },
+    })),
+
   setPrivacyProxyStatus: (status) =>
     set((state) => ({
       privacyProxy: { ...state.privacyProxy, ...status },
+    })),
+
+  setLoadgenStatus: (status) =>
+    set((state) => ({
+      loadgen: { ...state.loadgen, ...status },
     })),
 
   setAccountBalances: (l1, l2) =>

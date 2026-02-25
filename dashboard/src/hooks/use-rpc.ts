@@ -13,7 +13,7 @@ const COMPRESSION_NAMES: Record<number, string> = {
 
 export function useChainData() {
   const [isLoading, setIsLoading] = useState(true);
-  const { setL1Status, setL2Status, setBuilderStatus, setBlobDAStatus, setExplorerStatus, setPrivacyProxyStatus, setAccountBalances, addLog } = useChainStore();
+  const { setL1Status, setL2Status, setBuilderStatus, setBlobDAStatus, setExplorerStatus, setExplorerL1Status, setPrivacyProxyStatus, setLoadgenStatus, setBridgeStatus, setAccountBalances, addLog } = useChainStore();
 
   const fetchL1Data = useCallback(async () => {
     try {
@@ -63,6 +63,7 @@ export function useChainData() {
         blockTimeMs: status.blockTimeMs,
         skipEmptyBlocks: status.skipEmptyBlocks,
         pendingTxCount: status.pendingTxCount,
+        stressThresholdPct: status.stressThresholdPct ?? 70,
       });
       return true;
     } catch {
@@ -105,6 +106,42 @@ export function useChainData() {
     }
   }, [setPrivacyProxyStatus]);
 
+  const fetchExplorerL1Health = useCallback(async () => {
+    try {
+      const resp = await fetch("/api/explorer-l1/health", { signal: AbortSignal.timeout(5000) });
+      setExplorerL1Status({ isOnline: resp.ok });
+    } catch {
+      setExplorerL1Status({ isOnline: false });
+    }
+  }, [setExplorerL1Status]);
+
+  const fetchBridgeRelayerHealth = useCallback(async () => {
+    try {
+      const resp = await fetch("/api/bridge/relayer/health", { signal: AbortSignal.timeout(5000) });
+      setBridgeStatus({ relayerOnline: resp.ok });
+    } catch {
+      setBridgeStatus({ relayerOnline: false });
+    }
+  }, [setBridgeStatus]);
+
+  const fetchBridgeUiHealth = useCallback(async () => {
+    try {
+      const resp = await fetch("/api/bridge/ui/health", { signal: AbortSignal.timeout(5000) });
+      setBridgeStatus({ uiOnline: resp.ok });
+    } catch {
+      setBridgeStatus({ uiOnline: false });
+    }
+  }, [setBridgeStatus]);
+
+  const fetchLoadgenHealth = useCallback(async () => {
+    try {
+      const resp = await fetch("/api/loadgen/health", { signal: AbortSignal.timeout(5000) });
+      setLoadgenStatus({ isOnline: resp.ok });
+    } catch {
+      setLoadgenStatus({ isOnline: false });
+    }
+  }, [setLoadgenStatus]);
+
   const fetchBalances = useCallback(async () => {
     try {
       const [l1Balance, l2Balance] = await Promise.all([
@@ -119,9 +156,9 @@ export function useChainData() {
 
   const refreshAll = useCallback(async () => {
     setIsLoading(true);
-    await Promise.all([fetchL1Data(), fetchL2Data(), fetchBuilderStatus(), fetchBlobDAData(), fetchExplorerHealth(), fetchPrivacyHealth(), fetchBalances()]);
+    await Promise.all([fetchL1Data(), fetchL2Data(), fetchBuilderStatus(), fetchBlobDAData(), fetchExplorerHealth(), fetchExplorerL1Health(), fetchPrivacyHealth(), fetchBridgeRelayerHealth(), fetchBridgeUiHealth(), fetchLoadgenHealth(), fetchBalances()]);
     setIsLoading(false);
-  }, [fetchL1Data, fetchL2Data, fetchBuilderStatus, fetchBlobDAData, fetchExplorerHealth, fetchPrivacyHealth, fetchBalances]);
+  }, [fetchL1Data, fetchL2Data, fetchBuilderStatus, fetchBlobDAData, fetchExplorerHealth, fetchExplorerL1Health, fetchPrivacyHealth, fetchBridgeRelayerHealth, fetchBridgeUiHealth, fetchLoadgenHealth, fetchBalances]);
 
   useEffect(() => {
     // Use microtask to avoid synchronous setState in effect body
@@ -143,7 +180,11 @@ export function useChainData() {
     fetchBuilderStatus,
     fetchBlobDAData,
     fetchExplorerHealth,
+    fetchExplorerL1Health,
     fetchPrivacyHealth,
+    fetchBridgeRelayerHealth,
+    fetchBridgeUiHealth,
+    fetchLoadgenHealth,
     fetchBalances,
   };
 }
