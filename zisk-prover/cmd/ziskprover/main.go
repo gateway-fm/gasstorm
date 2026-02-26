@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 	"os/signal"
 	"syscall"
 
@@ -75,8 +76,9 @@ func main() {
 	// Start HTTP server
 	addr := fmt.Sprintf(":%d", *port)
 	httpServer := &http.Server{
-		Addr:    addr,
-		Handler: server.Handler(),
+		Addr:              addr,
+		Handler:           server.Handler(),
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	// Handle shutdown
