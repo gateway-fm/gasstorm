@@ -103,6 +103,15 @@ importers:
       '@metamask/providers':
         specifier: 10.2.1
         version: 10.2.1
+      '@provablehq/aleo-types':
+        specifier: 0.3.0-alpha.1
+        version: 0.3.0-alpha.1
+      '@provablehq/aleo-wallet-adaptor-shield':
+        specifier: 0.3.0-alpha.1
+        version: 0.3.0-alpha.1
+      '@provablehq/aleo-wallet-standard':
+        specifier: 0.3.0-alpha.1
+        version: 0.3.0-alpha.1
       '@radixdlt/babylon-gateway-api-sdk':
         specifier: ^1.10.1
         version: 1.10.1

@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useCallback, useState, useEffect, useRef, ReactNode } from "react";
 import { useGoLoadTestStore } from "@/stores/go-load-test-store";
+import { isDevMode, getServiceWsUrl } from "@/lib/host";
 
 interface NewHeadResult {
   number: string;
@@ -23,19 +24,17 @@ interface WebSocketContextValue {
 
 const WebSocketContext = createContext<WebSocketContextValue | null>(null);
 
-// In dev mode (port 3000), connect directly to service ports
+// In dev mode (port 3000), connect directly to service ports.
+// Uses window.location.hostname so it works over Tailscale / non-localhost access.
 function getWebSocketUrl(path: string): string {
   if (typeof window === "undefined") return path;
 
-  const host = window.location.host;
-  const isDev = host.includes("localhost:3000") || host.includes("127.0.0.1:3000");
-
-  if (isDev) {
-    if (path === "/ws/l1") return "ws://localhost:18545";
-    if (path === "/ws/l2") return "ws://localhost:18547";
+  if (isDevMode()) {
+    if (path === "/ws/l1") return getServiceWsUrl(18545);
+    if (path === "/ws/l2") return getServiceWsUrl(18547);
   }
 
-  return `ws://${host}${path}`;
+  return `ws://${window.location.host}${path}`;
 }
 
 interface WebSocketMessage {

@@ -21,11 +21,11 @@ export const metadata: Metadata = {
     template: "%s | GasStorm",
   },
   description:
-    "Blockchain sequencer load testing framework with sub-second block times. Up to 25,000 tx/s with real-time metrics.",
+    "Local devnet and stress-testing toolkit for EVM sequencers — spins up an L1/L2 stack, block builder, and load generator with a real-time dashboard to measure throughput, latency, and gas metrics.",
   openGraph: {
     title: "GasStorm",
     description:
-      "Blockchain sequencer load testing framework with sub-second block times.",
+      "Local devnet and stress-testing toolkit for EVM sequencers with real-time metrics.",
     type: "website",
     images: ["/og-image.png"],
   },

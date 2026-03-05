@@ -25,6 +25,7 @@ const NAV_ITEMS: NavItem[] = [
 const SERVICE_ITEMS: NavItem[] = [
   { label: "L1 Explorer", href: "/explorer-l1", match: matchExact("/explorer-l1") },
   { label: "L2 Explorer", href: "/explorer-l2", match: matchExact("/explorer-l2") },
+  { label: "Blob DA", href: "/blob-da", match: matchExact("/blob-da") },
   { label: "Bridge UI", href: "/bridge-ui", match: matchExact("/bridge-ui") },
   { label: "Privacy", href: "/privacy", match: matchExact("/privacy") },
   { label: "Docs", href: "/docs", match: matchExact("/docs") },
@@ -64,9 +65,6 @@ export function Header() {
               <h1 className="text-sm font-semibold font-mono truncate tracking-tight">
                 GasStorm
               </h1>
-              <p className="text-xs text-muted-foreground font-mono truncate">
-                Blockchain stress testing rig
-              </p>
             </div>
           </div>
 

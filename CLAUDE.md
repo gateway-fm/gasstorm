@@ -2,7 +2,7 @@
 
 > This file is for Claude Code context. For user-facing docs, see [README.md](./README.md).
 
-Blockchain sequencer load testing framework with sub-second block times.
+Local devnet and stress-testing toolkit for EVM sequencers — spins up an L1/L2 stack, block builder, and load generator with a real-time dashboard to measure throughput, latency, and gas metrics.
 
 **Task Tracking:** See [todo.md](./todo.md) for current tasks and priorities.
 
@@ -127,6 +127,7 @@ go build ./...
 | explorer-ui | 18201 | L2 block explorer web UI |
 | explorer-l1-api | 18202 | L1 block explorer REST API |
 | explorer-l1-ui | 18203 | L1 block explorer web UI |
+| blob-da-ui | 18126 | Blob DA web UI |
 | privacy-proxy | 18300 | Privacy proxy API |
 | privacy-ui | 18301 | Privacy proxy UI |
 

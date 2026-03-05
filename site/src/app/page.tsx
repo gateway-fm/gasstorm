@@ -1,7 +1,6 @@
 import Link from "next/link";
 import {
   Zap,
-  Timer,
   Bot,
   Blocks,
   Activity,
@@ -30,8 +29,7 @@ export default function HomePage() {
               <span className="text-primary">GasStorm</span>
             </h1>
             <p className="text-xl md:text-2xl text-muted-foreground mb-4">
-              Blockchain sequencer load testing framework with sub-second block
-              times.
+              All in one blockchain ecosystem test rig in a box.
             </p>
             <p className="text-base text-muted-foreground mb-8 max-w-2xl">
               Orchestrates op-reth, an external block builder, and a
@@ -66,12 +64,13 @@ export default function HomePage() {
           <Card className="bg-card hover:shadow-md transition-shadow">
             <CardHeader>
               <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center mb-2">
-                <Timer className="size-5 text-primary" />
+                <Blocks className="size-5 text-primary" />
               </div>
-              <CardTitle className="text-lg">Sub-Second Blocks</CardTitle>
+              <CardTitle className="text-lg">All-in-One Test Rig</CardTitle>
               <CardDescription>
-                Block times as low as 50ms with configurable intervals. External
-                block builder with Engine API pipeline for maximum throughput.
+                Complete sequencer test environment in one stack: execution
+                layer, block builder, load generation, observability, and
+                operator tooling.
               </CardDescription>
             </CardHeader>
           </Card>

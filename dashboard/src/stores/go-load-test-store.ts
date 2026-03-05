@@ -21,6 +21,7 @@ import {
   getResetState,
   type GoLoadTestStore,
 } from "./load-test-store-state";
+import { useActivityFeedStore } from "./activity-feed-store";
 
 // Re-export types for consumers
 export type { GoLoadTestState, GoLoadTestStore } from "./load-test-store-state";
@@ -115,6 +116,7 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()((set, get) => {
       console.log("[LoadTest] Auto-resetting stores for new test");
       useMetricsStore.getState().reset();
       useChainStore.getState().clearLogs();
+      useActivityFeedStore.getState().clearEvents();
       set({
         ...getResetState(),
         status: "initializing",
@@ -162,6 +164,7 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()((set, get) => {
       wsManager.resetForNewTest(); // Clear frozen flag from previous test
       useMetricsStore.getState().reset();
       useChainStore.getState().clearLogs();
+      useActivityFeedStore.getState().clearEvents();
       set({
         ...getResetState(),
         isStarting: true,
@@ -232,6 +235,7 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()((set, get) => {
         wsManager.resetForNewTest(); // Clear frozen flag from previous test
         useMetricsStore.getState().reset();
         useChainStore.getState().clearLogs();
+        useActivityFeedStore.getState().clearEvents();
         set(getResetState());
       } catch (error) {
         console.error("Failed to reset:", error);

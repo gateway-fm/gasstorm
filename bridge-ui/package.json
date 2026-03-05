@@ -28,6 +28,9 @@
     "@intercom/messenger-js-sdk": "^0.0.18",
     "@metamask/post-message-stream": "6.1.2",
     "@metamask/providers": "10.2.1",
+    "@provablehq/aleo-types": "0.3.0-alpha.1",
+    "@provablehq/aleo-wallet-adaptor-shield": "0.3.0-alpha.1",
+    "@provablehq/aleo-wallet-standard": "0.3.0-alpha.1",
     "@radixdlt/babylon-gateway-api-sdk": "^1.10.1",
     "@radixdlt/radix-dapp-toolkit": "^2.2.1",
     "@rainbow-me/rainbowkit": "2.2.0",
@@ -114,7 +117,7 @@
   },
   "scripts": {
     "clean": "rm -rf dist cache .next",
-    "dev": "next dev",
+    "dev": "next dev --hostname 0.0.0.0",
     "build": "next build",
     "typecheck": "tsc",
     "lint": "next lint",

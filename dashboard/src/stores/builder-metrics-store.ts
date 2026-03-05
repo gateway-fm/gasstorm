@@ -9,15 +9,20 @@
 
 import { create } from "zustand";
 import type { BuilderBlockMetrics } from "@/types/load-test";
+import { isDevMode, getServiceWsUrl } from "@/lib/host";
 
 const RECENT_WINDOW = 10; // Keep last 10 blocks for rolling averages
 
 interface BuilderTimingSnapshot {
   avgFilterMs: number;
   avgEngineApiMs: number;
+  avgFcuMs: number;
+  avgGetPayloadMs: number;
   avgTotalBuildMs: number;
   latestFilterMs: number;
   latestEngineApiMs: number;
+  latestFcuMs: number;
+  latestGetPayloadMs: number;
   latestTotalBuildMs: number;
   blockCount: number;
 }
@@ -42,9 +47,13 @@ type BuilderMetricsStore = BuilderMetricsState & BuilderMetricsActions;
 const EMPTY_TIMING: BuilderTimingSnapshot = {
   avgFilterMs: 0,
   avgEngineApiMs: 0,
+  avgFcuMs: 0,
+  avgGetPayloadMs: 0,
   avgTotalBuildMs: 0,
   latestFilterMs: 0,
   latestEngineApiMs: 0,
+  latestFcuMs: 0,
+  latestGetPayloadMs: 0,
   latestTotalBuildMs: 0,
   blockCount: 0,
 };
@@ -57,14 +66,20 @@ function computeTiming(blocks: BuilderBlockMetrics[]): BuilderTimingSnapshot {
 
   const avgFilterMs = blocks.reduce((sum, b) => sum + b.filterDurationMs, 0) / n;
   const avgEngineApiMs = blocks.reduce((sum, b) => sum + b.engineApiDurationMs, 0) / n;
+  const avgFcuMs = blocks.reduce((sum, b) => sum + (b.fcuDurationMs ?? 0), 0) / n;
+  const avgGetPayloadMs = blocks.reduce((sum, b) => sum + (b.getPayloadDurationMs ?? 0), 0) / n;
   const avgTotalBuildMs = blocks.reduce((sum, b) => sum + b.totalBuildDurationMs, 0) / n;
 
   return {
     avgFilterMs,
     avgEngineApiMs,
+    avgFcuMs,
+    avgGetPayloadMs,
     avgTotalBuildMs,
     latestFilterMs: latest.filterDurationMs,
     latestEngineApiMs: latest.engineApiDurationMs,
+    latestFcuMs: latest.fcuDurationMs ?? 0,
+    latestGetPayloadMs: latest.getPayloadDurationMs ?? 0,
     latestTotalBuildMs: latest.totalBuildDurationMs,
     blockCount: n,
   };
@@ -96,16 +111,13 @@ export const useBuilderMetricsStore = create<BuilderMetricsStore>((set) => ({
 function getBuilderBlockMetricsWsUrl(): string {
   if (typeof window === "undefined") return "ws://localhost:13002/ws/block-metrics";
 
-  const host = window.location.host;
-  const isDev = host.includes("localhost:3000") || host.includes("127.0.0.1:3000");
-
-  if (isDev) {
-    return "ws://localhost:13002/ws/block-metrics";
+  if (isDevMode()) {
+    return getServiceWsUrl(13002, "/ws/block-metrics");
   }
 
   // Production: use nginx proxy path
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${host}/ws/builder-metrics`;
+  return `${protocol}//${window.location.host}/ws/builder-metrics`;
 }
 
 let ws: WebSocket | null = null;

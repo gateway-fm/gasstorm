@@ -134,6 +134,10 @@ MAX_REQUEUE_COUNT="${MAX_REQUEUE_COUNT:-15}"
 NONCE_TIMEOUT_MS="${NONCE_TIMEOUT_MS:-500}"
 PRECONF_BUFFER_SIZE="${PRECONF_BUFFER_SIZE:-10000}"
 
+# Bind address for services. 0.0.0.0 allows Tailscale / LAN access.
+# Set to 127.0.0.1 to restrict to localhost only.
+BIND_ADDR="${BIND_ADDR:-0.0.0.0}"
+
 # Ports - matching Docker external ports for dashboard compatibility
 L1_PORT=18545
 RETH_HTTP_PORT=18546
@@ -303,7 +307,7 @@ main() {
     log_info "Starting L1 (Anvil)..."
 
     anvil \
-        --host 127.0.0.1 \
+        --host $BIND_ADDR \
         --port $L1_PORT \
         --block-time 12 \
         --silent \
@@ -323,14 +327,15 @@ main() {
         --chain "$PROJECT_DIR/genesis/genesis.json" \
         --datadir "$DATA_DIR/reth" \
         --http \
-        --http.addr 127.0.0.1 \
+        --http.addr $BIND_ADDR \
         --http.port $RETH_HTTP_PORT \
         --http.api eth,net,web3,debug \
         --http.corsdomain "*" \
         --ws \
-        --ws.addr 127.0.0.1 \
+        --ws.addr $BIND_ADDR \
         --ws.port $RETH_WS_PORT \
         --ws.api eth,net,web3,debug \
+        --ws.origins "*" \
         --authrpc.addr 127.0.0.1 \
         --authrpc.port $RETH_ENGINE_PORT \
         --authrpc.jwtsecret "$PROJECT_DIR/genesis/jwt.hex" \
@@ -434,7 +439,7 @@ main() {
 
     (
         cd "$PROJECT_DIR/dashboard"
-        npm run dev 2>&1 | tee "$DATA_DIR/logs/dashboard.log" | sed 's/^/[dashboard] /'
+        npx next dev --hostname $BIND_ADDR --port $DASHBOARD_PORT 2>&1 | tee "$DATA_DIR/logs/dashboard.log" | sed 's/^/[dashboard] /'
     ) &
     DASHBOARD_PID=$!
     write_pid "dashboard" "$DASHBOARD_PID"

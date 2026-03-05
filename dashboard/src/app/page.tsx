@@ -1,27 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
-import { ChainStatusCard } from "@/components/status/chain-status-card";
-import { BlockBuilderCard } from "@/components/status/block-builder-card";
-import { AccountCard } from "@/components/status/account-card";
-import { QuickActions } from "@/components/status/quick-actions";
-import { ActivityLog } from "@/components/status/activity-log";
-import { ArchitectureDiagram } from "@/components/status/architecture-diagram";
-import { ServiceLinks } from "@/components/status/service-links";
+import { ComponentStatus } from "@/components/status/component-status";
+import { ActivityFeed } from "@/components/status/activity-feed";
 import { useChainStore } from "@/stores/chain-store";
+import { useActivityFeedStore } from "@/stores/activity-feed-store";
 import { useChainData } from "@/hooks/use-rpc";
+import { useActivityEmitter } from "@/hooks/use-activity-emitter";
 import { useL1NewHead, useL2NewHead } from "@/contexts/websocket-context";
 
 export default function DashboardPage() {
-  const { refreshAll, fetchBalances } = useChainData();
+  useChainData();
+  useActivityEmitter();
 
   const {
-    l1,
-    l2,
-    builder,
-    accountL1Balance,
-    accountL2Balance,
-    addLog,
     setL1Status,
     setL2Status,
     lastL1Block,
@@ -30,11 +22,12 @@ export default function DashboardPage() {
     setLastL2Block,
   } = useChainStore();
 
+  const addEvent = useActivityFeedStore((s) => s.addEvent);
+
   // Use refs to track last block numbers to avoid stale closures
   const lastL1BlockRef = useRef(lastL1Block);
   const lastL2BlockRef = useRef(lastL2Block);
 
-  // Sync refs with state (must be in useEffect, not during render)
   useEffect(() => {
     lastL1BlockRef.current = lastL1Block;
   }, [lastL1Block]);
@@ -50,13 +43,14 @@ export default function DashboardPage() {
       if (blockNum > lastL1BlockRef.current) {
         setL1Status({ blockNumber: blockNum, isOnline: true, latestBlockHash: head.hash });
         if (lastL1BlockRef.current > 0) {
-          addLog(`L1 Block ${blockNum} (${head.hash.slice(0, 10)}...)`, "block");
+          addEvent("l1", "block", "info", `L1 Block ${blockNum}`, {
+            hash: head.hash.slice(0, 10),
+          });
         }
         setLastL1Block(blockNum);
-        fetchBalances();
       }
     },
-    [setL1Status, addLog, setLastL1Block, fetchBalances]
+    [setL1Status, addEvent, setLastL1Block],
   );
 
   // Handle L2 new block via WebSocket
@@ -66,74 +60,28 @@ export default function DashboardPage() {
       if (blockNum > lastL2BlockRef.current) {
         setL2Status({ blockNumber: blockNum, isOnline: true, latestBlockHash: head.hash });
         if (lastL2BlockRef.current > 0) {
-          addLog(`Block ${blockNum} produced by sequencer`, "block");
+          addEvent("l2", "block", "info", `L2 Block ${blockNum} produced`, {
+            hash: head.hash.slice(0, 10),
+          });
         }
         setLastL2Block(blockNum);
-        fetchBalances();
       }
     },
-    [setL2Status, addLog, setLastL2Block, fetchBalances]
+    [setL2Status, addEvent, setLastL2Block],
   );
 
-  // Subscribe to new block events from global WebSocket context
   useL1NewHead(handleL1NewHead);
   useL2NewHead(handleL2NewHead);
 
   return (
-    <div className="min-h-screen bg-background">
-
-      <main className="container mx-auto px-4 py-6">
-        {/* Service Endpoints */}
-        <ServiceLinks />
-
-        {/* Status Cards Grid */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
-          <ChainStatusCard
-            title="L1 - Anvil"
-            subtitle="Ethereum L1 (local)"
-            endpoint="localhost:18545"
-            isOnline={l1.isOnline}
-            blockNumber={l1.blockNumber}
-            chainId={l1.chainId}
-            gasPrice={l1.gasPrice}
-          />
-
-          <ChainStatusCard
-            title="L2 - op-reth"
-            subtitle="OP Stack Execution Client"
-            endpoint="localhost:18546"
-            isOnline={l2.isOnline}
-            blockNumber={l2.blockNumber}
-            chainId={l2.chainId}
-            additionalInfo={
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Engine API</span>
-                <span className="font-mono">localhost:18551 (JWT)</span>
-              </div>
-            }
-          />
-
-          <BlockBuilderCard
-            isOnline={builder.isOnline}
-            blocksBuilt={l2.blockNumber}
-            blockTimeMs={builder.blockTimeMs}
-            skipEmptyBlocks={builder.skipEmptyBlocks}
-            pendingTxs={builder.pendingTxCount}
-          />
-
-          <QuickActions onRefresh={refreshAll} />
+    <div className="h-full bg-background">
+      <main className="container mx-auto px-4 py-6 h-full flex flex-col gap-4">
+        <div className="shrink-0">
+          <ComponentStatus />
         </div>
-
-        {/* Compact Account + Activity Row */}
-        <div className="grid gap-4 md:grid-cols-3 mb-4">
-          <AccountCard l1Balance={accountL1Balance} l2Balance={accountL2Balance} compact />
-          <div className="md:col-span-2">
-            <ActivityLog compact maxItems={3} />
-          </div>
+        <div className="min-h-0 flex-1">
+          <ActivityFeed />
         </div>
-
-        {/* Architecture Diagram - Full Width */}
-        <ArchitectureDiagram />
       </main>
     </div>
   );

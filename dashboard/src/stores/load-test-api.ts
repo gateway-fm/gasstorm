@@ -13,27 +13,26 @@ import type {
   InitPhase,
   VerifyPhase,
 } from "@/types/load-test";
+import { isDevMode, getServiceWsUrl } from "@/lib/host";
 
 // Load generator API base URL - proxied through nginx in docker
 export const LOAD_GEN_API = "/api/loadgen";
 
 /**
  * Get WebSocket URL for load generator
- * In dev mode (port 3000), connect directly since Next.js rewrites don't support WebSocket upgrades
+ * In dev mode (port 3000), connect directly since Next.js rewrites don't support WebSocket upgrades.
+ * Uses window.location.hostname so it works over Tailscale / non-localhost access.
  */
 export function getLoadGenWsUrl(): string {
   if (typeof window === "undefined") return "ws://localhost:13001/ws";
 
-  const host = window.location.host;
-  const isDev = host.includes("localhost:3000") || host.includes("127.0.0.1:3000");
-
-  if (isDev) {
-    return "ws://localhost:13001/ws";
+  if (isDevMode()) {
+    return getServiceWsUrl(13001, "/ws");
   }
 
   // Production: use nginx proxy path
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${protocol}//${host}/ws/loadgen`;
+  return `${protocol}//${window.location.host}/ws/loadgen`;
 }
 
 /**

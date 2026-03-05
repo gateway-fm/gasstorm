@@ -1,4 +1,4 @@
-.PHONY: run run-build run-reth run-cdk-erigon run-metal stop-metal restart-metal run-hyperlane stop restart logs status resource-report clean clean-metal build test test-load-generator test-dashboard test-tx bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-with-blob run-with-explorer run-with-privacy run-with-explorer-privacy pull-explorer pull-privacy run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help pull-blockbuilder pull-loadgenerator mcp-server mcp-build site-dev site-build
+.PHONY: run run-build run-reth run-cdk-erigon run-metal stop-metal restart-metal run-hyperlane stop restart logs status resource-report clean clean-metal build test test-load-generator test-dashboard test-tx bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-with-blob run-with-explorer run-with-privacy run-with-explorer-privacy pull-explorer pull-privacy run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help pull-blockbuilder pull-loadgenerator mcp-server mcp-build site-dev site-build tunnel-url _print-tunnel-url
 
 # =============================================================================
 # Configuration: Source .env file if it exists
@@ -62,10 +62,12 @@ endif
 # Start the full system: L1/L2, block-builder, load-generator, dashboard, docs, explorer, privacy, bridge(reth)
 run: mcp-build
 	docker compose --profile $(COMPOSE_PROFILE) --profile $(EXPLORER_PROFILE) --profile explorer-l1 --profile $(PRIVACY_PROFILE) $(BRIDGE_PROFILES) $(BLOB_PROFILE) up -d
+	@$(MAKE) --no-print-directory _print-tunnel-url
 
 # Build from local sibling repos (../blockbuilder, ../loadgenerator) and run everything
 run-build: mcp-build
 	docker compose -f docker-compose.yml -f docker-compose.build.yaml --profile $(COMPOSE_PROFILE) --profile $(EXPLORER_PROFILE) --profile explorer-l1 --profile $(PRIVACY_PROFILE) $(BRIDGE_PROFILES) $(BLOB_PROFILE) up --build -d
+	@$(MAKE) --no-print-directory _print-tunnel-url
 
 # Start with op-reth (block-builder + Engine API)
 run-reth:
@@ -101,6 +103,32 @@ mcp-server: mcp-build
 	EXPLORER_URL=http://localhost:18200 PRIVACY_URL=http://localhost:18300 \
 	GASSTORM_DIR=$(CURDIR) \
 		./mcp/mcp
+
+# Print the cloudflared tunnel URL (for privacy-proxy QR callbacks from phone)
+tunnel-url:
+	@docker logs gasstorm-privacy-tunnel 2>&1 | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' | tail -1
+
+# Internal helper: wait for tunnel URL, write to bind-mounted file, and print it.
+# The backend reads data/tunnel/tunnel-url.txt to construct QR callback URLs.
+_print-tunnel-url:
+	@if docker ps --format '{{.Names}}' 2>/dev/null | grep -q gasstorm-privacy-tunnel; then \
+		echo ""; \
+		echo "Waiting for privacy tunnel..."; \
+		mkdir -p data/tunnel; \
+		for i in 1 2 3 4 5 6 7 8; do \
+			URL=$$(docker logs gasstorm-privacy-tunnel 2>&1 | grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' | tail -1); \
+			if [ -n "$$URL" ]; then \
+				echo "$$URL" > data/tunnel/tunnel-url.txt; \
+				echo "Privacy tunnel: $$URL"; \
+				echo "(open localhost:18301 — QR callbacks route through tunnel automatically)"; \
+				break; \
+			fi; \
+			sleep 2; \
+		done; \
+		if [ ! -f data/tunnel/tunnel-url.txt ]; then \
+			echo "(tunnel starting... run 'make tunnel-url' to get URL later)"; \
+		fi; \
+	fi
 
 # =============================================================================
 # Performance Profiles (uses current EXECUTION_LAYER)

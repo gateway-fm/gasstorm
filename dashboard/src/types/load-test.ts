@@ -261,6 +261,8 @@ export interface BuilderBlockMetrics {
   fillRate: number; // gasUsed/gasLimit * 100
   filterDurationMs: number;
   engineApiDurationMs: number;
+  fcuDurationMs: number;
+  getPayloadDurationMs: number;
   totalBuildDurationMs: number;
   rejections: BuilderBlockRejections;
 }

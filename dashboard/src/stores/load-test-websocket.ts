@@ -280,8 +280,18 @@ export function createWebSocketManager(callbacks: WebSocketCallbacks) {
             return;
           }
 
-          // 3. Skip idle messages — nothing to display
-          if (incomingStatus === "idle") return;
+          // 3. Handle idle messages — if server is idle but we think a test is
+          //    active, we missed the completion (e.g. navigated away mid-test).
+          //    Reset the store so the UI isn't stuck on "running".
+          if (incomingStatus === "idle") {
+            if (isActive(currentStatus)) {
+              console.log("[LoadTest] Server idle but store was %s — resetting (missed completion)", currentStatus);
+              frozen = false;
+              flushNow();
+              callbacks.onStateUpdate({ status: "idle" });
+            }
+            return;
+          }
 
           // 4. Skip redundant terminal state updates (already processed in step 2)
           if (incomingStatus === "completed" || incomingStatus === "error") return;

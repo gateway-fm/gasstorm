@@ -6,9 +6,8 @@ import { TEST_ACCOUNT } from "@/types/chain";
 import { useChainStore } from "@/stores/chain-store";
 
 const COMPRESSION_NAMES: Record<number, string> = {
-  0: "none",
-  1: "brotli",
-  2: "zstd",
+  0: "brotli",
+  1: "zstd",
 };
 
 export function useChainData() {

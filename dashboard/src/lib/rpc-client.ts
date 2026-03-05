@@ -152,6 +152,7 @@ export interface BuilderStatus {
   skipEmptyBlocks: boolean;
   sequencerAddress: string;
   pendingTxCount: number;
+  stressThresholdPct?: number;
   blocksBuilt?: number;
   txsProcessed?: number;
   avgBuildTimeMs?: number;

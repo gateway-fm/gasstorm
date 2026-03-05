@@ -18,7 +18,7 @@ const FRAME_SRC_HOSTS = [
   'https://intercom-sheets.com',
   'https://intercom-reporting.com',
 ];
-const STYLE_SRC_HOSTS = ['https://js.refiner.io', 'https://storage.refiner.io'];
+const STYLE_SRC_HOSTS = ['https://js.refiner.io', 'https://storage.refiner.io', 'https://fonts.googleapis.com'];
 const IMG_SRC_HOSTS = [
   'https://*.walletconnect.com',
   'https://*.githubusercontent.com',
@@ -46,11 +46,11 @@ const MEDIA_SRC_HOSTS = [
 ];
 const cspHeader = `
   default-src 'self';
-  script-src 'self'${isDev ? " 'unsafe-eval'" : ''} ${SCRIPT_SRC_HOSTS.join(' ')};
+  script-src 'self'${isDev ? " 'unsafe-eval'" : " 'wasm-unsafe-eval'"} ${SCRIPT_SRC_HOSTS.join(' ')};
   style-src 'self' 'unsafe-inline' ${STYLE_SRC_HOSTS.join(' ')};
   connect-src *;
   img-src 'self' blob: data: ${IMG_SRC_HOSTS.join(' ')};
-  font-src 'self' data: https://js.intercomcdn.com https://fonts.intercomcdn.com;
+  font-src 'self' data: https://js.intercomcdn.com https://fonts.intercomcdn.com https://fonts.googleapis.com https://fonts.gstatic.com;
   object-src 'none';
   base-uri 'self';
   form-action 'self';

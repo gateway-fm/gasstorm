@@ -135,7 +135,7 @@ export default function LoadTestPage() {
         // Use arrival timestamps (ms precision) since block timestamps are seconds
         const prevArrival = lastBlockArrivalRef.current;
         // Use configured block time as fallback for first block
-        const blockTimeMs = prevArrival !== null ? arrivedAt - prevArrival : (builder.blockTimeMs || 2000);
+        const blockTimeMs = prevArrival !== null ? arrivedAt - prevArrival : (builder.blockTimeMs || 1000);
         const blockTime = blockTimeMs / 1000; // Convert to seconds
 
         // Update ref for next block
