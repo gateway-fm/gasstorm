@@ -1,14 +1,7 @@
 "use client";
 
+import { ServiceIframe } from "@/components/layout/service-iframe";
+
 export default function BridgePage() {
-  return (
-    <div className="h-[calc(100vh-4rem)] w-full">
-      <iframe
-        src="http://localhost:18001"
-        className="h-full w-full border-0"
-        title="Hyperlane Bridge"
-        allow="clipboard-write"
-      />
-    </div>
-  );
+  return <ServiceIframe port={18001} title="Hyperlane Bridge" syncHash />;
 }

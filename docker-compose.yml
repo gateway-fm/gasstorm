@@ -413,7 +413,7 @@ services:
       - hyperlane-relayer-data:/data
       - hyperlane-config:/config:ro
     ports:
-      - "19090:9090" # Metrics
+      - "19190:9090" # Metrics (19090 conflicts with miden agglayer)
     entrypoint: [ "/app/relayer" ]
     command: []
     restart: unless-stopped
