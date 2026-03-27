@@ -21,18 +21,9 @@ interface IMailboxRecipient {
 
 contract TestMailbox {
     // Events (matching Hyperlane's Mailbox events)
-    event Dispatch(
-        address indexed sender,
-        uint32 indexed destination,
-        bytes32 indexed recipient,
-        bytes message
-    );
+    event Dispatch(address indexed sender, uint32 indexed destination, bytes32 indexed recipient, bytes message);
     event DispatchId(bytes32 indexed messageId);
-    event Process(
-        uint32 indexed origin,
-        bytes32 indexed sender,
-        address indexed recipient
-    );
+    event Process(uint32 indexed origin, bytes32 indexed sender, address indexed recipient);
     event ProcessId(bytes32 indexed messageId);
 
     // Domain ID for this mailbox
@@ -86,11 +77,11 @@ contract TestMailbox {
     /**
      * @notice Dispatch a message to a remote domain
      */
-    function dispatch(
-        uint32 _destinationDomain,
-        bytes32 _recipientAddress,
-        bytes calldata _messageBody
-    ) external payable returns (bytes32) {
+    function dispatch(uint32 _destinationDomain, bytes32 _recipientAddress, bytes calldata _messageBody)
+        external
+        payable
+        returns (bytes32)
+    {
         return _dispatchInternal(_destinationDomain, _recipientAddress, _messageBody, new bytes(0));
     }
 
@@ -104,11 +95,7 @@ contract TestMailbox {
         bytes memory _metadata
     ) internal returns (bytes32) {
         // Build the message
-        bytes memory message = _buildMessage(
-            _destinationDomain,
-            _recipientAddress,
-            _messageBody
-        );
+        bytes memory message = _buildMessage(_destinationDomain, _recipientAddress, _messageBody);
 
         // Compute message ID
         bytes32 messageId = keccak256(message);
@@ -151,10 +138,7 @@ contract TestMailbox {
 
         // Verify with ISM if configured
         if (defaultIsm != address(0)) {
-            require(
-                IMailboxISM(defaultIsm).verify(_metadata, _message),
-                "Mailbox: ISM verification failed"
-            );
+            require(IMailboxISM(defaultIsm).verify(_metadata, _message), "Mailbox: ISM verification failed");
         }
 
         // Mark as delivered
@@ -171,11 +155,11 @@ contract TestMailbox {
     /**
      * @notice Build a Hyperlane message
      */
-    function _buildMessage(
-        uint32 _destinationDomain,
-        bytes32 _recipientAddress,
-        bytes calldata _messageBody
-    ) internal view returns (bytes memory) {
+    function _buildMessage(uint32 _destinationDomain, bytes32 _recipientAddress, bytes calldata _messageBody)
+        internal
+        view
+        returns (bytes memory)
+    {
         return abi.encodePacked(
             VERSION,
             nonce,
@@ -228,7 +212,11 @@ contract TestMailbox {
         uint32, /* _destinationDomain */
         bytes32, /* _recipientAddress */
         bytes calldata /* _messageBody */
-    ) external pure returns (uint256) {
+    )
+        external
+        pure
+        returns (uint256)
+    {
         return 0; // No fee for POC
     }
 
@@ -236,7 +224,13 @@ contract TestMailbox {
      * @notice Get the ISM for a recipient
      * @dev Required by Hyperlane relayer to determine which ISM to use for verification
      */
-    function recipientIsm(address /* _recipient */) external view returns (address) {
+    function recipientIsm(
+        address /* _recipient */
+    )
+        external
+        view
+        returns (address)
+    {
         // Always return the default ISM for simplicity
         return defaultIsm;
     }

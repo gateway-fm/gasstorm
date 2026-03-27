@@ -44,12 +44,14 @@ get_sender_address() {
 # Get warp route contract addresses from deployment artifacts
 get_warp_addresses() {
     # First priority: Check Docker container for addresses (from hyperlane-init)
-    if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "gasstorm-relayer"; then
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "gasstorm-relayer\|gasstorm-hyperlane-init"; then
         local docker_addrs
-        docker_addrs=$(docker exec gasstorm-relayer cat /config/addresses.json 2>/dev/null || true)
+        docker_addrs=$(docker exec gasstorm-relayer cat /config/addresses.json 2>/dev/null || \
+                       docker exec gasstorm-hyperlane-init cat /output/addresses.json 2>/dev/null || true)
         if [ -n "$docker_addrs" ]; then
-            L1_WARP_ADDRESS=$(echo "$docker_addrs" | jq -r '.l1.warpRoute // empty' 2>/dev/null || true)
-            L2_WARP_ADDRESS=$(echo "$docker_addrs" | jq -r '.l2.warpRoute // empty' 2>/dev/null || true)
+            # Try exact keys first (l1/l2), then find by chain name pattern
+            L1_WARP_ADDRESS=$(echo "$docker_addrs" | jq -r '(.l1 // .l1local // .anvillocal // .besulocal // (to_entries | map(select(.key | test("l2") | not)) | first // empty | .value)).warpRoute // empty' 2>/dev/null || true)
+            L2_WARP_ADDRESS=$(echo "$docker_addrs" | jq -r '(.l2 // .l2local // (to_entries | map(select(.key | test("l2"))) | first // empty | .value)).warpRoute // empty' 2>/dev/null || true)
             if [ -n "$L1_WARP_ADDRESS" ]; then
                 log_info "Using addresses from Docker container"
                 return
@@ -175,8 +177,9 @@ bridge_deposit() {
     # Get quote for interchain gas payment
     log_step "Getting interchain gas quote..."
 
-    # L2 domain ID
-    local dest_domain=42069
+    # L2 domain ID — use chain ID as domain
+    local dest_domain
+    dest_domain=$(cast chain-id --rpc-url "$L2_RPC" 2>/dev/null || echo "42069")
 
     # Quote gas (simplified - 200k gas should be enough)
     local gas_quote

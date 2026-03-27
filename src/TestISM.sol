@@ -10,9 +10,14 @@ contract TestISM {
     uint8 public constant moduleType = 6; // NULL type - always accepts messages
 
     function verify(
-        bytes calldata, /* _metadata */
-        bytes calldata  /* _message */
-    ) external pure returns (bool) {
+        bytes calldata,
+        /* _metadata */
+        bytes calldata /* _message */
+    )
+        external
+        pure
+        returns (bool)
+    {
         return true; // Always accept
     }
 }
@@ -53,9 +58,13 @@ contract TestHook {
     }
 
     function postDispatch(
-        bytes calldata, /* metadata */
+        bytes calldata,
+        /* metadata */
         bytes calldata message
-    ) external payable {
+    )
+        external
+        payable
+    {
         // Track the message for merkle tree hook compatibility
         bytes32 messageId = keccak256(message);
         emit InsertedIntoTree(messageId, _count);
@@ -63,9 +72,14 @@ contract TestHook {
     }
 
     function quoteDispatch(
-        bytes calldata, /* metadata */
-        bytes calldata  /* message */
-    ) external pure returns (uint256) {
+        bytes calldata,
+        /* metadata */
+        bytes calldata /* message */
+    )
+        external
+        pure
+        returns (uint256)
+    {
         return 0; // No payment required
     }
 

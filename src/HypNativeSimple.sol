@@ -7,11 +7,10 @@ pragma solidity ^0.8.20;
  * @dev Simplified version for POC - handles ETH lock/unlock between chains
  */
 interface IMailbox {
-    function dispatch(
-        uint32 destinationDomain,
-        bytes32 recipientAddress,
-        bytes calldata messageBody
-    ) external payable returns (bytes32);
+    function dispatch(uint32 destinationDomain, bytes32 recipientAddress, bytes calldata messageBody)
+        external
+        payable
+        returns (bytes32);
 
     function process(bytes calldata metadata, bytes calldata message) external;
 }
@@ -22,16 +21,8 @@ interface IInterchainSecurityModule {
 
 contract HypNativeSimple {
     // Events
-    event SentTransferRemote(
-        uint32 indexed destination,
-        bytes32 indexed recipient,
-        uint256 amount
-    );
-    event ReceivedTransferRemote(
-        uint32 indexed origin,
-        bytes32 indexed recipient,
-        uint256 amount
-    );
+    event SentTransferRemote(uint32 indexed destination, bytes32 indexed recipient, uint256 amount);
+    event ReceivedTransferRemote(uint32 indexed origin, bytes32 indexed recipient, uint256 amount);
 
     // Hyperlane mailbox
     address public immutable mailbox;
@@ -85,11 +76,11 @@ contract HypNativeSimple {
      * @param _amount The amount to transfer (must match msg.value minus gas payment)
      * @return messageId The Hyperlane message ID
      */
-    function transferRemote(
-        uint32 _destination,
-        bytes32 _recipient,
-        uint256 _amount
-    ) external payable returns (bytes32) {
+    function transferRemote(uint32 _destination, bytes32 _recipient, uint256 _amount)
+        external
+        payable
+        returns (bytes32)
+    {
         require(routers[_destination] != bytes32(0), "No router for domain");
         require(msg.value >= _amount, "Insufficient value");
 
@@ -100,11 +91,8 @@ contract HypNativeSimple {
         uint256 gasPayment = msg.value - _amount;
 
         // Dispatch message via mailbox
-        bytes32 messageId = IMailbox(mailbox).dispatch{value: gasPayment}(
-            _destination,
-            routers[_destination],
-            messageBody
-        );
+        bytes32 messageId =
+            IMailbox(mailbox).dispatch{value: gasPayment}(_destination, routers[_destination], messageBody);
 
         emit SentTransferRemote(_destination, _recipient, _amount);
         return messageId;
@@ -114,7 +102,13 @@ contract HypNativeSimple {
      * @notice Quote gas payment for a transfer
      * @dev Returns 0 for simplicity in POC (no interchain gas paymaster)
      */
-    function quoteGasPayment(uint32 /* _destination */) external pure returns (uint256) {
+    function quoteGasPayment(
+        uint32 /* _destination */
+    )
+        external
+        pure
+        returns (uint256)
+    {
         return 0;
     }
 
@@ -124,11 +118,7 @@ contract HypNativeSimple {
      * @param _sender The sender address on origin chain
      * @param _message The message body
      */
-    function handle(
-        uint32 _origin,
-        bytes32 _sender,
-        bytes calldata _message
-    ) external onlyMailbox {
+    function handle(uint32 _origin, bytes32 _sender, bytes calldata _message) external onlyMailbox {
         require(_sender == routers[_origin], "Invalid router");
 
         // Decode the transfer
@@ -138,7 +128,7 @@ contract HypNativeSimple {
         address recipientAddr = address(uint160(uint256(recipient)));
 
         // Transfer ETH to recipient
-        (bool success, ) = recipientAddr.call{value: amount}("");
+        (bool success,) = recipientAddr.call{value: amount}("");
         require(success, "ETH transfer failed");
 
         emit ReceivedTransferRemote(_origin, recipient, amount);
@@ -160,7 +150,7 @@ contract HypNativeSimple {
      * @notice Withdraw stuck funds (emergency only)
      */
     function withdraw(uint256 amount) external onlyOwner {
-        (bool success, ) = owner.call{value: amount}("");
+        (bool success,) = owner.call{value: amount}("");
         require(success, "Withdraw failed");
     }
 }

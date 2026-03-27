@@ -22,10 +22,8 @@ contract ConfigureMailbox is Script {
     address constant L2_MAILBOX = 0x21e128Bbc4AF60777B3FbdBC6888f5d068fcB3d4;
 
     function run() external {
-        uint256 deployerKey = vm.envOr(
-            "PRIVATE_KEY",
-            uint256(0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80)
-        );
+        uint256 deployerKey =
+            vm.envOr("PRIVATE_KEY", uint256(0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80));
 
         vm.startBroadcast(deployerKey);
 

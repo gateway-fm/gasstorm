@@ -49,8 +49,9 @@ get_warp_addresses() {
         docker_addrs=$(docker exec gasstorm-relayer cat /config/addresses.json 2>/dev/null || \
                        docker exec gasstorm-hyperlane-init cat /output/addresses.json 2>/dev/null || true)
         if [ -n "$docker_addrs" ]; then
-            L1_WARP_ADDRESS=$(echo "$docker_addrs" | jq -r '.l1.warpRoute // empty' 2>/dev/null || true)
-            L2_WARP_ADDRESS=$(echo "$docker_addrs" | jq -r '.l2.warpRoute // empty' 2>/dev/null || true)
+            # Try exact keys first (l1/l2), then find by chain name pattern
+            L1_WARP_ADDRESS=$(echo "$docker_addrs" | jq -r '(.l1 // .l1local // .anvillocal // .besulocal // (to_entries | map(select(.key | test("l2") | not)) | first // empty | .value)).warpRoute // empty' 2>/dev/null || true)
+            L2_WARP_ADDRESS=$(echo "$docker_addrs" | jq -r '(.l2 // .l2local // (to_entries | map(select(.key | test("l2"))) | first // empty | .value)).warpRoute // empty' 2>/dev/null || true)
             if [ -n "$L2_WARP_ADDRESS" ]; then
                 log_info "Using addresses from Docker container"
                 return
@@ -183,8 +184,9 @@ bridge_withdraw() {
     # Get quote for interchain gas payment
     log_step "Getting interchain gas quote..."
 
-    # L1 domain ID (Anvil's domain, NOT chain ID)
-    local dest_domain=31337
+    # L1 domain ID — use chain ID as domain (works for both Anvil=31337 and Besu=1337)
+    local dest_domain
+    dest_domain=$(cast chain-id --rpc-url "$L1_RPC" 2>/dev/null || echo "31337")
 
     # Quote gas (simplified - 200k gas should be enough)
     local gas_quote
