@@ -16,16 +16,18 @@ export function useChainData() {
 
   const fetchL1Data = useCallback(async () => {
     try {
-      const [blockNumber, chainId, gasPrice] = await Promise.all([
+      const [blockNumber, chainId, gasPrice, clientName] = await Promise.all([
         l1.getBlockNumber(),
         l1.getChainId(),
         l1.getGasPrice(),
+        l1.getClientVersion().catch(() => undefined),
       ]);
 
       setL1Status({
         isOnline: true,
         blockNumber,
         chainId,
+        clientName,
         gasPrice,
       });
       return true;

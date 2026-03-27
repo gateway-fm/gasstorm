@@ -25,28 +25,29 @@ export function SolidButton(
   const color = _color ?? 'primary';
 
   const base =
-    'flex items-center justify-center rounded-md transition-all duration-300 active:scale-[0.98] disabled:cursor-not-allowed';
+    'flex items-center justify-center rounded transition-all duration-500 active:scale-95';
   let baseColors, onHover;
   if (color === 'primary') {
     baseColors = 'bg-primary-500 text-white';
-    onHover = 'hover:bg-primary-400 hover:shadow-primary';
+    onHover = 'hover:bg-primary-600';
   } else if (color === 'accent') {
-    baseColors = 'bg-accent-500 text-white';
-    onHover = 'hover:bg-accent-400 hover:shadow-primary';
+    baseColors = 'bg-accent-gradient text-white shadow-accent-glow';
+    onHover = 'hover:opacity-90';
   } else if (color === 'green') {
     baseColors = 'bg-green-500 text-white';
     onHover = 'hover:bg-green-600';
   } else if (color === 'red') {
-    baseColors = 'bg-red-600 text-white';
-    onHover = 'hover:bg-red-500';
+    baseColors = 'bg-error-gradient text-white shadow-error-glow';
+    onHover = 'hover:opacity-90';
   } else if (color === 'white') {
-    baseColors = 'bg-slate-100 text-slate-900';
-    onHover = 'hover:bg-white';
+    baseColors = 'bg-white text-black';
+    onHover = 'hover:bg-primary-100';
   } else if (color === 'gray') {
-    baseColors = 'bg-slate-800 text-primary-200';
-    onHover = 'hover:bg-slate-700';
+    baseColors = 'bg-gray-100 text-primary-500';
+    onHover = 'hover:bg-gray-200';
   }
-  const onDisabled = 'disabled:bg-slate-700 disabled:text-slate-400';
+  const onDisabled =
+    'disabled:bg-gray-300 disabled:text-gray-500 disabled:shadow-none disabled:bg-none';
   const weight = bold ? 'font-semibold' : '';
   const allClasses = `${base} ${baseColors} ${onHover} ${onDisabled} ${weight} ${className}`;
 

@@ -1,0 +1,89 @@
+# Docker Compose overlay: replaces Anvil L1 with Hyperledger Besu
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose-besu-l1.yaml \
+#       --profile reth --profile bridge --profile explorer --profile explorer-l1 \
+#       up --build -d
+#
+# Or simply:
+#   make run-besu-reth-hyperlane
+#
+# Besu runs as a sovereign chain (Clique dev mode, chain ID 1337) with
+# pre-funded Anvil test accounts. All existing services that depend on
+# the "l1" service work automatically since the service name is unchanged.
+
+services:
+  # Override L1 from Anvil to Besu (Clique dev mode)
+  l1:
+    image: hyperledger/besu:${BESU_VERSION:-24.12.2}
+    container_name: gasstorm-l1
+    entrypoint: ["besu"]
+    command:
+      [
+        "--genesis-file=/config/besu-dev-genesis.json",
+        "--node-private-key-file=/config/besu-node-key",
+        "--data-path=/data",
+        # HTTP RPC
+        "--rpc-http-enabled",
+        "--rpc-http-host=0.0.0.0",
+        "--rpc-http-port=8545",
+        "--rpc-http-api=ETH,NET,WEB3,TXPOOL,ADMIN",
+        # WebSocket RPC
+        "--rpc-ws-enabled",
+        "--rpc-ws-host=0.0.0.0",
+        "--rpc-ws-port=8546",
+        "--rpc-ws-api=ETH,NET,WEB3",
+        # Access control
+        "--host-allowlist=*",
+        "--rpc-http-cors-origins=all",
+        # Mining (Clique signer = Anvil Account #0)
+        "--min-gas-price=0",
+        "--miner-enabled",
+        "--miner-coinbase=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+        # Logging
+        "--logging=INFO",
+      ]
+    ports:
+      # Note: 18545:8545 comes from the base docker-compose.yml (ports are merged)
+      - "18549:8546"
+    volumes:
+      - ./genesis/besu-dev-genesis.json:/config/besu-dev-genesis.json:ro
+      - ./genesis/besu-node-key:/config/besu-node-key:ro
+      - besu-data:/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "bash -c 'echo > /dev/tcp/localhost/8545' 2>/dev/null",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+    restart: unless-stopped
+
+  # Override Hyperlane init environment for Besu chain params
+  hyperlane-init:
+    environment:
+      - L1_RPC=http://l1:8545
+      - L2_RPC=http://block-builder:3000
+      - HYP_KEY=${HYP_KEY:-0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d}
+      - OUTPUT_DIR=/output
+      - MONITOR_INTERVAL=30
+      # Besu chain configuration
+      - L1_CHAIN_NAME=besulocal
+      - L1_DOMAIN=1337
+      - L1_CHAIN_ID=1337
+      - L1_BLOCK_TIME=2
+
+  # Override bridge UI build args for Besu chain name in RPC overrides
+  hyperlane-bridge-ui:
+    build:
+      context: ./bridge-ui
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_WALLET_CONNECT_ID=${WALLET_CONNECT_ID:-00000000000000000000000000000000}
+        - NEXT_PUBLIC_RPC_OVERRIDES={"besulocal":{"http":"http://host.docker.internal:18545"},"l2local":{"http":"http://host.docker.internal:13000"}}
+
+volumes:
+  besu-data:

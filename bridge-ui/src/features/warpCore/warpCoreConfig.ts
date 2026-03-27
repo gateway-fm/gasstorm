@@ -3,6 +3,7 @@ import {
   warpRouteConfigs as publishedRegistryWarpRoutes,
 } from '@hyperlane-xyz/registry';
 import {
+  ChainName,
   TOKEN_STANDARD_TO_PROTOCOL,
   TokenStandard,
   WarpCoreConfig,
@@ -10,40 +11,24 @@ import {
   getTokenConnectionId,
   validateZodResult,
 } from '@hyperlane-xyz/sdk';
-import { isObjEmpty, objFilter, objMerge } from '@hyperlane-xyz/utils';
+import { isObjEmpty, normalizeAddress, objFilter, objMerge } from '@hyperlane-xyz/utils';
 import { config } from '../../consts/config.ts';
 import { warpRouteWhitelist } from '../../consts/warpRouteWhitelist.ts';
-import { buildWarpRouteConfig, DEFAULT_WARP_ADDRESSES } from '../../consts/warpRoutes.ts';
+import { warpRouteConfigs as tsWarpRoutes } from '../../consts/warpRoutes.ts';
 import yamlWarpRoutes from '../../consts/warpRoutes.yaml';
 import { logger } from '../../utils/logger.ts';
-import { loadDynamicAddresses } from '../../utils/dynamicConfig.ts';
+
+// Map of chain -> address -> wireDecimals
+export type WireDecimalsMap = Record<ChainName, Record<string, number>>;
 
 export async function assembleWarpCoreConfig(
   storeOverrides: WarpCoreConfig[],
   registry: IRegistry,
-): Promise<WarpCoreConfig> {
-  // Load dynamic addresses from deployment endpoint
-  // This is critical for bridge-ui to work with fresh hyperlane-init deployments
-  const dynamicAddresses = await loadDynamicAddresses();
-
-  // Build warp route config with dynamic addresses if available, otherwise use defaults
-  const l1WarpRoute = dynamicAddresses.l1WarpRoute || DEFAULT_WARP_ADDRESSES.l1;
-  const l2WarpRoute = dynamicAddresses.l2WarpRoute || DEFAULT_WARP_ADDRESSES.l2;
-  const dynamicWarpRoutes = buildWarpRouteConfig(l1WarpRoute, l2WarpRoute);
-
-  if (dynamicAddresses.loadedFromDynamic) {
-    logger.debug('Using dynamic warp route addresses:', { l1WarpRoute, l2WarpRoute });
-  } else {
-    logger.debug('Using default warp route addresses (dynamic loading failed)');
-  }
-
-  // Use dynamic config instead of static tsWarpRoutes
-  const tsResult = WarpCoreConfigSchema.safeParse(dynamicWarpRoutes);
-  const tsConfig = validateZodResult(tsResult, 'warp core typescript config');
-
-  // Parse yaml config (kept for backwards compatibility, but dynamic takes precedence)
+): Promise<{ config: WarpCoreConfig; wireDecimalsMap: WireDecimalsMap }> {
   const yamlResult = WarpCoreConfigSchema.safeParse(yamlWarpRoutes);
   const yamlConfig = validateZodResult(yamlResult, 'warp core yaml config');
+  const tsResult = WarpCoreConfigSchema.safeParse(tsWarpRoutes);
+  const tsConfig = validateZodResult(tsResult, 'warp core typescript config');
 
   let registryWarpRoutes: Record<string, WarpCoreConfig>;
 
@@ -64,6 +49,10 @@ export async function assembleWarpCoreConfig(
     ? filterToIds(registryWarpRoutes, warpRouteWhitelist)
     : registryWarpRoutes;
   filteredRegistryConfigMap = fillMissingCoinGeckoIds(filteredRegistryConfigMap);
+
+  // Build wireDecimalsMap BEFORE flattening - this preserves route grouping
+  const wireDecimalsMap = buildWireDecimalsMap(filteredRegistryConfigMap);
+
   const filteredRegistryConfigValues = Object.values(filteredRegistryConfigMap);
   const filteredRegistryTokens = filteredRegistryConfigValues.map((c) => c.tokens).flat();
   const filteredRegistryOptions = filteredRegistryConfigValues.map((c) => c.options).flat();
@@ -92,7 +81,22 @@ export async function assembleWarpCoreConfig(
       'No warp route configs provided. Please check your registry, warp route whitelist, and custom route configs for issues.',
     );
 
-  return { tokens, options };
+  return { config: { tokens, options }, wireDecimalsMap };
+}
+
+// Build map of chain -> address -> wireDecimals before tokens are flattened
+// wireDecimals = max decimals across all tokens in a warp route
+function buildWireDecimalsMap(routes: Record<string, WarpCoreConfig>): WireDecimalsMap {
+  const map: WireDecimalsMap = {};
+  for (const routeConfig of Object.values(routes)) {
+    const wireDecimals = Math.max(...routeConfig.tokens.map((t) => t.decimals ?? 18));
+    for (const token of routeConfig.tokens) {
+      if (!token.addressOrDenom) continue;
+      map[token.chainName] ||= {};
+      map[token.chainName][normalizeAddress(token.addressOrDenom)] = wireDecimals;
+    }
+  }
+  return map;
 }
 
 // Fill missing coinGeckoIds within each warp route

@@ -50,9 +50,15 @@ func registerExplorerStats(s *server.MCPServer, client *httpClient) {
 		if err := json.Unmarshal(raw, &m); err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Parsing stats: %v", err)), nil
 		}
+		latestBlock := getFloat(m, "latestBlock")
+		if latestBlock == 0 {
+			if latest, err := fetchLatestBlockNumber(client); err == nil {
+				latestBlock = latest
+			}
+		}
 		return mcp.NewToolResultText(joinLines(
 			sectionf("Explorer Stats"),
-			kvf("Latest Block", formatNumber(getFloat(m, "latestBlock"))),
+			kvf("Latest Block", formatNumber(latestBlock)),
 			kvf("Total Blocks", formatNumber(getFloat(m, "totalBlocks"))),
 			kvf("Total TXs", formatNumber(getFloat(m, "totalTransactions"))),
 			kvf("Total Addresses", formatNumber(getFloat(m, "totalAddresses"))),
@@ -77,7 +83,7 @@ func registerExplorerBlocks(s *server.MCPServer, client *httpClient) {
 		}
 
 		lines := sectionf("Recent Blocks") + "\n"
-		blocks, _ := m["blocks"].([]any)
+		blocks := getBlocksPayload(m)
 		if len(blocks) == 0 {
 			lines += "No blocks indexed yet."
 			return mcp.NewToolResultText(lines), nil
@@ -87,11 +93,15 @@ func registerExplorerBlocks(s *server.MCPServer, client *httpClient) {
 			if !ok {
 				continue
 			}
+			timestamp := getString(block, "timestamp")
+			if timestamp == "" {
+				timestamp = formatNumber(getFloat(block, "timestamp"))
+			}
 			lines += fmt.Sprintf("\n### Block %s\n", formatNumber(getFloat(block, "number")))
 			lines += joinLines(
 				kvf("TXs", formatNumber(getFloat(block, "transactionCount"))),
 				kvf("Gas Used", formatNumber(getFloat(block, "gasUsed"))),
-				kvf("Timestamp", getString(block, "timestamp")),
+				kvf("Timestamp", timestamp),
 			) + "\n"
 		}
 		return mcp.NewToolResultText(lines), nil
@@ -181,4 +191,34 @@ func registerExplorerSearch(s *server.MCPServer, client *httpClient) {
 			string(pretty),
 		)), nil
 	})
+}
+
+func fetchLatestBlockNumber(client *httpClient) (float64, error) {
+	raw, err := client.get("/api/blocks?limit=1")
+	if err != nil {
+		return 0, err
+	}
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return 0, err
+	}
+	blocks := getBlocksPayload(m)
+	if len(blocks) == 0 {
+		return 0, nil
+	}
+	block, ok := blocks[0].(map[string]any)
+	if !ok {
+		return 0, nil
+	}
+	return getFloat(block, "number"), nil
+}
+
+func getBlocksPayload(m map[string]any) []any {
+	if blocks, ok := m["blocks"].([]any); ok {
+		return blocks
+	}
+	if blocks, ok := m["data"].([]any); ok {
+		return blocks
+	}
+	return nil
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useWebSocketContext } from "@/contexts/websocket-context";
+import { useChainStore } from "@/stores/chain-store";
 
 interface NavItem {
   label: string;
@@ -19,16 +20,6 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/", match: (p) => p === "/" || p === "" },
   { label: "Load Test", href: "/load-test", match: matchExact("/load-test") },
   { label: "History", href: "/load-test/history", match: (p) => p.startsWith("/load-test/history") },
-  { label: "Bridge", href: "/bridge", match: matchExact("/bridge") },
-];
-
-const SERVICE_ITEMS: NavItem[] = [
-  { label: "L1 Explorer", href: "/explorer-l1", match: matchExact("/explorer-l1") },
-  { label: "L2 Explorer", href: "/explorer-l2", match: matchExact("/explorer-l2") },
-  { label: "Blob DA", href: "/blob-da", match: matchExact("/blob-da") },
-  { label: "Bridge UI", href: "/bridge-ui", match: matchExact("/bridge-ui") },
-  { label: "Privacy", href: "/privacy", match: matchExact("/privacy") },
-  { label: "Docs", href: "/docs", match: matchExact("/docs") },
 ];
 
 function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
@@ -50,6 +41,30 @@ function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
 export function Header() {
   const pathname = usePathname();
   const { l1Connected, l2Connected, loadGenConnected } = useWebSocketContext();
+  const explorer = useChainStore((state) => state.explorer);
+  const explorerL1 = useChainStore((state) => state.explorerL1);
+  const privacyProxy = useChainStore((state) => state.privacyProxy);
+  const bridge = useChainStore((state) => state.bridge);
+  const blobDA = useChainStore((state) => state.blobDA);
+
+  const optionalItems: NavItem[] = [
+    ...(bridge.relayerOnline || bridge.uiOnline
+      ? [{ label: "Bridge", href: "/bridge", match: matchExact("/bridge") }]
+      : []),
+    ...(blobDA.isOnline
+      ? [{ label: "Blob DA", href: "/blob-da", match: matchExact("/blob-da") }]
+      : []),
+    ...(explorerL1.isOnline
+      ? [{ label: "L1 Explorer", href: "/explorer-l1", match: matchExact("/explorer-l1") }]
+      : []),
+    ...(explorer.isOnline
+      ? [{ label: "L2 Explorer", href: "/explorer-l2", match: matchExact("/explorer-l2") }]
+      : []),
+    ...(privacyProxy.isOnline
+      ? [{ label: "Privacy", href: "/privacy", match: matchExact("/privacy") }]
+      : []),
+    { label: "Docs", href: "/docs", match: matchExact("/docs") },
+  ];
 
   return (
     <header className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-50">
@@ -73,8 +88,8 @@ export function Header() {
             {NAV_ITEMS.map((item) => (
               <NavLink key={item.href} item={item} pathname={pathname} />
             ))}
-            <span className="text-muted-foreground/30 select-none">|</span>
-            {SERVICE_ITEMS.map((item) => (
+            {optionalItems.length > 0 && <span className="text-muted-foreground/30 select-none">|</span>}
+            {optionalItems.map((item) => (
               <NavLink key={item.href} item={item} pathname={pathname} />
             ))}
           </nav>

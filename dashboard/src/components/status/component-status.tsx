@@ -45,16 +45,18 @@ export function ComponentStatus() {
   const { l1, l2, builder, explorer, explorerL1, privacyProxy, bridge, blobDA, loadgen } = useChainStore();
   const loadTest = useGoLoadTestStore();
 
+  const l1Name = l1.clientName ? `L1 (${l1.clientName})` : "L1";
+
   const rows: ComponentRow[] = [
     {
-      name: "L1 (Anvil)",
+      name: l1Name,
       online: l1.isOnline,
       metrics: l1.isOnline
         ? `Block: ${l1.blockNumber.toLocaleString()} | Chain ID: ${l1.chainId}`
         : undefined,
     },
     {
-      name: "L2 (op-reth)",
+      name: "L2 (Execution Layer)",
       online: l2.isOnline,
       metrics: l2.isOnline
         ? `Block: ${l2.blockNumber.toLocaleString()} | Chain ID: ${l2.chainId}`

@@ -23,6 +23,7 @@ export const navigation: NavGroup[] = [
     title: "Usage",
     items: [
       { title: "Load Testing", href: "/docs/load-testing" },
+      { title: "Cross-Chain Bridging", href: "/docs/bridging" },
       { title: "MCP Integration", href: "/docs/mcp" },
     ],
   },

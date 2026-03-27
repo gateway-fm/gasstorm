@@ -1,0 +1,18 @@
+# Hyperlane Chain Metadata - Besu (sovereign L1, Clique dev mode)
+# Docker-internal hostname for init container (replaces Anvil as l1 service)
+
+name: besulocal
+chainId: 1337
+domainId: 1337
+protocol: ethereum
+rpcUrls:
+  - http: http://l1:8545
+nativeToken:
+  name: Ether
+  symbol: ETH
+  decimals: 18
+blocks:
+  confirmations: 1
+  reorgPeriod: 0
+  estimateBlockTime: 5
+isTestnet: true

@@ -15,58 +15,44 @@ interface IHypNativeSimple {
  *
  * Usage:
  *   # Set environment variables with the deployed addresses first!
- *   export L1_WARP=0x...
- *   export L2_WARP=0x...
+ *   export LOCAL_WARP=0x...   # Warp route on the chain you're deploying to
+ *   export REMOTE_WARP=0x...  # Warp route on the other chain
+ *   export REMOTE_DOMAIN=42069  # Hyperlane domain ID of the other chain
  *
- *   # Enroll L2 router on L1 warp route
+ *   # Enroll remote router on local warp route
  *   forge script script/EnrollRouters.s.sol --rpc-url http://localhost:18545 --broadcast
- *
- *   # Enroll L1 router on L2 warp route
- *   forge script script/EnrollRouters.s.sol --rpc-url http://localhost:13000 --broadcast
  */
 contract EnrollRouters is Script {
-    // Domain IDs
-    uint32 constant L1_DOMAIN = 31337;
-    uint32 constant L2_DOMAIN = 42069;
-
     function run() external {
         uint256 deployerKey =
             vm.envOr("PRIVATE_KEY", uint256(0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80));
 
-        // Get warp route addresses from environment
-        address l1Warp = vm.envAddress("L1_WARP");
-        address l2Warp = vm.envAddress("L2_WARP");
+        // Get warp route addresses and remote domain from environment
+        // LOCAL_WARP: the warp route on the current chain
+        // REMOTE_WARP: the warp route on the remote chain
+        // REMOTE_DOMAIN: the Hyperlane domain ID of the remote chain
+        address localWarp = vm.envAddress("LOCAL_WARP");
+        address remoteWarp = vm.envAddress("REMOTE_WARP");
+        uint32 remoteDomain = uint32(vm.envUint("REMOTE_DOMAIN"));
 
-        require(l1Warp != address(0), "L1_WARP not set");
-        require(l2Warp != address(0), "L2_WARP not set");
+        require(localWarp != address(0), "LOCAL_WARP not set");
+        require(remoteWarp != address(0), "REMOTE_WARP not set");
+        require(remoteDomain != 0, "REMOTE_DOMAIN not set");
 
-        console.log("L1 Warp Route:", l1Warp);
-        console.log("L2 Warp Route:", l2Warp);
+        console.log("Local Warp Route:", localWarp);
+        console.log("Remote Warp Route:", remoteWarp);
+        console.log("Remote Domain:", remoteDomain);
 
         vm.startBroadcast(deployerKey);
 
-        // Determine which chain we're on and enroll the remote router
-        if (block.chainid == 31337) {
-            // We're on L1, enroll L2 router
-            console.log("On L1, enrolling L2 router...");
-            IHypNativeSimple(l1Warp).enrollRemoteRouter(L2_DOMAIN, bytes32(uint256(uint160(l2Warp))));
-            console.log("Enrolled L2 router on L1 warp route");
+        // Enroll the remote router on the local warp route
+        console.log("Enrolling remote router...");
+        IHypNativeSimple(localWarp).enrollRemoteRouter(remoteDomain, bytes32(uint256(uint160(remoteWarp))));
+        console.log("Enrolled remote router on local warp route");
 
-            // Verify
-            bytes32 enrolled = IHypNativeSimple(l1Warp).routers(L2_DOMAIN);
-            console.log("L1 routers[L2_DOMAIN] =", vm.toString(enrolled));
-        } else if (block.chainid == 42069) {
-            // We're on L2, enroll L1 router
-            console.log("On L2, enrolling L1 router...");
-            IHypNativeSimple(l2Warp).enrollRemoteRouter(L1_DOMAIN, bytes32(uint256(uint160(l1Warp))));
-            console.log("Enrolled L1 router on L2 warp route");
-
-            // Verify
-            bytes32 enrolled = IHypNativeSimple(l2Warp).routers(L1_DOMAIN);
-            console.log("L2 routers[L1_DOMAIN] =", vm.toString(enrolled));
-        } else {
-            revert("Unknown chain ID");
-        }
+        // Verify
+        bytes32 enrolled = IHypNativeSimple(localWarp).routers(remoteDomain);
+        console.log("routers[remoteDomain] =", vm.toString(enrolled));
 
         vm.stopBroadcast();
 

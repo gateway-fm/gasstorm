@@ -47,6 +47,22 @@ Start the GasStorm stack with a profile. **Mutating.**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `profile` | string | No | Docker Compose profile: `reth` (default), `cdk-erigon`, `gravity-reth` |
+| `with` | string | No | Optional features CSV: `blob`, `privacy`, `explorer`, `bridge`, `bridge-ui` |
+| `metal` | boolean | No | Start in metal mode (core services only) |
+| `gasless` | boolean | No | Enable gasless mode (`reth` only) |
+| `bridge` | boolean | No | Legacy compatibility flag (same as adding `bridge` to `with`) |
+| `bridge_ui` | boolean | No | Legacy compatibility flag (same as adding `bridge-ui` to `with`) |
+| `blob` | boolean | No | Legacy compatibility flag (same as adding `blob` to `with`) |
+
+Default `with` behavior:
+- `profile=reth` -> `blob,privacy,explorer`
+- `profile=cdk-erigon` / `gravity-reth` -> `privacy,explorer`
+
+Validation rules:
+- `blob` requires `profile=reth` or `profile=cdk-erigon` (`profile=cdk-erigon` maps to `blob-cdk`)
+- `bridge`, `bridge-ui` require `profile=reth`
+- `bridge-ui` requires `bridge`
+- `metal=true` does not allow optional features
 
 #### `stack_down`
 
@@ -101,6 +117,8 @@ All [load generator tools](https://github.com/gateway-fm/loadgenerator/blob/main
 With Claude Code or OpenCode, you can manage the full stack conversationally:
 
 - "Start the stack with the reth profile"
+- "Start the stack with reth plus bridge and bridge-ui"
+- "Start the stack in metal mode"
 - "What's the stack status?"
 - "Show me the block builder logs"
 - "Set BLOCK_TIME_MS to 250 and restart the block builder"

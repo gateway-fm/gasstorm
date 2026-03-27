@@ -1,6 +1,4 @@
-# Local development chains for GasStorm
-# L1: Anvil (local Ethereum)
-# L2: op-reth (Optimism-style L2)
+# GasStorm local development chains
 ---
 l1local:
   chainId: 31337
@@ -14,12 +12,29 @@ l1local:
     name: Ether
     symbol: ETH
     decimals: 18
-  blockExplorers: []
   blocks:
     confirmations: 1
     reorgPeriod: 0
     estimateBlockTime: 12
-  logoURI: /logos/ethereum.svg
+  isTestnet: true
+
+besulocal:
+  chainId: 1337
+  domainId: 1337
+  name: besulocal
+  displayName: Besu
+  protocol: ethereum
+  rpcUrls:
+    - http: http://localhost:18545
+  nativeToken:
+    name: Ether
+    symbol: ETH
+    decimals: 18
+  blocks:
+    confirmations: 1
+    reorgPeriod: 0
+    estimateBlockTime: 5
+  isTestnet: true
 
 l2local:
   chainId: 42069
@@ -33,9 +48,8 @@ l2local:
     name: Ether
     symbol: ETH
     decimals: 18
-  blockExplorers: []
   blocks:
     confirmations: 1
     reorgPeriod: 0
     estimateBlockTime: 1
-  logoURI: /logos/optimism.svg
+  isTestnet: true

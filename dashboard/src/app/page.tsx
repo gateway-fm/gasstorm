@@ -5,12 +5,10 @@ import { ComponentStatus } from "@/components/status/component-status";
 import { ActivityFeed } from "@/components/status/activity-feed";
 import { useChainStore } from "@/stores/chain-store";
 import { useActivityFeedStore } from "@/stores/activity-feed-store";
-import { useChainData } from "@/hooks/use-rpc";
 import { useActivityEmitter } from "@/hooks/use-activity-emitter";
 import { useL1NewHead, useL2NewHead } from "@/contexts/websocket-context";
 
 export default function DashboardPage() {
-  useChainData();
   useActivityEmitter();
 
   const {

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { l1, l2 } from "@/lib/rpc-client";
+import { useChainStore } from "@/stores/chain-store";
 import { RPC_ENDPOINTS, HYPERLANE_CONTRACTS, BRIDGE_ACCOUNT, WARP_ROUTE_ABI } from "@/types/chain";
 
 import { BridgeSelector } from "./BridgeSelector";
@@ -166,6 +167,7 @@ async function loadHyperlaneAddresses(): Promise<{
 }
 
 export function BridgePanel() {
+  const l1ClientName = useChainStore((s) => s.l1.clientName);
   const [l1Balance, setL1Balance] = useState<bigint>(0n);
   const [l2Balance, setL2Balance] = useState<bigint>(0n);
   const [l1WarpBalance, setL1WarpBalance] = useState<bigint>(0n);
@@ -484,7 +486,7 @@ export function BridgePanel() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-muted-foreground">L1 (Anvil)</Label>
+                  <Label className="text-muted-foreground">L1 ({l1ClientName ?? "Anvil"})</Label>
                   <div className="text-2xl font-bold">{formatEth(l1Balance)} ETH</div>
                 </div>
                 <div className="space-y-2">

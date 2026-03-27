@@ -23,8 +23,8 @@ export function useActivityEmitter() {
     // --- Chain store: health transitions ---
     type HealthKey = { field: string; label: string; source: Parameters<typeof addEvent>[0] };
     const healthKeys: HealthKey[] = [
-      { field: "l1", label: "L1 (Anvil)", source: "l1" },
-      { field: "l2", label: "L2 (op-reth)", source: "l2" },
+      { field: "l1", label: `L1 (${useChainStore.getState().l1.clientName ?? "Anvil"})`, source: "l1" },
+      { field: "l2", label: "L2 (Execution Layer)", source: "l2" },
       { field: "builder", label: "Block Builder", source: "builder" },
       { field: "explorer", label: "L2 Explorer", source: "explorer" },
       { field: "explorerL1", label: "L1 Explorer", source: "explorer-l1" },

@@ -21,15 +21,16 @@ Both the block-builder and load-generator are maintained in separate repositorie
 |-----------|-------|--------|
 | block-builder | `gatewayfm/blockbuilder` | [github.com/gateway-fm/blockbuilder](https://github.com/gateway-fm/blockbuilder) |
 | load-generator | `gatewayfm/loadgenerator` | [github.com/gateway-fm/loadgenerator](https://github.com/gateway-fm/loadgenerator) |
-| privacy-proxy | `gatewayfm/privacy-proxy` | [github.com/gateway-fm/privacy-proxy](https://github.com/gateway-fm/privacy-proxy) |
-| block-explorer | `gatewayfm/block-explorer` | [github.com/gateway-fm/block-explorer](https://github.com/gateway-fm/block-explorer) |
+| privacy-proxy | `gatewayfm/privacy-proxy` (local build only) | [github.com/gateway-fm/privacy-proxy](https://github.com/gateway-fm/privacy-proxy) |
+| block-explorer-api | `gatewayfm/block-explorer-api` | [github.com/gateway-fm/block-explorer](https://github.com/gateway-fm/block-explorer) |
+| block-explorer-indexer | `gatewayfm/block-explorer-indexer` | [github.com/gateway-fm/block-explorer](https://github.com/gateway-fm/block-explorer) |
+| block-explorer-frontend | `gatewayfm/block-explorer-frontend` | [github.com/gateway-fm/block-explorer](https://github.com/gateway-fm/block-explorer) |
 
 To use specific versions:
 ```bash
 BLOCKBUILDER_VERSION=v1.0.0 make run-reth
 LOADGENERATOR_VERSION=v1.0.0 make run-reth
 BLOCK_EXPLORER_VERSION=v1.0.0 make run-with-explorer
-PRIVACY_PROXY_VERSION=v1.0.0 make run-with-privacy
 ```
 
 For local development with sibling repos:

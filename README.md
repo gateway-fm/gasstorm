@@ -9,17 +9,20 @@ GasStorm is a local-first blockchain sequencer testbed that orchestrates an op-r
 ## Quick Start
 
 ```bash
-# Default stack (op-reth + block-builder + Hyperlane bridge + Blob DA infra)
-make run
+# Recommended default: cdk-erigon + L1/L2 + blob-da + privacy + L1/L2 explorers
+make up PROFILE=cdk-erigon WITH=blob,privacy,explorer
 
-# op-reth + block-builder only (disable default bridge + blob infra)
-ENABLE_HYPERLANE_BRIDGE=false ENABLE_BLOB_DA=false make run
+# Same services on op-reth + external block-builder
+make up PROFILE=reth WITH=blob,privacy,explorer
 
-# cdk-erigon standalone sequencer
-make run-cdk-erigon
+# Full stack on op-reth (adds bridge + bridge-ui)
+make up PROFILE=reth WITH=blob,privacy,explorer,bridge,bridge-ui
 
-# Fast blocks with preconfirmations
-BLOCK_TIME_MS=250 ENABLE_PRECONFIRMATIONS=true make run-reth
+# Core only (no optional profiles)
+make up PROFILE=cdk-erigon WITH=
+
+# Metal mode (core services only)
+make up MODE=metal
 
 # Open dashboard
 open http://localhost:18000/load-test/
@@ -111,7 +114,7 @@ Run all components natively on the host machine with no Docker overhead. Elimina
 
 ```bash
 # Start (builds Go binaries, starts all 4 services)
-make run-metal
+make up MODE=metal
 
 # Stop
 make stop-metal
@@ -123,7 +126,7 @@ make restart-metal
 make clean-metal
 ```
 
-Services use the same ports as Docker mode (dashboard: 3000, builder: 13000, loadgen: 13001, reth: 18546). Configuration is read from `.env` just like Docker mode.
+Services use the same ports as Docker mode (dashboard: 3000, builder: 13000, loadgen: 13001, reth: 18546). Configuration is read from `.env` just like Docker mode. Optional profiles (`blob`, `privacy`, `explorer`, `bridge`) are Docker-only.
 
 Metal mode writes PID files to `data/metal/pids/` and logs to `data/metal/logs/`. The MCP tools (`stack_status`, `stack_logs`, etc.) auto-detect which mode is active.
 
@@ -149,20 +152,23 @@ make stop
 GasStorm uses additive Docker Compose profiles for optional services. These run alongside the core stack without affecting block builder performance.
 
 ```bash
-# Block explorer
-make run-with-explorer
+# Default profile set (reth): blob + privacy + explorer
+make up
+
+# Block explorer only
+make up WITH=explorer
 
 # Privacy proxy (RPC access control)
-make run-with-privacy
+make up WITH=privacy
 
 # Both explorer + privacy
-make run-with-explorer-privacy
+make up WITH=explorer,privacy
 
 # Blob DA (EIP-4844 data availability)
-make run-with-blob
+make up WITH=blob
 
 # Hyperlane bridge + Warp UI
-make run-with-bridge
+make up WITH=bridge,bridge-ui
 ```
 
 ### Block Explorer

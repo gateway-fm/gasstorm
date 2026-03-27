@@ -1,10 +1,9 @@
 # Hyperlane Init Container
-# Deploys Hyperlane core and warp route contracts on startup
+# Deploys Hyperlane core contracts via CLI, warp routes via ethers.js
 
-# Use glibc-based image for Foundry compatibility
 FROM node:20-slim
 
-# Install dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl bash jq python3 python3-pip build-essential git ca-certificates libssl-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -12,49 +11,40 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install pycryptodome for keccak hashing
 RUN pip3 install --break-system-packages pycryptodome
 
-# Foundry version - pinned for reproducibility
-# Update version and checksum when upgrading
+# Foundry (forge, cast)
 ARG FOUNDRY_VERSION=nightly-5b7e4cb3c882b28f3c32ba580de27ce7381f415a
-# SHA256 checksum for the selected Foundry archive
-# Note: Foundry nightly releases don't provide official checksums.
-# Verify manually: curl -sL <url> | sha256sum
 ARG FOUNDRY_SHA256=skip
 ARG TARGETARCH
-
-# Install Foundry (forge, cast, anvil) directly from releases.
-# Select binary by build arch to avoid slow amd64 emulation on arm64 hosts.
 RUN if [ "${TARGETARCH}" = "arm64" ]; then FOUNDRY_ARCH=arm64; else FOUNDRY_ARCH=amd64; fi && \
     curl -L "https://github.com/foundry-rs/foundry/releases/download/${FOUNDRY_VERSION}/foundry_nightly_linux_${FOUNDRY_ARCH}.tar.gz" -o foundry.tar.gz && \
-    if [ "$FOUNDRY_SHA256" != "skip" ]; then \
-        echo "${FOUNDRY_SHA256}  foundry.tar.gz" | sha256sum -c -; \
-    fi && \
-    tar -xzf foundry.tar.gz -C /usr/local/bin && \
-    rm foundry.tar.gz && \
+    if [ "$FOUNDRY_SHA256" != "skip" ]; then echo "${FOUNDRY_SHA256}  foundry.tar.gz" | sha256sum -c -; fi && \
+    tar -xzf foundry.tar.gz -C /usr/local/bin && rm foundry.tar.gz && \
     chmod +x /usr/local/bin/forge /usr/local/bin/cast /usr/local/bin/anvil /usr/local/bin/chisel
-
-# Add foundry to PATH
 ENV PATH="/usr/local/bin:${PATH}"
 
-# Install Hyperlane CLI globally
-RUN npm install -g @hyperlane-xyz/cli@8.9.0
+# Hyperlane CLI (v29 for production contracts)
+RUN npm install -g @hyperlane-xyz/cli@29.0.1
 
-# Create working directory
 WORKDIR /app
 
-# Copy deployment scripts and configs (from context root)
+# Copy deployment scripts and configs
 COPY hyperlane-init/deploy.sh /app/
+COPY hyperlane-init/deploy-warp.mjs /app/
 COPY hyperlane-init/chains/ /app/chains/
 COPY hyperlane-init/core-config.yaml /app/
 COPY hyperlane-init/warp-config.yaml /app/
-# Copy Foundry contracts and scripts
+
+# Copy Solidity contracts for forge build + MockUSDC deployment
 COPY contracts/ /app/contracts/
 COPY script/ /app/script/
 COPY src/ /app/src/
 COPY foundry.toml /app/foundry.toml
-# Copy lib directory for forge-std
 COPY lib/ /app/lib/
+
+# Install Node.js deps for warp deployer and compile Solidity
+RUN npm init -y && npm install ethers@6 yaml
+RUN forge build
 
 RUN chmod +x /app/deploy.sh
 
-# Set entrypoint
 ENTRYPOINT ["/app/deploy.sh"]

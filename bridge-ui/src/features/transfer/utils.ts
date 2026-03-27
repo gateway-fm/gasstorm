@@ -1,5 +1,4 @@
 import ConfirmedIcon from '../../images/icons/confirmed-icon.svg';
-import DeliveredIcon from '../../images/icons/delivered-icon.svg';
 import ErrorCircleIcon from '../../images/icons/error-circle.svg';
 import { FinalTransferStatuses, SentTransferStatuses, TransferStatus } from './types';
 
@@ -58,7 +57,6 @@ export const STATUSES_WITH_ICON = [
 export function getIconByTransferStatus(status: TransferStatus) {
   switch (status) {
     case TransferStatus.Delivered:
-      return DeliveredIcon;
     case TransferStatus.ConfirmedTransfer:
       return ConfirmedIcon;
     case TransferStatus.Failed:
@@ -77,7 +75,7 @@ import {
   TypedTransactionReceipt,
   ViemProvider,
 } from '@hyperlane-xyz/sdk';
-import { isValidAddressEvm } from '@hyperlane-xyz/utils';
+import { isValidAddress, isValidAddressEvm } from '@hyperlane-xyz/utils';
 import { getAddress } from 'viem';
 import { logger } from '../../utils/logger';
 import { getChainDisplayName } from '../chains/utils';
@@ -181,4 +179,15 @@ export async function isSmartContract(
     logger.error(msg, error);
     return { isContract: false, error: msg };
   }
+}
+
+// Returns if the recipient should be cleared by checking if it is valid address from the current chain protocol
+export function shouldClearAddress(
+  multiProvider: MultiProtocolProvider,
+  recipient: string,
+  chainName: string,
+) {
+  const protocol = multiProvider.tryGetProtocol(chainName);
+  if (recipient && protocol && !isValidAddress(recipient, protocol)) return true;
+  return false;
 }

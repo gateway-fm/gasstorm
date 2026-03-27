@@ -50,13 +50,13 @@ See [Execution Layers](./execution-layers.md) for detailed mode comparison.
 
 ```bash
 # reth mode (default) - uses block-builder
-make run-reth
+make up PROFILE=reth
 
 # cdk-erigon mode - standalone sequencer
-EXECUTION_LAYER=cdk-erigon make run-cdk-erigon
+make up PROFILE=cdk-erigon
 
 # gravity-reth mode - parallel EVM sequencer
-EXECUTION_LAYER=gravity-reth make run-gravity-reth
+make up PROFILE=gravity-reth
 ```
 
 ### Prover Selection
@@ -79,21 +79,48 @@ PROVER=zisk make run-agglayer
 ### Running the Stack
 
 ```bash
-# Default: op-reth + block-builder
-make run
+# Recommended default stack:
+# cdk-erigon + blob-da + privacy + L1/L2 explorers
+make up PROFILE=cdk-erigon WITH=blob,privacy,explorer
 
-# Explicit reth mode
-make run-reth
+# Same services on op-reth + external block-builder
+make up PROFILE=reth WITH=blob,privacy,explorer
 
-# cdk-erigon standalone sequencer
-make run-cdk-erigon
+# Full optional stack (op-reth only for bridge features)
+make up PROFILE=reth WITH=blob,privacy,explorer,bridge,bridge-ui
+
+# Besu L1 + op-reth + Hyperlane bridge + explorers
+make run-besu-reth-hyperlane
+
+# Core only (no optional features)
+make up PROFILE=cdk-erigon WITH=
 
 # gravity-reth parallel EVM
-make run-gravity-reth
+make up PROFILE=gravity-reth
 
 # Metal mode (native, no Docker)
-make run-metal
+make up MODE=metal
 ```
+
+### Composable Startup (`make up`)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MODE` | `docker` | `docker` or `metal` |
+| `PROFILE` | `reth` | `reth`, `cdk-erigon`, `gravity-reth` |
+| `WITH` | profile-dependent | Comma-separated optional features: `blob`, `privacy`, `explorer`, `bridge`, `bridge-ui` |
+| `BUILD_LOCAL` | `false` | Build local sibling repos (`docker-compose.build.yaml`) |
+| `ATTACHED` | `false` | Run attached (no `-d`) |
+
+`WITH` defaults:
+- `PROFILE=reth` -> `blob,privacy,explorer`
+- `PROFILE=cdk-erigon` / `gravity-reth` -> `privacy,explorer`
+
+Compatibility rules:
+- `blob` is supported on `PROFILE=reth` and `PROFILE=cdk-erigon` (`cdk-erigon` uses the `blob-cdk` compose profile)
+- `bridge` and `bridge-ui` are only supported on `PROFILE=reth`
+- `bridge-ui` requires `bridge`
+- `MODE=metal` supports core services only (no `WITH` features)
 
 ### Performance Profiles
 
@@ -185,18 +212,59 @@ polycli-help
 ### Profile Usage
 
 ```bash
-# Single profile
-docker compose --profile reth up -d
-
-# Multiple profiles
-docker compose --profile reth --profile bridge up -d
-
-# Bridge UI (optional)
-docker compose --profile reth --profile bridge --profile bridge-ui up -d
-
-# All prover profiles
-docker compose --profile prover-sp1 up -d
+# Equivalent via make up
+make up PROFILE=reth WITH=explorer,privacy
+make up PROFILE=reth WITH=bridge,bridge-ui
+make up PROFILE=cdk-erigon WITH=explorer,privacy
 ```
+
+## Besu L1 Mode
+
+Replaces Anvil with Hyperledger Besu (Clique dev mode, chain ID 1337) as the L1. Uses a Docker Compose overlay file (`docker-compose-besu-l1.yaml`).
+
+```bash
+# Start full stack: Besu L1 + op-reth L2 + Hyperlane bridge + block explorers
+make run-besu-reth-hyperlane
+
+# Stop
+make stop-besu
+
+# Clean (stop + remove volumes)
+make clean-besu
+```
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `BESU_VERSION` | 24.12.2 | Besu Docker image tag |
+
+| Service | Port | Description |
+|---------|------|-------------|
+| Besu HTTP RPC | 18545 | Same as Anvil (drop-in replacement) |
+| Besu WebSocket | 18549 | WS RPC |
+| Bridge UI | 18001 | Hyperlane Warp UI (Besu ↔ op-reth) |
+| L1 Explorer UI | 18203 | Indexes Besu blocks |
+| L2 Explorer UI | 18201 | Indexes op-reth blocks |
+
+## External L1 Mode
+
+Connects to any remote L1 via an nginx reverse proxy. All internal services still use `http://l1:8545` - the proxy transparently forwards to the external RPC. Chain ID and domain are auto-detected.
+
+```bash
+# Connect to a remote Besu/Geth/etc.
+EXTERNAL_L1_RPC=http://10.0.0.5:8545 \
+EXTERNAL_L1_KEY=0xYourFundedPrivateKey \
+  make run-external-l1-hyperlane
+
+# Stop / clean
+make stop-external-l1
+make clean-external-l1
+```
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `EXTERNAL_L1_RPC` | Yes | External L1 JSON-RPC URL |
+| `EXTERNAL_L1_KEY` | Yes | Private key with ETH on the external L1 (for Hyperlane contract deployment) |
+| `EXTERNAL_L1_CHAIN_NAME` | No | Hyperlane chain name (default: `externall1`) |
 
 ## Service Ports
 
@@ -206,9 +274,9 @@ docker compose --profile prover-sp1 up -d
 | block-builder | 13000 | HTTP | TX submission RPC |
 | block-builder | 13002 | WS | Preconfirmation WebSocket |
 | load-generator | 13001 | HTTP | Load test API |
-| l1-anvil | 18545 | HTTP | L1 RPC |
+| l1 (anvil/besu) | 18545 | HTTP | L1 RPC |
 | l2-reth | 18546 | HTTP/WS | L2 RPC/WebSocket |
-| cdk-erigon | 18545 | HTTP/WS | L2 RPC (cdk-erigon mode) |
+| cdk-erigon | 18546 | HTTP/WS | L2 RPC (cdk-erigon mode) |
 | explorer-api | 18200 | HTTP | Block explorer REST API |
 | explorer-ui | 18201 | HTTP | Block explorer web UI |
 | explorer-db | 15436 | TCP | Explorer PostgreSQL |

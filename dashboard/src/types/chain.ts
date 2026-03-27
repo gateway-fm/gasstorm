@@ -2,6 +2,7 @@ export interface ChainStatus {
   isOnline: boolean;
   blockNumber: number;
   chainId: number;
+  clientName?: string;
   gasPrice?: bigint;
   latestBlockHash?: string;
 }

@@ -58,6 +58,13 @@ export async function getChainId(rpc: string): Promise<number> {
   return parseInt(result, 16);
 }
 
+export async function getClientVersion(rpc: string): Promise<string> {
+  const result = await rpcCall<string>(rpc, "web3_clientVersion");
+  // Extract client name from version string (e.g. "besu/v24.12.2/..." -> "Besu")
+  const name = result.split("/")[0];
+  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+}
+
 export async function getGasPrice(rpc: string): Promise<bigint> {
   const result = await rpcCall<string>(rpc, "eth_gasPrice");
   return BigInt(result);
@@ -126,6 +133,7 @@ export async function getTransactionByHash(
 export const l1 = {
   getBlockNumber: () => getBlockNumber(RPC_ENDPOINTS.L1_RPC),
   getChainId: () => getChainId(RPC_ENDPOINTS.L1_RPC),
+  getClientVersion: () => getClientVersion(RPC_ENDPOINTS.L1_RPC),
   getGasPrice: () => getGasPrice(RPC_ENDPOINTS.L1_RPC),
   getBalance: (address: string) => getBalance(RPC_ENDPOINTS.L1_RPC, address),
   getTransactionCount: (address: string, blockTag?: "latest" | "pending") => getTransactionCount(RPC_ENDPOINTS.L1_RPC, address, blockTag),

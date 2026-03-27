@@ -121,14 +121,17 @@ func registerStackUp(s *server.MCPServer, dir string) {
 		mcp.WithString("profile",
 			mcp.Description("Docker Compose profile: reth (default), cdk-erigon, gravity-reth"),
 		),
+		mcp.WithString("with",
+			mcp.Description("Optional features (comma-separated): blob, privacy, explorer, bridge, bridge-ui. Defaults: reth=blob,privacy,explorer; others=privacy,explorer."),
+		),
 		mcp.WithBoolean("bridge",
-			mcp.Description("Enable Hyperlane bridge infrastructure profile. Defaults to true for reth, false otherwise."),
+			mcp.Description("Legacy flag: include bridge profile."),
 		),
 		mcp.WithBoolean("bridge_ui",
-			mcp.Description("Enable Hyperlane Warp UI profile (bridge-ui). Defaults to false."),
+			mcp.Description("Legacy flag: include bridge-ui profile."),
 		),
 		mcp.WithBoolean("blob",
-			mcp.Description("Enable Blob DA profile. Defaults to true for reth, false otherwise."),
+			mcp.Description("Legacy flag: include blob profile."),
 		),
 		mcp.WithBoolean("metal",
 			mcp.Description("Start in Metal mode (no Docker). Requires op-reth, Go, Node.js, and sibling repos."),
@@ -138,7 +141,17 @@ func registerStackUp(s *server.MCPServer, dir string) {
 		),
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		profile := req.GetString("profile", "reth")
+		gasless := req.GetBool("gasless", false)
+		withRaw := strings.TrimSpace(req.GetString("with", ""))
+		legacyBridge := req.GetBool("bridge", false)
+		legacyBridgeUI := req.GetBool("bridge_ui", false)
+		legacyBlob := req.GetBool("blob", false)
+
 		if req.GetBool("metal", false) {
+			if withRaw != "" || legacyBridge || legacyBridgeUI || legacyBlob {
+				return mcp.NewToolResultError("MODE=metal supports core services only. Use Docker mode for optional features (blob/privacy/explorer/bridge)."), nil
+			}
 			out, err := runScript(dir, "scripts/run-metal.sh")
 			if err != nil {
 				return mcp.NewToolResultError(fmt.Sprintf("Metal mode start failed: %v\n%s\n\nUse `make run-metal` for interactive mode.", err, out)), nil
@@ -153,21 +166,54 @@ func registerStackUp(s *server.MCPServer, dir string) {
 			return mcp.NewToolResultError("Stack is running in Metal mode. Use stack_down first, or use `make stop-metal` to stop."), nil
 		}
 
-		profile := req.GetString("profile", "reth")
-		gasless := req.GetBool("gasless", false)
-		enableBridge := req.GetBool("bridge", profile == "reth")
-		enableBridgeUI := req.GetBool("bridge_ui", false)
-		enableBlob := req.GetBool("blob", profile == "reth")
+		if withRaw == "" {
+			if profile == "reth" {
+				withRaw = "blob,privacy,explorer"
+			} else {
+				withRaw = "privacy,explorer"
+			}
+		}
 
-		profiles := []string{profile}
-		if profile == "reth" && enableBridge {
-			profiles = append(profiles, "bridge")
+		features, err := parseWithFeatures(withRaw)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
 		}
-		if profile == "reth" && enableBridgeUI {
-			profiles = append(profiles, "bridge-ui")
+		if legacyBridge {
+			features["bridge"] = true
 		}
-		if profile == "reth" && enableBlob {
-			profiles = append(profiles, "blob")
+		if legacyBridgeUI {
+			features["bridge-ui"] = true
+		}
+		if legacyBlob {
+			features["blob"] = true
+		}
+
+		if features["bridge-ui"] && !features["bridge"] {
+			return mcp.NewToolResultError("Feature 'bridge-ui' requires 'bridge'."), nil
+		}
+
+		if gasless && profile != "reth" {
+			return mcp.NewToolResultError("Gasless mode is only supported with profile=reth."), nil
+		}
+
+		profiles := []string{}
+		addProfile := func(p string) {
+			for _, existing := range profiles {
+				if existing == p {
+					return
+				}
+			}
+			profiles = append(profiles, p)
+		}
+
+		addProfile(profile)
+
+		extraProfiles, err := resolveOptionalProfiles(profile, features)
+		if err != nil {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+		for _, p := range extraProfiles {
+			addProfile(p)
 		}
 
 		args := []string{}
@@ -204,6 +250,7 @@ func registerStackUp(s *server.MCPServer, dir string) {
 		}
 
 		statusMsg := fmt.Sprintf("Profiles: %s", strings.Join(profiles, ", "))
+		statusMsg += fmt.Sprintf(" | Features: %s", withRaw)
 		if gasless {
 			statusMsg += " (Gasless Mode Enabled)"
 		}
@@ -215,6 +262,89 @@ func registerStackUp(s *server.MCPServer, dir string) {
 			out,
 		)), nil
 	})
+}
+
+func parseWithFeatures(withRaw string) (map[string]bool, error) {
+	features := map[string]bool{}
+	if strings.TrimSpace(withRaw) == "" {
+		return features, nil
+	}
+
+	for _, token := range strings.Split(withRaw, ",") {
+		feature := strings.ToLower(strings.TrimSpace(token))
+		switch feature {
+		case "":
+			continue
+		case "bridge_ui":
+			features["bridge-ui"] = true
+		case "blob", "privacy", "explorer", "bridge", "bridge-ui":
+			features[feature] = true
+		default:
+			return nil, fmt.Errorf("unknown feature '%s'. Valid: blob, privacy, explorer, bridge, bridge-ui", feature)
+		}
+	}
+
+	return features, nil
+}
+
+func resolveOptionalProfiles(profile string, features map[string]bool) ([]string, error) {
+	if profile != "reth" && profile != "cdk-erigon" && profile != "gravity-reth" {
+		return nil, fmt.Errorf("unsupported profile '%s'. Valid: reth, cdk-erigon, gravity-reth", profile)
+	}
+
+	profiles := []string{}
+	add := func(p string) {
+		for _, existing := range profiles {
+			if existing == p {
+				return
+			}
+		}
+		profiles = append(profiles, p)
+	}
+
+	if features["blob"] {
+		switch profile {
+		case "reth":
+			add("blob")
+		case "cdk-erigon":
+			add("blob-cdk")
+		default:
+			return nil, fmt.Errorf("feature 'blob' is only supported with profile=reth or profile=cdk-erigon")
+		}
+	}
+
+	if features["privacy"] {
+		if profile == "cdk-erigon" {
+			add("privacy-cdk")
+		} else {
+			add("privacy")
+		}
+	}
+
+	if features["explorer"] {
+		if profile == "cdk-erigon" {
+			add("explorer-cdk")
+		} else {
+			add("explorer")
+		}
+		add("explorer-l1")
+	}
+
+	if features["bridge"] {
+		if profile != "reth" {
+			return nil, fmt.Errorf("feature 'bridge' is only supported with profile=reth")
+		}
+		add("bridge")
+	}
+
+	if features["bridge-ui"] {
+		if profile != "reth" {
+			return nil, fmt.Errorf("feature 'bridge-ui' is only supported with profile=reth")
+		}
+		add("bridge-ui")
+	}
+
+	return profiles, nil
 }
 
 func registerStackDown(s *server.MCPServer, dir string) {

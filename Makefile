@@ -1,4 +1,4 @@
-.PHONY: run run-build run-reth run-cdk-erigon run-metal stop-metal restart-metal run-hyperlane stop restart logs status resource-report clean clean-metal build test test-load-generator test-dashboard test-tx bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-with-blob run-with-explorer run-with-privacy run-with-explorer-privacy pull-explorer pull-privacy run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help pull-blockbuilder pull-loadgenerator mcp-server mcp-build site-dev site-build tunnel-url _print-tunnel-url
+.PHONY: up run run-build run-reth run-cdk-erigon run-metal stop-metal restart-metal run-attached run-hyperlane stop restart logs status resource-report clean clean-metal build test test-load-generator test-dashboard test-tx bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-with-blob run-with-explorer run-with-privacy run-with-explorer-privacy pull-explorer pull-privacy run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help pull-blockbuilder pull-loadgenerator mcp-server mcp-build site-dev site-build tunnel-url _print-tunnel-url
 
 # =============================================================================
 # Configuration: Source .env file if it exists
@@ -26,9 +26,15 @@ else
   PRIVACY_PROFILE := privacy
 endif
 
-# Hyperlane bridge defaults
-# Enable bridge services by default for reth mode only.
-ENABLE_HYPERLANE_BRIDGE ?= true
+# Lego stack startup defaults
+MODE ?= docker
+PROFILE ?= $(COMPOSE_PROFILE)
+WITH ?=
+BUILD_LOCAL ?= false
+ATTACHED ?= false
+
+# Legacy toggles retained for compatibility in older targets.
+ENABLE_HYPERLANE_BRIDGE ?= false
 ENABLE_BLOB_DA ?= true
 ifeq ($(COMPOSE_PROFILE),reth)
   ifneq ($(ENABLE_HYPERLANE_BRIDGE),false)
@@ -59,28 +65,124 @@ endif
 # Run Targets
 # =============================================================================
 
-# Start the full system: L1/L2, block-builder, load-generator, dashboard, docs, explorer, privacy, bridge(reth)
-run: mcp-build
-	docker compose --profile $(COMPOSE_PROFILE) --profile $(EXPLORER_PROFILE) --profile explorer-l1 --profile $(PRIVACY_PROFILE) $(BRIDGE_PROFILES) $(BLOB_PROFILE) up -d
-	@$(MAKE) --no-print-directory _print-tunnel-url
+# Composable stack startup.
+# Examples:
+#   make up
+#   make up MODE=docker PROFILE=reth WITH=blob,privacy,explorer,bridge,bridge-ui
+#   make up MODE=metal
+up: mcp-build
+	@set -e; \
+	mode="$(MODE)"; \
+	profile="$(PROFILE)"; \
+	with_raw="$(WITH)"; \
+	build_local="$(BUILD_LOCAL)"; \
+	attached="$(ATTACHED)"; \
+	if [ "$$mode" != "docker" ] && [ "$$mode" != "metal" ]; then \
+		echo "Error: MODE must be 'docker' or 'metal' (got '$$mode')."; \
+		exit 1; \
+	fi; \
+	if [ "$$mode" = "docker" ] && [ -z "$$(printf "%s" "$$with_raw" | tr -d '[:space:]')" ]; then \
+		if [ "$$profile" = "reth" ]; then \
+			with_raw="blob,privacy,explorer"; \
+		else \
+			with_raw="privacy,explorer"; \
+		fi; \
+	fi; \
+	if [ "$$mode" = "metal" ]; then \
+		if [ -n "$$(printf "%s" "$$with_raw" | tr -d '[:space:]')" ]; then \
+			echo "Error: MODE=metal supports core services only."; \
+			echo "Use MODE=docker for optional features (blob/privacy/explorer/bridge)."; \
+			exit 1; \
+		fi; \
+		./scripts/run-metal.sh; \
+		exit 0; \
+	fi; \
+	profiles="--profile $$profile"; \
+	bridge_enabled=0; \
+	bridge_ui_enabled=0; \
+	for raw_feat in $$(printf "%s" "$$with_raw" | tr ',' ' '); do \
+		feat=$$(printf "%s" "$$raw_feat" | tr '[:upper:]' '[:lower:]'); \
+		case "$$feat" in \
+			"") ;; \
+			blob) \
+				if [ "$$profile" = "reth" ]; then \
+					profiles="$$profiles --profile blob"; \
+				elif [ "$$profile" = "cdk-erigon" ]; then \
+					profiles="$$profiles --profile blob-cdk"; \
+				else \
+					echo "Error: 'blob' is only supported with PROFILE=reth or PROFILE=cdk-erigon."; \
+					exit 1; \
+				fi; \
+				;; \
+			privacy) \
+				if [ "$$profile" = "cdk-erigon" ]; then \
+					profiles="$$profiles --profile privacy-cdk"; \
+				else \
+					profiles="$$profiles --profile privacy"; \
+				fi; \
+				;; \
+			explorer) \
+				if [ "$$profile" = "cdk-erigon" ]; then \
+					profiles="$$profiles --profile explorer-cdk --profile explorer-l1"; \
+				else \
+					profiles="$$profiles --profile explorer --profile explorer-l1"; \
+				fi; \
+				;; \
+			bridge) \
+				if [ "$$profile" != "reth" ]; then echo "Error: 'bridge' is only supported with PROFILE=reth."; exit 1; fi; \
+				profiles="$$profiles --profile bridge"; \
+				bridge_enabled=1; \
+				;; \
+			bridge-ui|bridge_ui) \
+				if [ "$$profile" != "reth" ]; then echo "Error: 'bridge-ui' is only supported with PROFILE=reth."; exit 1; fi; \
+				profiles="$$profiles --profile bridge-ui"; \
+				bridge_ui_enabled=1; \
+				;; \
+			*) \
+				echo "Error: unknown feature '$$feat'. Valid: blob, privacy, explorer, bridge, bridge-ui"; \
+				exit 1; \
+				;; \
+		esac; \
+	done; \
+	if [ "$$bridge_ui_enabled" -eq 1 ] && [ "$$bridge_enabled" -eq 0 ]; then \
+		echo "Error: 'bridge-ui' requires 'bridge' in WITH."; \
+		exit 1; \
+	fi; \
+	compose_files=""; \
+	if [ "$$build_local" = "true" ]; then \
+		compose_files="-f docker-compose.yml -f docker-compose.build.yaml"; \
+	fi; \
+	build_flag=""; \
+	detach_flag="-d"; \
+	if [ "$$build_local" = "true" ] || [ "$$attached" = "true" ]; then \
+		build_flag="--build"; \
+	fi; \
+	if [ "$$attached" = "true" ]; then \
+		detach_flag=""; \
+	fi; \
+	docker compose $$profiles $$compose_files up $$build_flag $$detach_flag; \
+	$(MAKE) --no-print-directory _print-tunnel-url
+
+# Start the default Docker stack using current EXECUTION_LAYER mapping.
+run:
+	@$(MAKE) --no-print-directory up MODE=docker PROFILE=$(COMPOSE_PROFILE)
 
 # Build from local sibling repos (../blockbuilder, ../loadgenerator) and run everything
-run-build: mcp-build
-	docker compose -f docker-compose.yml -f docker-compose.build.yaml --profile $(COMPOSE_PROFILE) --profile $(EXPLORER_PROFILE) --profile explorer-l1 --profile $(PRIVACY_PROFILE) $(BRIDGE_PROFILES) $(BLOB_PROFILE) up --build -d
-	@$(MAKE) --no-print-directory _print-tunnel-url
+run-build:
+	@$(MAKE) --no-print-directory up MODE=docker PROFILE=$(COMPOSE_PROFILE) BUILD_LOCAL=true
 
-# Start with op-reth (block-builder + Engine API)
+# Start op-reth core stack only (no optional profiles)
 run-reth:
-	docker compose --profile reth --profile bridge --profile blob up --build -d
+	@$(MAKE) --no-print-directory up MODE=docker PROFILE=reth WITH=
 
-# Start with logs attached (all services)
+# Start default Docker stack with logs attached
 run-attached:
-	docker compose --profile $(COMPOSE_PROFILE) --profile $(EXPLORER_PROFILE) --profile $(PRIVACY_PROFILE) $(BRIDGE_PROFILES) $(BLOB_PROFILE) up --build
+	@$(MAKE) --no-print-directory up MODE=docker PROFILE=$(COMPOSE_PROFILE) ATTACHED=true
 
 # Start in native "Metal" mode (no Docker, maximum performance)
 # Requires: op-reth, go, node installed locally, sibling repos (../blockbuilder, ../loadgenerator)
 run-metal:
-	./scripts/run-metal.sh
+	@$(MAKE) --no-print-directory up MODE=metal WITH=
 
 # Stop metal mode services
 stop-metal:
@@ -398,15 +500,12 @@ pull-loadgenerator:
 	docker pull gatewayfm/loadgenerator:latest
 	@echo "Pulled gatewayfm/loadgenerator:latest"
 
-# Pull latest block-explorer image from DockerHub
+# Pull latest block-explorer images from DockerHub
 pull-explorer:
-	docker pull gatewayfm/block-explorer:latest
-	@echo "Pulled gatewayfm/block-explorer:latest"
-
-# Pull latest privacy-proxy image from DockerHub
-pull-privacy:
-	docker pull gatewayfm/privacy-proxy:latest
-	@echo "Pulled gatewayfm/privacy-proxy:latest"
+	docker pull gatewayfm/block-explorer-api:main
+	docker pull gatewayfm/block-explorer-indexer:main
+	docker pull gatewayfm/block-explorer-frontend:main
+	@echo "Pulled gatewayfm/block-explorer-{api,indexer,frontend}:main"
 
 # =============================================================================
 # SBOM Generation
@@ -501,27 +600,68 @@ dev-cdk-erigon:
 
 # Start with Blob DA enabled
 run-with-blob:
-	docker compose --profile $(COMPOSE_PROFILE) --profile blob up --build -d
+	@$(MAKE) --no-print-directory up MODE=docker PROFILE=$(COMPOSE_PROFILE) WITH=blob
 
 # Start with Hyperlane bridge enabled (includes Warp UI)
 run-with-bridge:
-	docker compose --profile $(COMPOSE_PROFILE) --profile bridge --profile bridge-ui up --build -d
+	@$(MAKE) --no-print-directory up MODE=docker PROFILE=reth WITH=bridge,bridge-ui
 
 # Alias for run-with-bridge (includes Hyperlane)
 run-hyperlane:
-	docker compose --profile $(COMPOSE_PROFILE) --profile bridge --profile bridge-ui up --build -d
+	@$(MAKE) --no-print-directory run-with-bridge
+
+# Start Besu (L1) + op-reth (L2) + Hyperlane bridge + block explorers
+# Replaces Anvil with Besu for cross-chain bridge demo
+run-besu-reth-hyperlane:
+	docker compose -f docker-compose.yml -f docker-compose-besu-l1.yaml \
+		--profile reth --profile bridge --profile explorer --profile explorer-l1 \
+		up --build -d
+
+# Stop Besu + op-reth + Hyperlane stack
+stop-besu:
+	docker compose -f docker-compose.yml -f docker-compose-besu-l1.yaml \
+		--profile reth --profile bridge --profile explorer --profile explorer-l1 \
+		down
+
+# Clean Besu stack (stop + remove volumes)
+clean-besu:
+	docker compose -f docker-compose.yml -f docker-compose-besu-l1.yaml \
+		--profile reth --profile bridge --profile explorer --profile explorer-l1 \
+		down -v
+
+# Start op-reth + Hyperlane bridge connected to an external L1 RPC
+# Requires: EXTERNAL_L1_RPC and EXTERNAL_L1_KEY env vars
+# Example: EXTERNAL_L1_RPC=http://10.0.0.5:8545 EXTERNAL_L1_KEY=0x... make run-external-l1-hyperlane
+run-external-l1-hyperlane:
+	@if [ -z "$(EXTERNAL_L1_RPC)" ]; then echo "Error: EXTERNAL_L1_RPC is required (e.g., http://besu:8545)"; exit 1; fi
+	@if [ -z "$(EXTERNAL_L1_KEY)" ]; then echo "Error: EXTERNAL_L1_KEY is required (funded private key on external L1)"; exit 1; fi
+	docker compose -f docker-compose.yml -f docker-compose-external-l1.yaml \
+		--profile reth --profile bridge --profile explorer --profile explorer-l1 \
+		up --build -d
+
+# Stop external L1 stack
+stop-external-l1:
+	docker compose -f docker-compose.yml -f docker-compose-external-l1.yaml \
+		--profile reth --profile bridge --profile explorer --profile explorer-l1 \
+		down
+
+# Clean external L1 stack (stop + remove volumes)
+clean-external-l1:
+	docker compose -f docker-compose.yml -f docker-compose-external-l1.yaml \
+		--profile reth --profile bridge --profile explorer --profile explorer-l1 \
+		down -v
 
 # Start with block explorer enabled (indexes blocks/txs)
 run-with-explorer:
-	docker compose --profile $(COMPOSE_PROFILE) --profile $(EXPLORER_PROFILE) --profile explorer-l1 up --build -d
+	@$(MAKE) --no-print-directory up MODE=docker PROFILE=$(COMPOSE_PROFILE) WITH=explorer
 
 # Start with privacy proxy enabled (RPC access control)
 run-with-privacy:
-	docker compose --profile $(COMPOSE_PROFILE) --profile $(PRIVACY_PROFILE) up --build -d
+	@$(MAKE) --no-print-directory up MODE=docker PROFILE=$(COMPOSE_PROFILE) WITH=privacy
 
 # Start with both explorer and privacy proxy
 run-with-explorer-privacy:
-	docker compose --profile $(COMPOSE_PROFILE) --profile $(EXPLORER_PROFILE) --profile explorer-l1 --profile $(PRIVACY_PROFILE) up --build -d
+	@$(MAKE) --no-print-directory up MODE=docker PROFILE=$(COMPOSE_PROFILE) WITH=explorer,privacy
 
 # #############################################################################
 # OVERHANGING: Hyperlane Bridge
@@ -575,9 +715,8 @@ bridge-setup: bridge-deploy bridge-relayer
 # Bridge help
 bridge-help:
 	@echo "Hyperlane Bridge Commands:"
-	@echo "  make run                  - Default reth stack (includes bridge infra)"
-	@echo "  ENABLE_HYPERLANE_BRIDGE=false make run - Run without bridge infra"
-	@echo "  ENABLE_BLOB_DA=false make run - Run without Blob DA"
+	@echo "  make up                   - Default reth stack (no bridge, includes blob/privacy/explorer)"
+	@echo "  make up WITH=bridge,bridge-ui,blob,privacy,explorer - Start full stack with bridge"
 	@echo "  make run-with-bridge      - Start stack with bridge + Warp UI"
 	@echo "  make bridge-deploy        - Deploy Hyperlane contracts to L1 and L2"
 	@echo "  make bridge-relayer       - Start the Hyperlane relayer"
@@ -592,9 +731,20 @@ bridge-help:
 	@echo "  - Hyperlane Warp UI: http://localhost:18001  (connect any wallet)"
 	@echo "  - Dashboard Bridge:  http://localhost:18000/bridge  (test account)"
 	@echo ""
+	@echo "Besu Mode (replaces Anvil L1 with local Besu):"
+	@echo "  make run-besu-reth-hyperlane  - Besu L1 + op-reth L2 + bridge + explorers"
+	@echo "  make stop-besu               - Stop Besu stack"
+	@echo "  make clean-besu              - Stop + remove Besu volumes"
+	@echo ""
+	@echo "External L1 Mode (connect to any remote L1):"
+	@echo "  EXTERNAL_L1_RPC=http://... EXTERNAL_L1_KEY=0x... make run-external-l1-hyperlane"
+	@echo "  make stop-external-l1        - Stop external L1 stack"
+	@echo "  make clean-external-l1       - Stop + remove volumes"
+	@echo ""
 	@echo "Quick Start:"
-	@echo "  make run                  # Starts bridge infra automatically in reth mode"
-	@echo "  make run-with-bridge      # Also starts Warp UI"
+	@echo "  make up WITH=bridge       # Start bridge infra (Anvil L1)"
+	@echo "  make run-with-bridge      # Start bridge infra + Warp UI (Anvil L1)"
+	@echo "  make run-besu-reth-hyperlane  # Full stack with Besu L1"
 
 # #############################################################################
 # OVERHANGING: AggLayer & Provers
@@ -793,9 +943,12 @@ help:
 	@echo "  ==== CORE: Gas Storm (reth mode) ===="
 	@echo ""
 	@echo "  Run:"
-	@echo "    make run              - Start full stack (reth includes bridge infra by default)"
+	@echo "    make up               - Lego startup (default: reth + blob + privacy + explorer)"
+	@echo "    make up MODE=metal    - Core stack in metal mode (no optional features)"
+	@echo "    make up WITH=bridge,bridge-ui,blob,privacy,explorer - Full optional stack"
+	@echo "    make run              - Alias for default docker startup"
 	@echo "    make run-build        - Build from local repos and start"
-	@echo "    make run-reth         - Start with op-reth (block-builder + Engine API)"
+	@echo "    make run-reth         - Start op-reth core only (no optional profiles)"
 	@echo "    make run-metal        - Native mode (no Docker, maximum performance)"
 	@echo "    make stop-metal       - Stop metal mode services"
 	@echo "    make restart-metal    - Restart metal mode services"
@@ -869,9 +1022,9 @@ help:
 	@echo ""
 	@echo "  ==== OVERHANGING: Hyperlane Bridge ===="
 	@echo ""
-	@echo "    make run-with-bridge  - Start with Hyperlane bridge + Warp UI"
-	@echo "    ENABLE_HYPERLANE_BRIDGE=false make run - Disable default bridge infra"
-	@echo "    ENABLE_BLOB_DA=false make run - Disable default Blob DA"
+	@echo "    make run-with-bridge  - Start with Hyperlane bridge + Warp UI (Anvil L1)"
+	@echo "    make run-besu-reth-hyperlane - Besu L1 + op-reth + bridge + explorers"
+	@echo "    EXTERNAL_L1_RPC=... EXTERNAL_L1_KEY=... make run-external-l1-hyperlane"
 	@echo "    make bridge-setup     - Full setup (deploy + start relayer)"
 	@echo "    make bridge-help      - Full bridge options"
 	@echo ""

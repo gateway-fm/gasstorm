@@ -3,6 +3,31 @@
 @tailwind utilities;
 
 /*
+Custom Fonts (optional - falls back to system fonts if not available)
+Place font files in public/fonts/ directory
+=====================================================================
+*/
+
+/* PP Valve - Secondary font */
+@font-face {
+  font-family: 'PP Valve';
+  src: url('/fonts/PPValve-PlainVariable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Custom fonts — fetched via `pnpm run fetch-fonts` (requires S3 creds). Falls back to system-ui if missing. */
+/* PP Fraktion Mono - Primary font */
+@font-face {
+  font-family: 'PP Fraktion Mono';
+  src: url('/fonts/PPFraktionMono-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/*
 Normalization
 =============
 */
@@ -10,12 +35,6 @@ html,
 body {
   padding: 0;
   margin: 0;
-}
-
-body {
-  color: #e2e8f0;
-  scroll-behavior: smooth;
-  scrollbar-width: thin;
 }
 
 a {
@@ -49,10 +68,33 @@ Text and shadows
   text-shadow: 0 0 #010101;
 }
 
-/* 
+/*
 Scrollbar Overrides
 ===================
 */
+
+body {
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: #e8caff transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #e8caff;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #d4a3ff;
+}
 
 /* phones */
 @media only screen and (max-width: 767px) {
@@ -73,7 +115,7 @@ input::-webkit-inner-spin-button {
   margin: 0;
 }
 
-/* clears the ‘X’ from Internet Explorer */
+/* clears the 'X' from Internet Explorer */
 input[type='search']::-ms-clear {
   display: none;
   width: 0;
@@ -85,7 +127,7 @@ input[type='search']::-ms-reveal {
   height: 0;
 }
 
-/* clears the ‘X’ from Chrome */
+/* clears the 'X' from Chrome */
 input[type='search']::-webkit-search-decoration,
 input[type='search']::-webkit-search-cancel-button,
 input[type='search']::-webkit-search-results-button,
@@ -143,47 +185,18 @@ Common animations
   }
 }
 
-@keyframes slowPan {
-  0% {
-    background-position: 0% 0%, 100% 0%, 50% 100%;
-  }
-  100% {
-    background-position: 10% 10%, 88% 8%, 50% 100%;
-  }
-}
-
-@keyframes sweep {
-  0% {
-    transform: translateY(-120%);
-  }
-  100% {
-    transform: translateY(140%);
-  }
-}
-
 /*
-Gateway Theme & Toasts
-======================
+Toasts
+======
 */
 :root {
-  /* Gateway brand colors */
-  --gateway-primary: #06b6d4;
-  --gateway-primary-light: #22d3ee;
-  --gateway-primary-dark: #0e7490;
-  --gateway-accent: #f97316;
-  --gateway-success: #22C55E;
-  --gateway-warning: #EAB308;
-  --gateway-error: #EF4444;
-  --gateway-background: #020617;
-
-  /* Toast overrides */
-  --toastify-color-light: #0b1220;
-  --toastify-color-dark: #020617;
-  --toastify-color-info: #06b6d4;
-  --toastify-color-success: #22C55E;
-  --toastify-color-warning: #f59e0b;
-  --toastify-color-error: #EF4444;
-  --toastify-color-transparent: rgba(2, 6, 23, 0.85);
+  --toastify-color-light: #ffffff;
+  --toastify-color-dark: #2e3338;
+  --toastify-color-info: #3498db;
+  --toastify-color-success: #35d07f;
+  --toastify-color-warning: #fcd34d;
+  --toastify-color-error: #dc2626;
+  --toastify-color-transparent: rgba(255, 255, 255, 0.7);
 
   --toastify-icon-color-info: var(--toastify-color-info);
   --toastify-icon-color-success: var(--toastify-color-success);
@@ -191,104 +204,37 @@ Gateway Theme & Toasts
   --toastify-icon-color-error: var(--toastify-color-error);
 
   --toastify-toast-width: 300px;
-  --toastify-toast-background: #0f172a;
+  --toastify-toast-background: #fff;
   --toastify-toast-min-height: 64px;
   --toastify-toast-max-height: 800px;
-  --toastify-font-family: var(--font-main), Segoe UI, sans-serif;
+  --toastify-font-family: Roboto, sans-serif;
   --toastify-z-index: 9999;
 
-  --toastify-text-color-light: #e2e8f0;
+  --toastify-text-color-light: #2e3338;
   --toastify-text-color-dark: #fff;
 
   --toastify-text-color-info: #fff;
   --toastify-text-color-success: #fff;
-  --toastify-text-color-warning: #0F0F0F;
+  --toastify-text-color-warning: #fff;
   --toastify-text-color-error: #fff;
 
-  --toastify-spinner-color: #06b6d4;
-  --toastify-spinner-color-empty-area: #334155;
+  --toastify-spinner-color: #616161;
+  --toastify-spinner-color-empty-area: #e0e0e0;
 
   --toastify-color-progress-light: linear-gradient(
     to right,
-    #06b6d4,
-    #22d3ee,
-    #f97316,
-    #22c55e
+    #4cd964,
+    #5ac8fa,
+    #007aff,
+    #34aadc,
+    #5856d6,
+    #ff2d55
   );
-  --toastify-color-progress-dark: #06b6d4;
+  --toastify-color-progress-dark: #bb86fc;
   --toastify-color-progress-info: var(--toastify-color-info);
   --toastify-color-progress-success: var(--toastify-color-success);
   --toastify-color-progress-warning: var(--toastify-color-warning);
   --toastify-color-progress-error: var(--toastify-color-error);
-}
-
-/* Gateway focus states */
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.24);
-}
-
-/* Gateway primary button hover glow */
-button[class*="bg-primary"]:hover {
-  box-shadow: 0 8px 24px rgba(6, 182, 212, 0.28);
-}
-
-::selection {
-  background: rgba(34, 211, 238, 0.24);
-}
-
-#app-content::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 8% 18%, rgba(34, 211, 238, 0.17), transparent 33%),
-    radial-gradient(circle at 92% 15%, rgba(249, 115, 22, 0.14), transparent 30%),
-    linear-gradient(180deg, rgba(2, 6, 23, 0.4), rgba(2, 6, 23, 0.8));
-  z-index: 0;
-  animation: slowPan 16s ease-in-out infinite alternate;
-}
-
-#app-content::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(rgba(6, 182, 212, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(6, 182, 212, 0.06) 1px, transparent 1px);
-  background-size: 36px 36px;
-  mask-image: radial-gradient(circle at center, black, transparent 88%);
-  z-index: 0;
-}
-
-#app-content > * {
-  position: relative;
-  z-index: 1;
-}
-
-.ops-card {
-  border-radius: 12px;
-  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
-}
-
-.ops-card::after {
-  content: '';
-  position: absolute;
-  inset: -120% 0 auto 0;
-  height: 120%;
-  pointer-events: none;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    rgba(34, 211, 238, 0.12) 45%,
-    transparent 100%
-  );
-  animation: sweep 8s linear infinite;
 }
 
 /*
@@ -315,4 +261,54 @@ Needs to be higher than Intercom chatbox (z-index: 2147483000)
 */
 #refiner-widget-wrapper {
   z-index: 2147483001 !important;
+}
+
+/*
+Chain Edit Modal - Widget style overrides
+==========================================
+Override htw- prefixed Tailwind classes from @hyperlane-xyz/widgets
+ChainDetailsMenu to match v2 styling
+*/
+.chain-edit-container {
+  font-family: var(--font-secondary, 'PP Valve', system-ui, sans-serif);
+}
+
+/* Section headers */
+.chain-edit-container h2 {
+  font-family: var(--font-secondary, 'PP Valve', system-ui, sans-serif);
+  font-size: 1rem;
+}
+
+.chain-edit-container h3 {
+  font-family: var(--font-secondary, 'PP Valve', system-ui, sans-serif);
+  color: var(--color-gray-500, #6b7280);
+}
+
+/* Text inputs */
+.chain-edit-container input[type='text'],
+.chain-edit-container textarea {
+  font-family: var(--font-primary, 'PP Fraktion Mono', monospace);
+  border-color: #d1d5db;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+}
+
+.chain-edit-container input[type='text']:focus,
+.chain-edit-container textarea:focus {
+  border-color: var(--color-primary-500, #9a0dff);
+  outline: none;
+}
+
+/* Buttons inside the widget */
+.chain-edit-container button {
+  font-family: var(--font-secondary, 'PP Valve', system-ui, sans-serif);
+}
+
+/* Links */
+.chain-edit-container a {
+  color: var(--color-primary-500, #9a0dff);
+}
+
+.chain-edit-container a:hover {
+  text-decoration: underline;
 }

@@ -49,9 +49,11 @@ services:
 
   # Load Generator Service (Go)
   # Sends transactions directly to cdk-erigon RPC (no block-builder)
-  # Image from DockerHub: gatewayfm/loadgenerator
   load-generator:
-    image: gatewayfm/loadgenerator:${LOADGENERATOR_VERSION:-latest}
+    build:
+      context: ../loadgenerator
+      dockerfile: Dockerfile
+    image: gatewayfm/loadgenerator:local
     container_name: gasstorm-loadgen
     depends_on:
       - l2-cdk-erigon
