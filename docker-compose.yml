@@ -353,8 +353,10 @@ services:
       - PRECONF_WS_URL= # No preconfirmations in cdk-erigon mode
       - LISTEN_ADDR=:3001
       - DATABASE_PATH=/data/loadgen.db
-    volumes:
-      - loadgen-data:/data
+      - PRIVACY_RPC_URL=${PRIVACY_RPC_URL:-}
+      - PRIVACY_AUTH_TOKEN_FILE=${PRIVACY_AUTH_TOKEN_FILE:-}
+    tmpfs:
+      - /data:mode=1777
     ports:
       - "13001:3001" # REST API for load test control
     restart: unless-stopped
