@@ -37,6 +37,8 @@ txpool.accountslots: 64
 txpool.globalslots: 100000
 txpool.accountqueue: 256
 txpool.globalqueue: 100000
+txpool.pricelimit: 0
+txpool.nolocals: true
 
 # zkEVM configuration (dotted notation)
 zkevm.l2-chain-id: 42069
