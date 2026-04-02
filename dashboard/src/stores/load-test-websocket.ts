@@ -125,6 +125,9 @@ export function parseMetricsMessage(
   if ("hsmFailoverEnabled" in metrics) {
     state.hsmFailoverEnabled = metrics.hsmFailoverEnabled ?? null;
   }
+  if ("privacyAvailable" in metrics) {
+    state.privacyAvailable = metrics.privacyAvailable ?? false;
+  }
 
   // Build time series for live chart (ONLY during running and strictly within duration).
   // Use strict < so the boundary point (where metrics are already declining) is excluded.

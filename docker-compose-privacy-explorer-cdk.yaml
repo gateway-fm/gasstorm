@@ -1,0 +1,16 @@
+# Privacy-enhanced block explorer overlay (CDK variant)
+services:
+  privacy-proxy-cdk:
+    depends_on:
+      explorer-db-cdk:
+        condition: service_healthy
+    environment:
+      - EXPLORER_DATABASE_URL=postgres://explorer:explorer@explorer-db-cdk:5432/explorer?sslmode=disable
+
+  explorer-api-cdk:
+    environment:
+      - PRIVACY_PROXY_URL=http://privacy-proxy-cdk:8080
+      - PRIVACY_PROXY_PUBLIC_URL=http://localhost:18300
+    depends_on:
+      privacy-proxy-cdk:
+        condition: service_started

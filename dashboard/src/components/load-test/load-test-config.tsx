@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -27,7 +28,7 @@ function formatDurationHuman(seconds: number): string {
 }
 
 export function LoadTestConfig() {
-  const { config, setConfig, status } = useGoLoadTestStore();
+  const { config, setConfig, status, privacyAvailable } = useGoLoadTestStore();
   const isDisabled = status === "running";
 
   const handlePatternChange = (pattern: LoadPattern) => {
@@ -51,6 +52,36 @@ export function LoadTestConfig() {
         <CardTitle className="text-base font-semibold font-mono">Load Test Configuration</CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
+        {/* Privacy Mode Toggle */}
+        <div className="space-y-2">
+          <Label className="text-sm">Test Mode</Label>
+          <div className="flex gap-2">
+            <Button
+              variant={!config?.privacyMode ? "default" : "outline"}
+              size="sm"
+              onClick={() => setConfig({ privacyMode: false })}
+              disabled={isDisabled}
+              className="flex-1"
+            >
+              Direct
+            </Button>
+            <Button
+              variant={config?.privacyMode ? "default" : "outline"}
+              size="sm"
+              onClick={() => setConfig({ privacyMode: true })}
+              disabled={isDisabled || !privacyAvailable}
+              className="flex-1"
+            >
+              Through Privacy Proxy
+            </Button>
+          </div>
+          {config?.privacyMode && (
+            <p className="text-xs text-muted-foreground">
+              Adds JWT auth, RBAC checks, and runtime tracing overhead per transaction
+            </p>
+          )}
+        </div>
+
         {/* Pattern Selection */}
         <Tabs
           value={config?.pattern ?? "constant"}

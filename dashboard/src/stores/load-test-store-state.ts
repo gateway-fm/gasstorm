@@ -82,6 +82,8 @@ export interface GoLoadTestState {
   hsmProvider: string;
   hsmKeyIdActive: string;
   hsmFailoverEnabled: boolean | null;
+  // Privacy proxy availability
+  privacyAvailable: boolean;
   // Time series for live chart
   chartTimeSeries: ChartTimeSeries;
   // Historical mode
@@ -170,6 +172,8 @@ export const INITIAL_STATE: GoLoadTestState = {
   hsmProvider: "",
   hsmKeyIdActive: "",
   hsmFailoverEnabled: null,
+  // Privacy proxy availability
+  privacyAvailable: false,
   // Time series
   chartTimeSeries: {
     timestamps: [],
@@ -247,6 +251,8 @@ export function getResetState(): Partial<GoLoadTestState> {
     hsmProvider: "",
     hsmKeyIdActive: "",
     hsmFailoverEnabled: null,
+    // Privacy proxy availability
+    privacyAvailable: false,
     // Time series
     chartTimeSeries: {
       timestamps: [],

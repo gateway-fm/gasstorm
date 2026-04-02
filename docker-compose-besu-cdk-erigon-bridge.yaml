@@ -1,0 +1,29 @@
+# Docker Compose overlay: Besu L1 + cdk-erigon L2 bridge
+#
+# Auto-included when PROFILE=cdk-erigon L1=besu WITH=bridge
+#
+# Points hyperlane-init at cdk-erigon L2 with Besu L1 chain params.
+
+services:
+  hyperlane-init:
+    depends_on:
+      l1:
+        condition: service_healthy
+      l2-cdk-erigon:
+        condition: service_started
+    environment:
+      - L2_RPC=http://l2-cdk-erigon:8545
+      - L2_RELAYER_RPC=http://l2-cdk-erigon:8545
+      # Besu chain configuration
+      - L1_CHAIN_NAME=besulocal
+      - L1_DOMAIN=1337
+      - L1_CHAIN_ID=1337
+      - L1_BLOCK_TIME=2
+
+  hyperlane-bridge-ui:
+    build:
+      context: ./bridge-ui
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_WALLET_CONNECT_ID=${WALLET_CONNECT_ID:-00000000000000000000000000000000}
+        - NEXT_PUBLIC_RPC_OVERRIDES={"besulocal":{"http":"http://host.docker.internal:18545"},"l2local":{"http":"http://host.docker.internal:18546"}}

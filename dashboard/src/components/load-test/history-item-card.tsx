@@ -242,6 +242,14 @@ export function HistoryItemCard({
               HSM ON
             </Badge>
           )}
+          {result.config?.privacyMode && (
+            <Badge
+              variant="secondary"
+              className="font-mono text-xs bg-violet-500/10 text-violet-400 border-violet-500/30"
+            >
+              Privacy
+            </Badge>
+          )}
           <span className="text-sm text-muted-foreground hidden md:block">
             {formatDate(result.startedAt)}
           </span>

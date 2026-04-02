@@ -292,6 +292,19 @@ export function HistoryHeader({ testRun, onBack }: HistoryHeaderProps) {
             </Badge>
           </div>
 
+          {/* Privacy Mode */}
+          {config?.privacyMode && (
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Privacy</span>
+              <Badge
+                variant="secondary"
+                className="text-xs bg-violet-500/10 text-violet-400 border-violet-500/30"
+              >
+                Through Privacy Proxy
+              </Badge>
+            </div>
+          )}
+
           {/* Pattern */}
           <div className="flex justify-between items-center">
             <span className="text-muted-foreground">Pattern</span>

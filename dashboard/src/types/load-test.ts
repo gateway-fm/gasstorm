@@ -135,6 +135,9 @@ export interface LoadTestConfig {
 
   // Builder configuration (fetched from builder status)
   blockTimeMs?: number; // target block time from builder
+
+  // Privacy mode (routes TXs through privacy proxy)
+  privacyMode?: boolean;
 }
 
 export type TransactionStatus = "pending" | "confirmed" | "failed";
@@ -300,6 +303,7 @@ export interface TestResult {
     adaptiveTargetPending?: number;
     adaptiveRateStep?: number;
     realisticConfig?: RealisticTestConfig;
+    privacyMode?: boolean;
   };
   environment?: EnvironmentSnapshot;
 }
@@ -322,6 +326,7 @@ export const DEFAULT_LOAD_TEST_CONFIG: LoadTestConfig = {
   realisticConfig: DEFAULT_REALISTIC_CONFIG,
   txValue: 1000000000000000000n, // 1 ETH
   gasLimit: 21000,
+  privacyMode: false,
 };
 
 // Time-series point from persistent storage

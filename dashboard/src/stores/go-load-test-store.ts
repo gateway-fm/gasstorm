@@ -41,6 +41,10 @@ function buildStartRequest(cfg: LoadTestConfig): StartTestRequest {
     transactionType: cfg.transactionType ?? "eth-transfer",
   };
 
+  if (cfg.privacyMode) {
+    request.privacyMode = true;
+  }
+
   switch (pattern) {
     case "constant":
       request.constantRate = cfg.constantRate ?? DEFAULT_LOAD_TEST_CONFIG.constantRate;
@@ -103,7 +107,15 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()((set, get) => {
   // WebSocket manager instance — stays connected for the lifetime of the page
   const wsManager = createWebSocketManager({
     onStateUpdate: (update) => set(update),
-    onConnected: () => set({ wsConnected: true }),
+    onConnected: () => {
+      set({ wsConnected: true });
+      // Fetch privacy availability via HTTP (WS messages may arrive before store is ready)
+      fetchLoadGenAPI("/v1/status").then(r => r.json()).then(data => {
+        if (data?.privacyAvailable !== undefined) {
+          set({ privacyAvailable: data.privacyAvailable });
+        }
+      }).catch(() => {});
+    },
     onDisconnected: () => set({ wsConnected: false }),
     isHistoricalMode: () => get().isHistoricalMode,
     getChartTimeSeries: () => get().chartTimeSeries,

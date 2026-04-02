@@ -1,4 +1,4 @@
-.PHONY: up run run-build run-reth run-cdk-erigon run-metal stop-metal restart-metal run-attached run-hyperlane stop restart logs status resource-report clean clean-metal build test test-load-generator test-dashboard test-tx bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-with-blob run-with-explorer run-with-privacy run-with-explorer-privacy pull-explorer pull-privacy run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help pull-blockbuilder pull-loadgenerator mcp-server mcp-build site-dev site-build tunnel-url _print-tunnel-url
+.PHONY: up run run-build run-reth run-cdk-erigon run-metal stop-metal restart-metal run-attached run-hyperlane stop restart logs status resource-report clean clean-metal build test test-load-generator test-dashboard test-tx bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-with-blob run-with-explorer run-with-privacy run-with-explorer-privacy pull-explorer pull-privacy run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help pull-blockbuilder pull-loadgenerator mcp-server mcp-build site-dev site-build tunnel-url _print-tunnel-url loadtest-privacy loadtest-direct
 
 # =============================================================================
 # Configuration: Source .env file if it exists
@@ -30,6 +30,7 @@ endif
 MODE ?= docker
 PROFILE ?= $(COMPOSE_PROFILE)
 WITH ?=
+L1 ?= anvil
 BUILD_LOCAL ?= false
 ATTACHED ?= false
 
@@ -69,12 +70,15 @@ endif
 # Examples:
 #   make up
 #   make up MODE=docker PROFILE=reth WITH=blob,privacy,explorer,bridge,bridge-ui
+#   make up PROFILE=cdk-erigon WITH=bridge,explorer
+#   make up PROFILE=reth L1=besu WITH=bridge,explorer
 #   make up MODE=metal
 up: mcp-build
 	@set -e; \
 	mode="$(MODE)"; \
 	profile="$(PROFILE)"; \
 	with_raw="$(WITH)"; \
+	l1="$(L1)"; \
 	build_local="$(BUILD_LOCAL)"; \
 	attached="$(ATTACHED)"; \
 	if [ "$$mode" != "docker" ] && [ "$$mode" != "metal" ]; then \
@@ -100,12 +104,16 @@ up: mcp-build
 	profiles="--profile $$profile"; \
 	bridge_enabled=0; \
 	bridge_ui_enabled=0; \
+	has_privacy=""; \
+	has_explorer=""; \
 	for raw_feat in $$(printf "%s" "$$with_raw" | tr ',' ' '); do \
 		feat=$$(printf "%s" "$$raw_feat" | tr '[:upper:]' '[:lower:]'); \
 		case "$$feat" in \
 			"") ;; \
 			blob) \
-				if [ "$$profile" = "reth" ]; then \
+				if [ "$$l1" = "besu" ]; then \
+					echo "Error: 'blob' requires EIP-4844 (Besu Clique doesn't support Cancun). Use L1=anvil."; exit 1; \
+				elif [ "$$profile" = "reth" ]; then \
 					profiles="$$profiles --profile blob"; \
 				elif [ "$$profile" = "cdk-erigon" ]; then \
 					profiles="$$profiles --profile blob-cdk"; \
@@ -120,6 +128,7 @@ up: mcp-build
 				else \
 					profiles="$$profiles --profile privacy"; \
 				fi; \
+				has_privacy=1; \
 				;; \
 			explorer) \
 				if [ "$$profile" = "cdk-erigon" ]; then \
@@ -127,14 +136,19 @@ up: mcp-build
 				else \
 					profiles="$$profiles --profile explorer --profile explorer-l1"; \
 				fi; \
+				has_explorer=1; \
 				;; \
 			bridge) \
-				if [ "$$profile" != "reth" ]; then echo "Error: 'bridge' is only supported with PROFILE=reth."; exit 1; fi; \
+				if [ "$$profile" != "reth" ] && [ "$$profile" != "cdk-erigon" ]; then \
+					echo "Error: 'bridge' requires PROFILE=reth or PROFILE=cdk-erigon."; exit 1; \
+				fi; \
 				profiles="$$profiles --profile bridge"; \
 				bridge_enabled=1; \
 				;; \
 			bridge-ui|bridge_ui) \
-				if [ "$$profile" != "reth" ]; then echo "Error: 'bridge-ui' is only supported with PROFILE=reth."; exit 1; fi; \
+				if [ "$$profile" != "reth" ] && [ "$$profile" != "cdk-erigon" ]; then \
+					echo "Error: 'bridge-ui' requires PROFILE=reth or PROFILE=cdk-erigon."; exit 1; \
+				fi; \
 				profiles="$$profiles --profile bridge-ui"; \
 				bridge_ui_enabled=1; \
 				;; \
@@ -151,6 +165,38 @@ up: mcp-build
 	compose_files=""; \
 	if [ "$$build_local" = "true" ]; then \
 		compose_files="-f docker-compose.yml -f docker-compose.build.yaml"; \
+	fi; \
+	if [ -n "$$has_privacy" ] && [ -n "$$has_explorer" ]; then \
+		if [ -z "$$compose_files" ]; then \
+			compose_files="-f docker-compose.yml"; \
+		fi; \
+		if [ "$$profile" = "cdk-erigon" ]; then \
+			compose_files="$$compose_files -f docker-compose-privacy-explorer-cdk.yaml"; \
+		else \
+			compose_files="$$compose_files -f docker-compose-privacy-explorer.yaml"; \
+		fi; \
+	fi; \
+	if [ -n "$$has_privacy" ]; then \
+		export PRIVACY_RPC_URL="http://privacy-proxy:8080"; \
+		export PRIVACY_AUTH_TOKEN_FILE="/shared/loadtest-jwt.txt"; \
+	fi; \
+	if [ "$$l1" = "besu" ]; then \
+		if [ -z "$$compose_files" ]; then \
+			compose_files="-f docker-compose.yml"; \
+		fi; \
+		compose_files="$$compose_files -f docker-compose-besu-l1.yaml"; \
+	elif [ "$$l1" != "anvil" ]; then \
+		echo "Error: L1 must be 'anvil' or 'besu' (got '$$l1')."; exit 1; \
+	fi; \
+	if [ "$$bridge_enabled" -eq 1 ] && [ "$$profile" = "cdk-erigon" ]; then \
+		if [ -z "$$compose_files" ]; then \
+			compose_files="-f docker-compose.yml"; \
+		fi; \
+		if [ "$$l1" = "besu" ]; then \
+			compose_files="$$compose_files -f docker-compose-besu-cdk-erigon-bridge.yaml"; \
+		else \
+			compose_files="$$compose_files -f docker-compose-cdk-erigon-bridge.yaml"; \
+		fi; \
 	fi; \
 	build_flag=""; \
 	detach_flag="-d"; \
@@ -919,6 +965,16 @@ polycli-help:
 	@echo "  - Pre-funded accounts (faster startup)"
 	@echo ""
 	@echo "Example: make polycli-eoa POLYCLI_TPS=500 POLYCLI_DURATION=60"
+
+# =============================================================================
+# Privacy Load Testing
+# =============================================================================
+
+loadtest-privacy: ## Start stack with privacy proxy for load testing
+	$(MAKE) up PROFILE=reth WITH=privacy,explorer
+
+loadtest-direct: ## Start stack without privacy for baseline comparison
+	$(MAKE) up PROFILE=reth WITH=explorer
 
 # #############################################################################
 # Documentation Site

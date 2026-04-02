@@ -1,0 +1,17 @@
+# Privacy-enhanced block explorer overlay
+# Auto-included when both privacy and explorer profiles are active
+services:
+  privacy-proxy:
+    depends_on:
+      explorer-db:
+        condition: service_healthy
+    environment:
+      - EXPLORER_DATABASE_URL=postgres://explorer:explorer@explorer-db:5432/explorer?sslmode=disable
+
+  explorer-api:
+    environment:
+      - PRIVACY_PROXY_URL=http://privacy-proxy:8080
+      - PRIVACY_PROXY_PUBLIC_URL=http://localhost:18300
+    depends_on:
+      privacy-proxy:
+        condition: service_started

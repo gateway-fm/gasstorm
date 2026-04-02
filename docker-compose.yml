@@ -319,8 +319,12 @@ services:
       - LISTEN_ADDR=:3001
       - DATABASE_PATH=/data/loadgen.db # SQLite database for test history
       - BLOCK_TIME_MS=${BLOCK_TIME_MS:-150} # Must match block-builder for account scaling
+      - PRIVACY_RPC_URL=${PRIVACY_RPC_URL:-http://privacy-proxy:8080}
+      - PRIVACY_AUTH_TOKEN_FILE=${PRIVACY_AUTH_TOKEN_FILE:-/shared/loadtest-jwt.txt}
     tmpfs:
       - /data:mode=1777
+    volumes:
+      - privacy-loadtest-config:/shared:ro
     ports:
       - "13001:3001" # REST API for load test control
       - "16061:6061" # pprof for profiling
@@ -370,11 +374,10 @@ services:
     depends_on:
       l1:
         condition: service_healthy
-      block-builder:
-        condition: service_started
     environment:
       - L1_RPC=http://l1:8545
-      - L2_RPC=http://block-builder:3000
+      - L2_RPC=${BRIDGE_L2_RPC:-http://block-builder:3000}
+      - L2_RELAYER_RPC=${BRIDGE_L2_RPC:-http://block-builder:3000}
       # Use Anvil account #1 to avoid nonce conflicts with load generator (account #0)
       # WARNING: This is a well-known test key - DO NOT use with real funds
       - HYP_KEY=${HYP_KEY:-0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d}
@@ -816,6 +819,7 @@ services:
       - DATABASE_URL=postgres://explorer:explorer@explorer-db:5432/explorer?sslmode=disable
       - RPC_URL=http://block-builder:3000
       - API_PORT=8080
+      - HIDDEN_TX_TYPES=126
     ports:
       - "18200:8080"
     restart: unless-stopped
@@ -1029,6 +1033,7 @@ services:
     build:
       context: ../privacy-proxy
       dockerfile: Dockerfile.backend
+      target: dev
     image: gatewayfm/privacy-proxy:${PRIVACY_PROXY_VERSION:-local}
     container_name: gasstorm-privacy-proxy
     profiles: [ "privacy" ]
@@ -1048,6 +1053,7 @@ services:
       - JWT_SECRET=dev-jwt-secret-do-not-use-in-production-1234567890
       - JWT_REFRESH_SECRET=dev-refresh-secret-do-not-use-in-production-0987654321
       - TUNNEL_URL_FILE=/shared/tunnel-url.txt
+      - ENABLE_RUNTIME_TRACING=true
     volumes:
       - ./data/tunnel:/shared:ro
     ports:
@@ -1084,6 +1090,20 @@ services:
       - privacy-proxy
     restart: unless-stopped
 
+  # Privacy Load Test Setup - creates RBAC config and JWT token for load generator
+  privacy-loadtest-setup:
+    image: alpine/curl:latest
+    container_name: gasstorm-privacy-loadtest-setup
+    profiles: [ "privacy" ]
+    depends_on:
+      privacy-proxy:
+        condition: service_started
+    volumes:
+      - ./scripts/privacy-loadtest-setup.sh:/setup.sh:ro
+      - privacy-loadtest-config:/shared
+    entrypoint: ["sh", "-c", "apk add --no-cache jq > /dev/null 2>&1 && sh /setup.sh"]
+    restart: "no"
+
   # --- Privacy CDK-Erigon variants ---
 
   privacy-db-cdk:
@@ -1109,6 +1129,7 @@ services:
     build:
       context: ../privacy-proxy
       dockerfile: Dockerfile.backend
+      target: dev
     image: gatewayfm/privacy-proxy:${PRIVACY_PROXY_VERSION:-local}
     container_name: gasstorm-privacy-proxy
     profiles: [ "privacy-cdk" ]
@@ -1128,6 +1149,7 @@ services:
       - JWT_SECRET=dev-jwt-secret-do-not-use-in-production-1234567890
       - JWT_REFRESH_SECRET=dev-refresh-secret-do-not-use-in-production-0987654321
       - TUNNEL_URL_FILE=/shared/tunnel-url.txt
+      - ENABLE_RUNTIME_TRACING=true
     volumes:
       - ./data/tunnel:/shared:ro
     ports:
@@ -1174,6 +1196,7 @@ volumes:
   explorer-db-data:
   explorer-l1-db-data:
   privacy-db-data:
+  privacy-loadtest-config:
 
 
 networks:

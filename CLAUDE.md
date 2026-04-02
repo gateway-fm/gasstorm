@@ -6,13 +6,6 @@ Local devnet and stress-testing toolkit for EVM sequencers — spins up an L1/L2
 
 **Task Tracking:** See [todo.md](./todo.md) for current tasks and priorities.
 
-## Git Workflow
-
-When committing, use `--no-gpg-sign` to avoid GPG timeout issues:
-```bash
-git commit --no-gpg-sign -m "commit message"
-```
-
 ## External Dependencies
 
 Both the block-builder and load-generator are maintained in separate repositories and pulled as Docker images:
@@ -68,6 +61,18 @@ type ExecutionLayerCapabilities struct {
 | `reth` / `op-reth` | External | Yes | Yes | Yes |
 | `gravity-reth` | None (direct) | No | No | No |
 | `cdk-erigon` | None (direct) | No | No | No |
+
+### Supported Combinations Matrix
+
+| L2 Engine | L1 | Privacy | Explorer | Bridge | Blob | Command |
+|-----------|-----|---------|----------|--------|------|---------|
+| op-reth + blockbuilder | Anvil | yes | yes | yes | yes | `make up PROFILE=reth WITH=blob,privacy,explorer,bridge` |
+| op-reth + blockbuilder | Besu | yes | yes | yes | -- | `make up PROFILE=reth L1=besu WITH=privacy,explorer,bridge` |
+| cdk-erigon | Anvil | yes | yes | yes | yes | `make up PROFILE=cdk-erigon WITH=blob,privacy,explorer,bridge` |
+| cdk-erigon | Besu | yes | yes | yes | -- | `make up PROFILE=cdk-erigon L1=besu WITH=privacy,explorer,bridge` |
+| gravity-reth | Anvil | -- | -- | -- | -- | `make up PROFILE=gravity-reth` |
+
+Unsupported: blob requires EIP-4844 L1 (Besu Clique is pre-Cancun), gravity-reth has no optional profiles yet. L1 defaults to Anvil; use `L1=besu` to swap.
 
 ### Adding a New Execution Layer
 
@@ -161,6 +166,31 @@ make clean-metal    # Remove data/metal/
 | `TX_ORDERING` | tip_desc | Transaction ordering: `fifo`, `tip_desc`, `tip_asc` |
 | `ENABLE_PRECONFIRMATIONS` | true | WebSocket preconf events (reth only) |
 | `SKIP_EMPTY_BLOCKS` | true | Don't produce blocks without transactions (reth only) |
+
+## Privacy Proxy Load Testing
+
+The dashboard supports comparative load testing with and without the privacy proxy.
+
+### Quick Start
+```bash
+make loadtest-privacy    # Start stack with privacy proxy
+make loadtest-direct     # Start stack without privacy (baseline)
+```
+
+### How It Works
+- Dashboard has a **Direct / Through Privacy Proxy** toggle on the load test config
+- When privacy mode is enabled, the load generator routes `eth_sendRawTransaction` through the privacy proxy with JWT auth
+- The privacy proxy performs RBAC checks, RLP decoding, runtime tracing (`debug_traceCall`), and audit logging per TX
+- Test history badges each run as "Privacy" or "Direct" for easy comparison
+
+### Privacy-Enhanced Explorer
+When both `privacy` and `explorer` profiles are active (`make up WITH=privacy,explorer`), the explorer API automatically routes through the privacy proxy for visibility-filtered data. The indexer is unaffected.
+
+### Performance Overhead (Privacy Proxy per TX)
+- JWT validation + RBAC DB lookup: ~1-5ms
+- Runtime tracing (`debug_traceCall`): **10-100ms+** for contract calls (skipped for simple ETH→EOA transfers)
+- Audit logging: ~1-2ms
+- **ETH transfer tests** measure auth+RBAC overhead only; **ERC20/Uniswap tests** measure the full tracing pipeline
 
 ## Performance Characteristics
 

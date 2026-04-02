@@ -43,6 +43,9 @@ Complete configuration reference for GasStorm.
 |----------|---------|-------------|
 | `PRIVACY_PROXY_VERSION` | local | Privacy proxy Docker image tag |
 | `PRIVACY_URL` | http://localhost:18300 | Privacy proxy URL (MCP server) |
+| `PRIVACY_RPC_URL` | http://privacy-proxy:8080 | RPC endpoint the load generator uses when routing through the privacy proxy |
+| `PRIVACY_AUTH_TOKEN_FILE` | /config/privacy-auth-token | Path to the JWT token file for privacy proxy authentication |
+| `HIDDEN_TX_TYPES` | [] | Transaction types hidden by the privacy proxy (JSON array, e.g. `["erc20-transfer"]`) |
 
 ### Execution Layer Selection
 

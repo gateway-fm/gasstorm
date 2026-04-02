@@ -202,6 +202,41 @@ Syncs L2 batches, packs them into EIP-4844 blobs, and posts to L1. Requires the 
 
 The dashboard auto-detects blob-da and shows live online/offline status in the system diagram.
 
+## Supported Combinations
+
+Feature support varies by L2 engine and L1 backend. Use this matrix to find the right command.
+
+| L2 Engine | L1 | Privacy | Explorer | Bridge | Blob | Load Test | Command |
+|-----------|-----|---------|----------|--------|------|-----------|---------|
+| op-reth + blockbuilder | Anvil | yes | yes | yes | yes | yes | `make up PROFILE=reth WITH=blob,privacy,explorer,bridge` |
+| op-reth + blockbuilder | Besu | yes | yes | yes | -- | yes | `make up PROFILE=reth L1=besu WITH=privacy,explorer,bridge` |
+| cdk-erigon | Anvil | yes | yes | yes | yes | yes | `make up PROFILE=cdk-erigon WITH=blob,privacy,explorer,bridge` |
+| cdk-erigon | Besu | yes | yes | yes | -- | yes | `make up PROFILE=cdk-erigon L1=besu WITH=privacy,explorer,bridge` |
+| gravity-reth | Anvil | -- | -- | -- | -- | -- | `make up PROFILE=gravity-reth` |
+
+L1 defaults to Anvil. Use `L1=besu` to swap to Hyperledger Besu (Clique dev mode).
+
+**Why some combinations are not supported:**
+
+- **Blob on Besu L1** -- Besu Clique dev mode runs pre-Cancun consensus; EIP-4844 blob transactions require Cancun (use Anvil L1 for blob).
+- **Features on gravity-reth** -- gravity-reth is an early integration; optional profiles have not been wired up yet.
+
+### Privacy Load Testing
+
+The dashboard load test page has two modes for comparative benchmarking:
+
+- **Direct** -- Transactions go straight to the block builder (or sequencer). This is the baseline.
+- **Through Privacy Proxy** -- Transactions route through the privacy proxy, which adds JWT auth, RBAC checks, runtime tracing, and audit logging.
+
+Convenience targets to start the stack in each mode:
+
+```bash
+make loadtest-privacy    # Start stack with privacy proxy enabled
+make loadtest-direct     # Start stack without privacy (baseline)
+```
+
+After running tests in both modes, open the **History** tab in the dashboard to compare results side-by-side. Each run is badged as "Privacy" or "Direct".
+
 ## Components
 
 | Component | Repository | Description |

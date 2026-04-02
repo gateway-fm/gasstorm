@@ -133,6 +133,10 @@ func registerStackUp(s *server.MCPServer, dir string) {
 		mcp.WithBoolean("blob",
 			mcp.Description("Legacy flag: include blob profile."),
 		),
+		mcp.WithString("l1",
+			mcp.Description("L1 backend: anvil (default) or besu (Clique PoA)."),
+			mcp.Enum("anvil", "besu"),
+		),
 		mcp.WithBoolean("metal",
 			mcp.Description("Start in Metal mode (no Docker). Requires op-reth, Go, Node.js, and sibling repos."),
 		),
@@ -142,6 +146,7 @@ func registerStackUp(s *server.MCPServer, dir string) {
 	)
 	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		profile := req.GetString("profile", "reth")
+		l1 := req.GetString("l1", "anvil")
 		gasless := req.GetBool("gasless", false)
 		withRaw := strings.TrimSpace(req.GetString("with", ""))
 		legacyBridge := req.GetBool("bridge", false)
@@ -216,41 +221,66 @@ func registerStackUp(s *server.MCPServer, dir string) {
 			addProfile(p)
 		}
 
+		// Collect compose overlay files. When any overlay is used,
+		// docker-compose.yml must be specified as the base file.
+		var composeFiles []string
+
+		if l1 == "besu" {
+			if features["blob"] {
+				return mcp.NewToolResultError("Feature 'blob' requires EIP-4844 (Besu Clique doesn't support Cancun). Use L1=anvil."), nil
+			}
+			composeFiles = append(composeFiles, "docker-compose-besu-l1.yaml")
+		}
+
+		if features["bridge"] && profile == "cdk-erigon" {
+			if l1 == "besu" {
+				composeFiles = append(composeFiles, "docker-compose-besu-cdk-erigon-bridge.yaml")
+			} else {
+				composeFiles = append(composeFiles, "docker-compose-cdk-erigon-bridge.yaml")
+			}
+		}
+
+		if features["privacy"] && features["explorer"] {
+			if profile == "cdk-erigon" {
+				composeFiles = append(composeFiles, "docker-compose-privacy-explorer-cdk.yaml")
+			} else {
+				composeFiles = append(composeFiles, "docker-compose-privacy-explorer.yaml")
+			}
+		}
+
+		if gasless {
+			composeFiles = append(composeFiles, "docker-compose-op-reth.yaml", "docker-compose-gasless.yaml")
+		}
+
+		// Build compose args: profiles, then file overrides, then command.
 		args := []string{}
 		for _, p := range profiles {
 			args = append(args, "--profile", p)
 		}
-		if gasless {
-			args = append(args, "-f", "docker-compose.yml", "-f", "docker-compose-op-reth.yaml", "-f", "docker-compose-gasless.yaml")
+		if len(composeFiles) > 0 {
+			args = append(args, "-f", "docker-compose.yml")
+			for _, f := range composeFiles {
+				args = append(args, "-f", f)
+			}
 		}
 		args = append(args, "up", "-d")
 
-		// Note: when using -f overrides, we must specify all base files if we deviate from default behavior.
-		// However, runCompose appends 'compose' + args. Standard usage often just relies on COMPOSE_FILE env or default.
-		// If gasless is false, we just use defaults. If true, we need to be careful about which files to include.
-		// docker-compose.yml is base. docker-compose-op-reth.yaml is the profile logic usually activated by profile name?
-		// Actually, profiles are in the service definitions. We just need to add the override file if gasless.
-		// But docker compose merging rules require specifying the base file if you specify -f.
-
-		// If gasless is active, we reconstruct the file list explicitly to be safe + the override.
-		// Standard set usually implicitly picks up docker-compose.yml and docker-compose.override.yml
-
-		if gasless {
-			// Reset args to be explicit about files
-			args = []string{}
-			for _, p := range profiles {
-				args = append(args, "--profile", p)
-			}
-			args = append(args, "-f", "docker-compose.yml", "-f", "docker-compose-op-reth.yaml", "-f", "docker-compose-gasless.yaml", "up", "-d")
+		// Set BRIDGE_L2_RPC for cdk-erigon bridge (different container hostname).
+		env := map[string]string{}
+		if features["bridge"] && profile == "cdk-erigon" {
+			env["BRIDGE_L2_RPC"] = "http://l2-cdk-erigon:8545"
 		}
 
-		out, err := runCompose(dir, args...)
+		out, err := runComposeWithEnv(dir, env, args...)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("stack_up failed: %v\n%s", err, out)), nil
 		}
 
 		statusMsg := fmt.Sprintf("Profiles: %s", strings.Join(profiles, ", "))
 		statusMsg += fmt.Sprintf(" | Features: %s", withRaw)
+		if l1 != "anvil" {
+			statusMsg += fmt.Sprintf(" | L1: %s", l1)
+		}
 		if gasless {
 			statusMsg += " (Gasless Mode Enabled)"
 		}
@@ -331,15 +361,15 @@ func resolveOptionalProfiles(profile string, features map[string]bool) ([]string
 	}
 
 	if features["bridge"] {
-		if profile != "reth" {
-			return nil, fmt.Errorf("feature 'bridge' is only supported with profile=reth")
+		if profile != "reth" && profile != "cdk-erigon" {
+			return nil, fmt.Errorf("feature 'bridge' requires profile=reth or profile=cdk-erigon")
 		}
 		add("bridge")
 	}
 
 	if features["bridge-ui"] {
-		if profile != "reth" {
-			return nil, fmt.Errorf("feature 'bridge-ui' is only supported with profile=reth")
+		if profile != "reth" && profile != "cdk-erigon" {
+			return nil, fmt.Errorf("feature 'bridge-ui' requires profile=reth or profile=cdk-erigon")
 		}
 		add("bridge-ui")
 	}
@@ -601,9 +631,17 @@ func registerStackConfigSet(s *server.MCPServer, dir string) {
 
 // runCompose runs a docker compose command in the gasstorm directory.
 func runCompose(dir string, args ...string) (string, error) {
+	return runComposeWithEnv(dir, nil, args...)
+}
+
+// runComposeWithEnv runs a docker compose command with extra environment variables.
+func runComposeWithEnv(dir string, env map[string]string, args ...string) (string, error) {
 	cmdArgs := append([]string{"compose"}, args...)
 	cmd := exec.Command("docker", cmdArgs...)
 	cmd.Dir = dir
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), mapToEnv(env)...)
+	}
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -615,6 +653,15 @@ func runCompose(dir string, args ...string) (string, error) {
 		output = stderr.String()
 	}
 	return strings.TrimSpace(output), err
+}
+
+// mapToEnv converts a map to a slice of KEY=VALUE strings.
+func mapToEnv(m map[string]string) []string {
+	env := make([]string, 0, len(m))
+	for k, v := range m {
+		env = append(env, k+"="+v)
+	}
+	return env
 }
 
 // runScript runs a shell script in the gasstorm directory with a timeout.

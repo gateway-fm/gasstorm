@@ -114,6 +114,8 @@ export interface GoLoadTestMetrics {
   hsmProvider?: string;
   hsmKeyIdActive?: string;
   hsmFailoverEnabled?: boolean;
+  // Privacy proxy availability
+  privacyAvailable?: boolean;
 }
 
 // Request payload to Go load generator
@@ -139,6 +141,8 @@ export interface StartTestRequest {
   adaptiveRateStep?: number;
   // Realistic pattern
   realisticConfig?: RealisticTestConfig;
+  // Privacy mode (route through privacy proxy)
+  privacyMode?: boolean;
 }
 
 // Types for historical data hydration
@@ -174,6 +178,7 @@ export interface HistoricalTestRun {
     adaptiveTargetPending?: number;
     adaptiveRateStep?: number;
     realisticConfig?: RealisticTestConfig;
+    privacyMode?: boolean;
   };
   tipHistogram?: TipHistogramBucket[];
   txTypeMetrics?: TxTypeMetrics[];
@@ -185,6 +190,7 @@ export interface HistoricalTestRun {
     builderHsmKeyIdActive?: string;
     builderHsmFailoverEnabled?: boolean;
   };
+  privacyMode?: boolean;
 }
 
 export interface HistoricalTimeSeriesPoint {
