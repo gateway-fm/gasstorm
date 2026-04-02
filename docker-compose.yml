@@ -1015,6 +1015,7 @@ services:
     image: postgres:15-alpine
     container_name: gasstorm-privacy-db
     profiles: [ "privacy" ]
+    command: ["postgres", "-c", "max_connections=200", "-c", "shared_buffers=128MB"]
     environment:
       - POSTGRES_USER=privacy
       - POSTGRES_PASSWORD=privacy
