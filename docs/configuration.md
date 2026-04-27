@@ -250,24 +250,69 @@ make clean-besu
 
 ## External L1 Mode
 
-Connects to any remote L1 via an nginx reverse proxy. All internal services still use `http://l1:8545` - the proxy transparently forwards to the external RPC. Chain ID and domain are auto-detected.
+Connect to any pre-existing L1 chain instead of running a local Anvil or Besu node. An nginx reverse proxy replaces the `l1` service and forwards `http://l1:8545` to the external RPC. Chain ID, domain, and block time are auto-detected from the RPC.
+
+### Setup
+
+Create a named config file from the template:
 
 ```bash
-# Connect to a remote Besu/Geth/etc.
-EXTERNAL_L1_RPC=http://10.0.0.5:8545 \
-EXTERNAL_L1_KEY=0xYourFundedPrivateKey \
-  make run-external-l1-hyperlane
-
-# Stop / clean
-make stop-external-l1
-make clean-external-l1
+cp config/l1/example.env config/l1/my-chain.env
 ```
+
+Edit with your chain details:
+
+```bash
+# config/l1/my-chain.env
+EXTERNAL_L1_RPC=https://user:pass@rpc.example.com:8545/
+EXTERNAL_L1_WS=wss://user:pass@rpc.example.com:8546/
+EXTERNAL_L1_CHAIN_ID=2026
+EXTERNAL_L1_KEY=0x...   # Only needed for WITH=bridge
+```
+
+Then start the stack:
+
+```bash
+# With explorer
+make up L1=my-chain PROFILE=reth WITH=explorer
+
+# With bridge (requires EXTERNAL_L1_KEY)
+make up L1=my-chain PROFILE=reth WITH=explorer,bridge
+
+# CDK-Erigon
+make up L1=my-chain PROFILE=cdk-erigon WITH=explorer
+
+# Stop / clean as usual
+make stop
+make clean
+```
+
+### Config File Reference
+
+Config files live at `config/l1/<name>.env`. The `<name>` matches the `L1=` argument.
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `EXTERNAL_L1_RPC` | Yes | External L1 JSON-RPC URL |
-| `EXTERNAL_L1_KEY` | Yes | Private key with ETH on the external L1 (for Hyperlane contract deployment) |
-| `EXTERNAL_L1_CHAIN_NAME` | No | Hyperlane chain name (default: `externall1`) |
+| `EXTERNAL_L1_RPC` | Yes | Full HTTP(S) JSON-RPC URL. Credentials can be embedded (`https://user:pass@host:port/`). |
+| `EXTERNAL_L1_WS` | No | WebSocket URL for subscriptions. If omitted, services fall back to HTTP polling. |
+| `EXTERNAL_L1_CHAIN_ID` | No | Chain ID. Auto-detected from RPC if omitted. |
+| `EXTERNAL_L1_CHAIN_NAME` | No | Chain name for Hyperlane registry. Defaults to the `L1=` value. |
+| `EXTERNAL_L1_KEY` | No | Private key for signing. Only required when `WITH=bridge` (contract deployment). |
+
+### How It Works
+
+The nginx proxy handles HTTPS upstream, basic auth (extracted from embedded URL credentials), and WebSocket upgrades (when `EXTERNAL_L1_WS` is set). All internal services continue to use `http://l1:8545` and `ws://l1:8546` — the proxy transparently forwards these to the external endpoints.
+
+### Legacy Targets
+
+The following targets still work but are deprecated in favour of `make up L1=<name>`:
+
+```bash
+# Deprecated — use make up L1=<name> instead
+EXTERNAL_L1_RPC=http://10.0.0.5:8545 EXTERNAL_L1_KEY=0x... make run-external-l1-hyperlane
+make stop-external-l1
+make clean-external-l1
+```
 
 ## Service Ports
 

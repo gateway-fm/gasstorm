@@ -19,8 +19,87 @@ COPY . .
 
 ARG NEXT_PUBLIC_WALLET_CONNECT_ID
 ARG NEXT_PUBLIC_RPC_OVERRIDES
+ARG NEXT_PUBLIC_DISABLE_HTTPS_UPGRADE
+ARG NEXT_PUBLIC_L1_CHAIN_NAME=l1local
+ARG L1_CHAIN_ID=31337
+ARG L1_DISPLAY_NAME="L1"
+ARG L1_RPC_URL=http://localhost:18545
+ARG L1_BLOCK_TIME=12
+ARG L2_RPC_URL=http://localhost:13000
+ARG L2_DISPLAY_NAME="CDK-L2 (reth)"
+ARG L1_ETH_WARP_ADDR
+ARG L2_ETH_WARP_ADDR
 ENV NEXT_PUBLIC_WALLET_CONNECT_ID=${NEXT_PUBLIC_WALLET_CONNECT_ID}
 ENV NEXT_PUBLIC_RPC_OVERRIDES=${NEXT_PUBLIC_RPC_OVERRIDES}
+ENV NEXT_PUBLIC_L1_CHAIN_NAME=${NEXT_PUBLIC_L1_CHAIN_NAME}
+ENV NEXT_PUBLIC_DISABLE_HTTPS_UPGRADE=${NEXT_PUBLIC_DISABLE_HTTPS_UPGRADE}
+
+# Generate chains.yaml from build args
+RUN printf '%s\n' \
+  "---" \
+  "${NEXT_PUBLIC_L1_CHAIN_NAME}:" \
+  "  chainId: ${L1_CHAIN_ID}" \
+  "  domainId: ${L1_CHAIN_ID}" \
+  "  name: ${NEXT_PUBLIC_L1_CHAIN_NAME}" \
+  "  displayName: \"${L1_DISPLAY_NAME}\"" \
+  "  protocol: ethereum" \
+  "  rpcUrls:" \
+  "    - http: ${L1_RPC_URL}" \
+  "  nativeToken:" \
+  "    name: Ether" \
+  "    symbol: ETH" \
+  "    decimals: 18" \
+  "  blocks:" \
+  "    confirmations: 1" \
+  "    reorgPeriod: 0" \
+  "    estimateBlockTime: ${L1_BLOCK_TIME}" \
+  "  isTestnet: true" \
+  "" \
+  "l2local:" \
+  "  chainId: 42069" \
+  "  domainId: 42069" \
+  "  name: l2local" \
+  "  displayName: \"${L2_DISPLAY_NAME}\"" \
+  "  protocol: ethereum" \
+  "  rpcUrls:" \
+  "    - http: ${L2_RPC_URL}" \
+  "  nativeToken:" \
+  "    name: Ether" \
+  "    symbol: ETH" \
+  "    decimals: 18" \
+  "  blocks:" \
+  "    confirmations: 1" \
+  "    reorgPeriod: 0" \
+  "    estimateBlockTime: 1" \
+  "  isTestnet: true" \
+  > src/consts/chains.yaml
+
+# Generate warp routes from build args (addresses from hyperlane-init)
+RUN if [ -n "${L1_ETH_WARP_ADDR}" ] && [ -n "${L2_ETH_WARP_ADDR}" ]; then \
+      printf '%s\n' \
+        "---" \
+        "tokens:" \
+        "  - chainName: ${NEXT_PUBLIC_L1_CHAIN_NAME}" \
+        "    standard: EvmHypNative" \
+        "    addressOrDenom: \"${L1_ETH_WARP_ADDR}\"" \
+        "    decimals: 18" \
+        "    symbol: ETH" \
+        "    name: Ether" \
+        "    connections:" \
+        "      - token: \"ethereum|l2local|${L2_ETH_WARP_ADDR}\"" \
+        "  - chainName: l2local" \
+        "    standard: EvmHypNative" \
+        "    addressOrDenom: \"${L2_ETH_WARP_ADDR}\"" \
+        "    decimals: 18" \
+        "    symbol: ETH" \
+        "    name: Ether" \
+        "    connections:" \
+        "      - token: \"ethereum|${NEXT_PUBLIC_L1_CHAIN_NAME}|${L1_ETH_WARP_ADDR}\"" \
+        "options: {}" \
+        > src/consts/warpRoutes.yaml; \
+    else \
+      printf '%s\n' "---" "tokens: []" "options: {}" > src/consts/warpRoutes.yaml; \
+    fi
 
 RUN --mount=type=cache,target=/app/.next/cache \
     pnpm build

@@ -32,7 +32,7 @@ services:
       "--ws.port=8546"
     ]
     volumes:
-      - ./config/cdk-erigon:/config:ro
+      - ../config/cdk-erigon:/config:ro
       - cdk-erigon-data:/data
     ports:
       - "18546:8545"   # L2 RPC
@@ -51,7 +51,7 @@ services:
   # Sends transactions directly to cdk-erigon RPC (no block-builder)
   load-generator:
     build:
-      context: ../loadgenerator
+      context: ../../loadgenerator
       dockerfile: Dockerfile
     image: gatewayfm/loadgenerator:local
     container_name: gasstorm-loadgen
@@ -75,7 +75,7 @@ services:
   # Dashboard (Next.js static build)
   dashboard:
     build:
-      context: ./dashboard
+      context: ../dashboard
       dockerfile: Dockerfile
     container_name: gasstorm-dashboard
     depends_on:

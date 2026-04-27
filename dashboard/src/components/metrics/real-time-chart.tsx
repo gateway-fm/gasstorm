@@ -241,8 +241,8 @@ export function RealTimeChart() {
   }, [chartData, hasMgasData]);
 
   return (
-    <Card className="col-span-2">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+    <Card className="col-span-2 flex flex-col">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <CardTitle className="text-base font-semibold">
           {isHistoricalMode
             ? (hasMgasData ? "Historical Throughput" : "Historical TPS")
@@ -292,8 +292,8 @@ export function RealTimeChart() {
           )}
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="h-[300px] min-w-0 w-full">
+      <CardContent className="flex-1 flex flex-col">
+        <div className="min-h-[300px] flex-1 min-w-0 w-full">
           {chartElement ?? (
             <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
               {liveStatus === "completed" || liveStatus === "error" ? (

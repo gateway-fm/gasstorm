@@ -23,8 +23,22 @@ export function isDevMode(): boolean {
   return window.location.port === "3000";
 }
 
+/**
+ * Whether we're running behind a single exposed port (e.g. remote/cloud deploy).
+ * In this mode, service iframes use /proxy/{port}/ paths instead of direct ports.
+ */
+function isSinglePortMode(): boolean {
+  if (typeof window === "undefined") return false;
+  const p = window.location.port;
+  // Port 80 (or empty = default HTTP) means only one port is exposed
+  return p === "" || p === "80";
+}
+
 /** Build an HTTP URL for a local service by port. */
 export function getServiceUrl(port: number, path = ""): string {
+  if (isSinglePortMode()) {
+    return `/proxy/${port}/${path.replace(/^\//, "")}`;
+  }
   return `http://${getHostname()}:${port}${path}`;
 }
 

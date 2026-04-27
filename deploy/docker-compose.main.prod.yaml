@@ -1,0 +1,201 @@
+# Production overlay for the main server in 3-way split topology.
+# Main server runs: dashboard (port 80), load generator, docs site.
+#
+# Requires env vars:
+#   CHAIN_SERVER    - IP/hostname of the chain server
+#   EXPLORER_SERVER - IP/hostname of the explorer server
+
+services:
+  dashboard:
+    build:
+      args:
+        LOADTEST_HIDE_FAILED: "1"
+        PRIVACY_UI_URL: "http://${EXPLORER_SERVER_PUBLIC}:18301"
+        BRIDGE_UI_URL: "http://${MAIN_SERVER_PUBLIC}:18001"
+    ports: !override
+      - "80:80"
+    environment:
+      - LOADGEN_HOST=load-generator:3001
+      - CHAIN_HOST_RPC=${CHAIN_SERVER}:13000
+      - CHAIN_HOST_BUILDER_WS=${CHAIN_SERVER}:13002
+      - CHAIN_HOST_L2_RPC=${CHAIN_SERVER}:18546
+      - CHAIN_HOST_L2_WS=${CHAIN_SERVER}:18547
+      - CHAIN_HOST_L1=${CHAIN_SERVER}:18545
+      - EXPLORER_HOST_API=${EXPLORER_SERVER}:18200
+      - EXPLORER_HOST_L1_API=${EXPLORER_SERVER}:18202
+      - EXPLORER_HOST_UI=${EXPLORER_SERVER}:18201
+      - EXPLORER_HOST_L1_UI=${EXPLORER_SERVER}:18203
+      # Privacy proxy on explorer server
+      - PRIVACY_HOST_API=${EXPLORER_SERVER}:18300
+      - PRIVACY_HOST_UI=${EXPLORER_SERVER}:18301
+      # External Besu L1 proxy for bridge RPC (local container)
+      - BRIDGE_L1_HOST=external-l1-proxy:8545
+
+  dashboard-cdk:
+    build:
+      args:
+        LOADTEST_HIDE_FAILED: "1"
+    ports: !override
+      - "80:80"
+    environment:
+      - LOADGEN_HOST=load-generator:3001
+      - CHAIN_HOST_RPC=${CHAIN_SERVER}:18546
+      - CHAIN_HOST_BUILDER_WS=${CHAIN_SERVER}:18546
+      - CHAIN_HOST_L2_RPC=${CHAIN_SERVER}:18546
+      - CHAIN_HOST_L2_WS=${CHAIN_SERVER}:18547
+      - CHAIN_HOST_L1=${CHAIN_SERVER}:18545
+      - EXPLORER_HOST_API=${EXPLORER_SERVER}:18200
+      - EXPLORER_HOST_L1_API=${EXPLORER_SERVER}:18202
+      - EXPLORER_HOST_UI=${EXPLORER_SERVER}:18201
+      - EXPLORER_HOST_L1_UI=${EXPLORER_SERVER}:18203
+      # Privacy proxy on explorer server
+      - PRIVACY_HOST_API=${EXPLORER_SERVER}:18300
+      - PRIVACY_HOST_UI=${EXPLORER_SERVER}:18301
+
+  load-generator:
+    build:
+      context: /opt/gasstorm-main/loadgenerator
+      dockerfile: Dockerfile
+    environment:
+      - BUILDER_RPC_URL=http://${CHAIN_SERVER}:13000
+      - L2_RPC_URL=http://${CHAIN_SERVER}:13000
+      - L2_WS_URL=ws://${CHAIN_SERVER}:18547
+      - PRECONF_WS_URL=ws://${CHAIN_SERVER}:13002/ws/preconfirmations
+      - BLOCK_TIME_MS=${BLOCK_TIME_MS:-1000}
+      # Privacy proxy for privacy-mode load tests
+      - PRIVACY_RPC_URL=http://${EXPLORER_SERVER}:18300
+
+  load-generator-cdk:
+    build:
+      context: /opt/gasstorm-main/loadgenerator
+      dockerfile: Dockerfile
+    environment:
+      - BUILDER_RPC_URL=http://${CHAIN_SERVER}:18546
+      - L2_RPC_URL=http://${CHAIN_SERVER}:18546
+      - L2_WS_URL=ws://${CHAIN_SERVER}:18547
+      - BLOCK_TIME_MS=${BLOCK_TIME_MS:-1000}
+
+  # --- Hyperlane Bridge (External Besu L1 ↔ op-reth L2) ---
+
+  # Nginx proxy that forwards to the external Besu RPC (hides credentials from browser)
+  external-l1-proxy:
+    image: nginx:alpine
+    container_name: gasstorm-external-l1-proxy
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    command: []
+    environment:
+      - EXTERNAL_L1_RPC=${EXTERNAL_L1_RPC}
+      - EXTERNAL_L1_WS=${EXTERNAL_L1_WS:-}
+    volumes:
+      - /opt/gasstorm-main/repo/config/external-l1-entrypoint.sh:/entrypoint.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- --post-data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_chainId\",\"params\":[],\"id\":1}' --header 'Content-Type: application/json' http://localhost:8545 | grep -q result"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 5s
+    restart: unless-stopped
+
+  hyperlane-init:
+    build:
+      context: /opt/gasstorm-main/repo
+      dockerfile: ./hyperlane-init/Dockerfile
+    container_name: gasstorm-hyperlane-init
+    depends_on:
+      external-l1-proxy:
+        condition: service_healthy
+    environment:
+      # L1 = external Besu (through local nginx proxy)
+      - L1_RPC=http://external-l1-proxy:8545
+      # L2 = op-reth (through block builder on chain server)
+      - L2_RPC=http://${CHAIN_SERVER}:13000
+      - L2_RELAYER_RPC=http://${CHAIN_SERVER}:13000
+      # Auto-detect chain ID/domain from the external L1 RPC
+      - AUTO_DETECT_CHAINS=true
+      - L1_CHAIN_NAME=${EXTERNAL_L1_CHAIN_NAME:-}
+      # Pre-deployed MockUSDC on external L1 (skip forge deploy on gasless chains)
+      - MOCK_USDC_ADDR=${MOCK_USDC_ADDR:-}
+      # Pinned warp contract addresses — skip re-deploy, keep bridge-ui addresses stable across deploys.
+      # Leave empty to force a fresh deploy.
+      - L1_ETH_WARP_ADDR=${L1_ETH_WARP_ADDR:-}
+      - L2_ETH_WARP_ADDR=${L2_ETH_WARP_ADDR:-}
+      - L1_ERC20_WARP_ADDR=${L1_ERC20_WARP_ADDR:-}
+      - L2_ERC20_WARP_ADDR=${L2_ERC20_WARP_ADDR:-}
+      # Top up deployer wallet with USDC if below threshold (for bridge testing)
+      - USDC_DEPLOYER_MIN=${USDC_DEPLOYER_MIN:-1000000}
+      # Anvil account #1 — gasless chain, just needs a valid signer
+      - HYP_KEY=${HYP_KEY:-0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d}
+      - DEPLOYER_PRIVATE_KEY=${HYP_KEY:-0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d}
+      - OUTPUT_DIR=/output
+      - MONITOR_INTERVAL=30
+    volumes:
+      - hyperlane-config:/output
+      - hyperlane-relayer-data:/relayer-data
+    healthcheck:
+      test: ["CMD", "test", "-f", "/output/relayer.json"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 600s
+    restart: unless-stopped
+
+  hyperlane-relayer:
+    image: gcr.io/abacus-labs-dev/hyperlane-agent:agents-v1.3.0
+    container_name: gasstorm-relayer
+    depends_on:
+      hyperlane-init:
+        condition: service_healthy
+    environment:
+      - RUST_LOG=info,hyperlane=debug
+      - RUST_BACKTRACE=1
+      - CONFIG_FILES=/config/relayer.json
+    volumes:
+      - hyperlane-relayer-data:/data
+      - hyperlane-config:/config:ro
+    ports:
+      - "19190:9090"
+    entrypoint: [ "/app/relayer" ]
+    command: []
+    restart: unless-stopped
+
+  hyperlane-bridge-ui:
+    build:
+      context: /opt/gasstorm-main/repo/bridge-ui
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_WALLET_CONNECT_ID=${WALLET_CONNECT_ID:-00000000000000000000000000000000}
+        - NEXT_PUBLIC_DISABLE_HTTPS_UPGRADE=1
+        - NEXT_PUBLIC_L1_CHAIN_NAME=${EXTERNAL_L1_CHAIN_NAME:-}
+        - L1_CHAIN_ID=${EXTERNAL_L1_CHAIN_ID:-}
+        - L1_DISPLAY_NAME=${EXTERNAL_L1_DISPLAY_NAME:-}
+        - L1_RPC_URL=http://${MAIN_SERVER_PUBLIC}/rpc/bridge-l1
+        - L2_RPC_URL=http://${MAIN_SERVER_PUBLIC}/rpc/l2
+        - L2_DISPLAY_NAME=CDK-L2 (reth)
+        - L1_ETH_WARP_ADDR=${L1_ETH_WARP_ADDR:-}
+        - L2_ETH_WARP_ADDR=${L2_ETH_WARP_ADDR:-}
+    container_name: gasstorm-hyperlane-bridge-ui
+    depends_on:
+      hyperlane-init:
+        condition: service_healthy
+    volumes:
+      - hyperlane-config:/config:ro
+    ports:
+      - "18001:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+# Standalone network — not joining the chain server's Docker network
+networks:
+  default:
+    name: gasstorm-main
+    external: false
+
+# Override external volumes — create locally on this server
+volumes:
+  privacy-loadtest-config:
+    external: false
+  hyperlane-config:
+    external: false
+  hyperlane-relayer-data:
+    external: false

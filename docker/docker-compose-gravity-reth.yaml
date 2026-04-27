@@ -17,7 +17,7 @@ services:
   # Layer 2 - Gravity Reth (standalone sequencer)
   l2-gravity-reth:
     build:
-      context: ./gravity-reth
+      context: ../gravity-reth
       dockerfile: Dockerfile
     container_name: gasstorm-l2
     depends_on:
@@ -50,7 +50,7 @@ services:
       "-vv"
     ]
     volumes:
-      - ./genesis:/config:ro
+      - ../genesis:/config:ro
       - gravity-reth-data:/data
     ports:
       - "18546:8545"   # L2 RPC
@@ -90,7 +90,7 @@ services:
   # Dashboard (Next.js static build)
   dashboard:
     build:
-      context: ./dashboard
+      context: ../dashboard
       dockerfile: Dockerfile
     container_name: gasstorm-dashboard
     depends_on:

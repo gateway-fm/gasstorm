@@ -1,0 +1,191 @@
+# Standalone explorer stack (DBs + indexers + APIs + UIs for L1 and L2).
+# Runs on the explorer server in the 3-way split topology.
+#
+# Local (same machine, shared Docker network — uses Docker DNS defaults):
+#   docker compose -f docker-compose.explorer.yaml --profile explorer --profile explorer-l1 up -d
+#
+# Remote (standalone explorer server, point at chain server):
+#   L1_RPC_URL=http://<chain-ip>:18545 \
+#   L2_RPC_URL=http://<chain-ip>:18546 \
+#   L2_BUILDER_RPC_URL=http://<chain-ip>:13000 \
+#   docker compose -f docker-compose.explorer.yaml --profile explorer --profile explorer-l1 up -d
+
+services:
+  # ===========================================================================
+  # L2 Explorer (reth mode)
+  # ===========================================================================
+
+  # Explorer Database (PostgreSQL)
+  explorer-db:
+    image: postgres:16-alpine
+    container_name: gasstorm-explorer-db
+    profiles: [ "explorer" ]
+    environment:
+      - POSTGRES_USER=explorer
+      - POSTGRES_PASSWORD=explorer
+      - POSTGRES_DB=explorer
+    volumes:
+      - explorer-db-data:/var/lib/postgresql/data
+    ports:
+      - "15436:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U explorer -d explorer" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Explorer Indexer - indexes blocks/txs from L2 RPC
+  explorer-indexer:
+    image: gatewayfm/block-explorer-indexer:${BLOCK_EXPLORER_VERSION:-main}
+    container_name: gasstorm-explorer-indexer
+    profiles: [ "explorer" ]
+    entrypoint: [ "/indexer" ]
+    depends_on:
+      explorer-db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgres://explorer:explorer@explorer-db:5432/explorer?sslmode=disable
+      - RPC_URL=${L2_RPC_URL:-http://l2-reth:8545}
+      - POLL_INTERVAL=2s
+      - START_BLOCK=0
+      - CATCHUP_WORKERS=${CATCHUP_WORKERS:-10}
+      - RPC_WORKERS=${RPC_WORKERS:-50}
+      - RPC_RATE_LIMIT=${RPC_RATE_LIMIT:-500}
+      - ENABLE_TRACING=true
+      - TRACE_WORKERS=10
+      - TRACE_RATE_LIMIT=50
+    restart: unless-stopped
+
+  # Explorer API - REST API for block/tx queries
+  explorer-api:
+    image: gatewayfm/block-explorer-api:${BLOCK_EXPLORER_VERSION:-main}
+    container_name: gasstorm-explorer-api
+    profiles: [ "explorer" ]
+    networks:
+      default:
+        aliases:
+          - api
+    depends_on:
+      explorer-db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgres://explorer:explorer@explorer-db:5432/explorer?sslmode=disable
+      - RPC_URL=${L2_BUILDER_RPC_URL:-http://block-builder:3000}
+      - API_PORT=8080
+      - HIDDEN_TX_TYPES=126
+    ports:
+      - "18200:8080"
+    restart: unless-stopped
+
+  # Explorer UI - Web frontend
+  explorer-ui:
+    image: gatewayfm/block-explorer-frontend:${BLOCK_EXPLORER_VERSION:-main}
+    container_name: gasstorm-explorer-ui
+    profiles: [ "explorer" ]
+    user: root
+    depends_on:
+      - explorer-api
+    ports:
+      - "18201:80"
+    healthcheck:
+      test: [ "CMD", "curl", "-sf", "http://localhost/" ]
+      interval: 10s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # ===========================================================================
+  # L1 Explorer
+  # ===========================================================================
+
+  # L1 Explorer Database (PostgreSQL)
+  explorer-l1-db:
+    image: postgres:16-alpine
+    container_name: gasstorm-explorer-l1-db
+    profiles: [ "explorer-l1" ]
+    environment:
+      - POSTGRES_USER=explorer
+      - POSTGRES_PASSWORD=explorer
+      - POSTGRES_DB=explorer
+    volumes:
+      - explorer-l1-db-data:/var/lib/postgresql/data
+    ports:
+      - "15438:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U explorer -d explorer" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # L1 Explorer Indexer
+  explorer-l1-indexer:
+    image: gatewayfm/block-explorer-indexer:${BLOCK_EXPLORER_VERSION:-main}
+    container_name: gasstorm-explorer-l1-indexer
+    profiles: [ "explorer-l1" ]
+    entrypoint: [ "/indexer" ]
+    depends_on:
+      explorer-l1-db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgres://explorer:explorer@explorer-l1-db:5432/explorer?sslmode=disable
+      - RPC_URL=${L1_RPC_URL:-http://l1:8545}
+      - POLL_INTERVAL=2s
+      - START_BLOCK=0
+      - CATCHUP_WORKERS=${CATCHUP_WORKERS:-10}
+      - RPC_WORKERS=${RPC_WORKERS:-50}
+      - RPC_RATE_LIMIT=${RPC_RATE_LIMIT:-500}
+      - ENABLE_TRACING=true
+      - TRACE_WORKERS=10
+      - TRACE_RATE_LIMIT=50
+    restart: unless-stopped
+
+  # L1 Explorer API
+  explorer-l1-api:
+    image: gatewayfm/block-explorer-api:${BLOCK_EXPLORER_VERSION:-main}
+    container_name: gasstorm-explorer-l1-api
+    profiles: [ "explorer-l1" ]
+    networks:
+      default:
+        aliases:
+          - l1-api
+    depends_on:
+      explorer-l1-db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgres://explorer:explorer@explorer-l1-db:5432/explorer?sslmode=disable
+      - RPC_URL=${L1_RPC_URL:-http://l1:8545}
+      - API_PORT=8080
+    ports:
+      - "18202:8080"
+    restart: unless-stopped
+
+  # L1 Explorer UI
+  explorer-l1-ui:
+    image: gatewayfm/block-explorer-frontend:${BLOCK_EXPLORER_VERSION:-main}
+    container_name: gasstorm-explorer-l1-ui
+    profiles: [ "explorer-l1" ]
+    user: root
+    depends_on:
+      - explorer-l1-api
+    volumes:
+      - ../config/explorer-l1-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "18203:80"
+    healthcheck:
+      test: [ "CMD", "curl", "-sf", "http://localhost/" ]
+      interval: 10s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  explorer-db-data:
+  explorer-l1-db-data:
+
+networks:
+  default:
+    name: gasstorm

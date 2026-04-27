@@ -60,7 +60,7 @@ services:
       "-vvv"
     ]
     volumes:
-      - ./genesis:/config:ro
+      - ../genesis:/config:ro
       - l2-data:/data
     ports:
       - "18546:8545"   # L2 RPC
@@ -111,7 +111,7 @@ services:
       - DEBUG_REJECTION_REASONS=${DEBUG_REJECTION_REASONS:-true}
       - STRESS_THRESHOLD_PCT=${STRESS_THRESHOLD_PCT:-80}
     volumes:
-      - ./genesis/jwt.hex:/config/jwt.hex:ro
+      - ../genesis/jwt.hex:/config/jwt.hex:ro
     ports:
       - "13000:3000"   # RPC for tx submission
       - "13002:3001"   # Preconfirmation WebSocket
@@ -144,7 +144,7 @@ services:
   # Dashboard (Next.js static build)
   dashboard:
     build:
-      context: ./dashboard
+      context: ../dashboard
       dockerfile: Dockerfile
     container_name: gasstorm-dashboard
     depends_on:

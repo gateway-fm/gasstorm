@@ -1,0 +1,174 @@
+# Standalone main server stack: load generator + dashboard + docs.
+# In the 3-way split topology this runs on the "main" server.
+#
+# Local (same machine, shared Docker network — uses Docker DNS defaults):
+#   docker compose -f docker-compose.loadgen.yaml --profile reth up --build -d
+#
+# Remote (separate server, set endpoints to chain/explorer server IPs):
+#   BUILDER_RPC_URL=http://<chain-ip>:13000 \
+#   L2_RPC_URL=http://<chain-ip>:13000 \
+#   L2_WS_URL=ws://<chain-ip>:18547 \
+#   PRECONF_WS_URL=ws://<chain-ip>:13002/ws/preconfirmations \
+#   docker compose -f docker-compose.loadgen.yaml --profile reth up --build -d
+
+services:
+  # Dashboard with RPC proxy (Next.js static build + nginx)
+  dashboard:
+    build:
+      context: ../dashboard
+      dockerfile: Dockerfile
+    container_name: gasstorm-dashboard
+    profiles: [ "reth" ]
+    environment:
+      - LOADGEN_HOST=${LOADGEN_HOST:-load-generator:3001}
+      - CHAIN_HOST_RPC=${CHAIN_HOST_RPC:-block-builder:3000}
+      - CHAIN_HOST_BUILDER_WS=${CHAIN_HOST_BUILDER_WS:-block-builder:3001}
+      - CHAIN_HOST_L2_RPC=${CHAIN_HOST_L2_RPC:-l2-reth:8545}
+      - CHAIN_HOST_L2_WS=${CHAIN_HOST_L2_WS:-l2-reth:8546}
+      - CHAIN_HOST_L1=${CHAIN_HOST_L1:-l1:8545}
+      - EXPLORER_HOST_API=${EXPLORER_HOST_API:-explorer-api:8080}
+      - EXPLORER_HOST_L1_API=${EXPLORER_HOST_L1_API:-explorer-l1-api:8080}
+      - EXPLORER_HOST_UI=${EXPLORER_HOST_UI:-explorer-ui:80}
+      - EXPLORER_HOST_L1_UI=${EXPLORER_HOST_L1_UI:-explorer-l1-ui:80}
+    volumes:
+      - hyperlane-config:/usr/share/nginx/html/api/hyperlane:ro
+    ports:
+      - "${DASHBOARD_PORT:-18000}:80"
+    healthcheck:
+      test: [ "CMD", "curl", "-sf", "http://localhost/" ]
+      interval: 10s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+    restart: unless-stopped
+
+  dashboard-cdk:
+    build:
+      context: ../dashboard
+      dockerfile: Dockerfile
+    container_name: gasstorm-dashboard
+    profiles: [ "cdk-erigon" ]
+    environment:
+      - LOADGEN_HOST=${LOADGEN_HOST:-load-generator:3001}
+      - CHAIN_HOST_RPC=${CHAIN_HOST_RPC:-l2-cdk-erigon:8545}
+      - CHAIN_HOST_BUILDER_WS=${CHAIN_HOST_BUILDER_WS:-l2-cdk-erigon:8545}
+      - CHAIN_HOST_L2_RPC=${CHAIN_HOST_L2_RPC:-l2-cdk-erigon:8545}
+      - CHAIN_HOST_L2_WS=${CHAIN_HOST_L2_WS:-l2-cdk-erigon:8546}
+      - CHAIN_HOST_L1=${CHAIN_HOST_L1:-l1:8545}
+      - EXPLORER_HOST_API=${EXPLORER_HOST_API:-explorer-api:8080}
+      - EXPLORER_HOST_L1_API=${EXPLORER_HOST_L1_API:-explorer-l1-api:8080}
+      - EXPLORER_HOST_UI=${EXPLORER_HOST_UI:-explorer-ui:80}
+      - EXPLORER_HOST_L1_UI=${EXPLORER_HOST_L1_UI:-explorer-l1-ui:80}
+    volumes:
+      - ../dashboard/nginx-cdk.conf:/etc/nginx/templates/default.conf.template:ro
+    ports:
+      - "${DASHBOARD_PORT:-18000}:80"
+    healthcheck:
+      test: [ "CMD", "curl", "-sf", "http://localhost/" ]
+      interval: 10s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # Documentation Site (Next.js static export + nginx)
+  docs-site:
+    build:
+      context: ../site
+      dockerfile: Dockerfile
+      args:
+        - DOCS_BASE_PATH=
+    container_name: gasstorm-docs
+    profiles: [ "reth" ]
+    ports:
+      - "18002:80"
+    healthcheck:
+      test: [ "CMD", "curl", "-sf", "http://localhost/" ]
+      interval: 10s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+    restart: unless-stopped
+
+  docs-site-cdk:
+    build:
+      context: ../site
+      dockerfile: Dockerfile
+    container_name: gasstorm-docs
+    profiles: [ "cdk-erigon" ]
+    ports:
+      - "18002:80"
+    healthcheck:
+      test: [ "CMD", "curl", "-sf", "http://localhost/" ]
+      interval: 10s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+    restart: unless-stopped
+
+  load-generator:
+    build:
+      context: ../../loadgenerator
+      dockerfile: Dockerfile
+    image: gatewayfm/loadgenerator:local
+    container_name: gasstorm-loadgen
+    profiles: [ "reth" ]
+    environment:
+      - EXECUTION_LAYER=reth
+      - BUILDER_RPC_URL=${BUILDER_RPC_URL:-http://block-builder:3000}
+      - L2_RPC_URL=${L2_RPC_URL:-http://block-builder:3000}
+      - L2_WS_URL=${L2_WS_URL:-ws://l2-reth:8546}
+      - PRECONF_WS_URL=${PRECONF_WS_URL:-ws://block-builder:3001/ws/preconfirmations}
+      - LISTEN_ADDR=:3001
+      - DATABASE_PATH=/data/loadgen.db
+      - BLOCK_TIME_MS=${BLOCK_TIME_MS:-150}
+      - PRIVACY_RPC_URL=${PRIVACY_RPC_URL:-http://privacy-proxy:8080}
+      - PRIVACY_AUTH_TOKEN_FILE=${PRIVACY_AUTH_TOKEN_FILE:-/shared/loadtest-jwt.txt}
+    tmpfs:
+      - /data:mode=1777
+    volumes:
+      - privacy-loadtest-config:/shared:ro
+    ports:
+      - "${LOADGEN_PORT:-13001}:3001"
+      - "16061:6061"
+    restart: unless-stopped
+
+  load-generator-cdk:
+    build:
+      context: ../../loadgenerator
+      dockerfile: Dockerfile
+    image: gatewayfm/loadgenerator:local
+    container_name: gasstorm-loadgen
+    profiles: [ "cdk-erigon" ]
+    networks:
+      default:
+        aliases:
+          - load-generator
+    environment:
+      - EXECUTION_LAYER=cdk-erigon
+      - BUILDER_RPC_URL=${BUILDER_RPC_URL:-http://l2-cdk-erigon:8545}
+      - L2_RPC_URL=${L2_RPC_URL:-http://l2-cdk-erigon:8545}
+      - L2_WS_URL=${L2_WS_URL:-ws://l2-cdk-erigon:8546}
+      - PRECONF_WS_URL=
+      - LISTEN_ADDR=:3001
+      - DATABASE_PATH=/data/loadgen.db
+      - PRIVACY_RPC_URL=${PRIVACY_RPC_URL:-}
+      - PRIVACY_AUTH_TOKEN_FILE=${PRIVACY_AUTH_TOKEN_FILE:-}
+    tmpfs:
+      - /data:mode=1777
+    ports:
+      - "${LOADGEN_PORT:-13001}:3001"
+    restart: unless-stopped
+
+volumes:
+  privacy-loadtest-config:
+    name: gasstorm_privacy-loadtest-config
+    external: true
+  hyperlane-config:
+    name: gasstorm_hyperlane-config
+    external: true
+
+networks:
+  default:
+    name: gasstorm
+    external: true

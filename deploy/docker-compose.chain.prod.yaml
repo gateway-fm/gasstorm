@@ -1,0 +1,24 @@
+# Production overlay for the chain server in 3-way split topology.
+# Chain server runs: L1 (Anvil), L2 (op-reth), block-builder.
+#
+# Exposes ports needed by the main and explorer servers:
+#   13000  - block-builder RPC
+#   13002  - preconfirmation WebSocket
+#   18545  - L1 RPC (Anvil)
+#   18546  - L2 RPC (op-reth)
+#   18547  - L2 WebSocket (op-reth)
+
+services:
+  block-builder:
+    build:
+      context: /opt/gasstorm-chain/blockbuilder
+      dockerfile: Dockerfile
+    environment:
+      - BLOCK_TIME_MS=${BLOCK_TIME_MS:-1000}
+      - SKIP_EMPTY_BLOCKS=false
+      # Loadtest-only: enables /reset-nonces and /flush-mempool. Never set on real-network deploys.
+      - ENABLE_LOADTEST_ENDPOINTS=1
+      # Disable stress-based TX rejection so large contract deploys (Hyperlane, Uniswap) don't get throttled
+      - STRESS_REJECTION_ENABLED=false
+      # Include L1 deposit TX — required for op-reth v1.9.3 eth_getTransactionReceipt to work
+      - INCLUDE_DEPOSIT_TX=true

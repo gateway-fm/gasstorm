@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { ComponentStatus } from "@/components/status/component-status";
 import { ActivityFeed } from "@/components/status/activity-feed";
+import { ChainInfo } from "@/components/status/chain-info";
 import { useChainStore } from "@/stores/chain-store";
 import { useActivityFeedStore } from "@/stores/activity-feed-store";
 import { useActivityEmitter } from "@/hooks/use-activity-emitter";
@@ -73,12 +74,17 @@ export default function DashboardPage() {
 
   return (
     <div className="h-full bg-background">
-      <main className="container mx-auto px-4 py-6 h-full flex flex-col gap-4">
-        <div className="shrink-0">
-          <ComponentStatus />
-        </div>
-        <div className="min-h-0 flex-1">
-          <ActivityFeed />
+      <main className="container mx-auto px-4 py-6 h-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-full">
+          <div className="min-h-0 h-full">
+            <ActivityFeed />
+          </div>
+          <div className="min-h-0 h-full flex flex-col gap-4">
+            <ChainInfo />
+            <div className="flex-1 min-h-0">
+              <ComponentStatus />
+            </div>
+          </div>
         </div>
       </main>
     </div>

@@ -114,6 +114,38 @@ auto_detect_chain_config() {
     fi
 }
 
+# Auto-detect block time by sampling two consecutive blocks
+auto_detect_block_time() {
+    local rpc=$1
+
+    local latest_hex=$(curl -s -X POST -H "Content-Type: application/json" \
+        --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
+        "$rpc" 2>/dev/null | jq -r '.result // ""')
+    if [ -z "$latest_hex" ] || [ "$latest_hex" = "0x0" ] || [ "$latest_hex" = "0x1" ]; then
+        echo "0"
+        return
+    fi
+
+    local latest=$(printf "%d" "$latest_hex")
+    local prev_hex=$(printf "0x%x" $((latest - 1)))
+
+    local ts_latest=$(curl -s -X POST -H "Content-Type: application/json" \
+        --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBlockByNumber\",\"params\":[\"$latest_hex\",false],\"id\":1}" \
+        "$rpc" 2>/dev/null | jq -r '.result.timestamp // ""')
+    local ts_prev=$(curl -s -X POST -H "Content-Type: application/json" \
+        --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBlockByNumber\",\"params\":[\"$prev_hex\",false],\"id\":1}" \
+        "$rpc" 2>/dev/null | jq -r '.result.timestamp // ""')
+
+    if [ -n "$ts_latest" ] && [ -n "$ts_prev" ]; then
+        local diff=$(( $(printf "%d" "$ts_latest") - $(printf "%d" "$ts_prev") ))
+        if [ "$diff" -gt 0 ]; then
+            echo "$diff"
+            return
+        fi
+    fi
+    echo "0"
+}
+
 derive_deployer_address() {
     local addr=$(cast wallet address --private-key "$DEPLOYER_PRIVATE_KEY" 2>/dev/null || echo "")
     if [ -n "$addr" ]; then
@@ -568,6 +600,12 @@ main() {
             L2_CHAIN_ID="$detected_l2_chain_id"
             L2_DOMAIN="$detected_l2_chain_id"
             log_info "L2 chain ID detected: $L2_CHAIN_ID"
+        fi
+        # Auto-detect L1 block time
+        local detected_l1_block_time=$(auto_detect_block_time "$L1_RPC")
+        if [ "$detected_l1_block_time" -gt 0 ] 2>/dev/null; then
+            L1_BLOCK_TIME="$detected_l1_block_time"
+            log_info "L1 block time detected: ${L1_BLOCK_TIME}s"
         fi
     fi
 

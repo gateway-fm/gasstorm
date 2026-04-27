@@ -1,0 +1,162 @@
+# Production overlay for the explorer server in 3-way split topology.
+# Explorer server runs: DBs, indexers, APIs, UIs for L1 and L2,
+# plus the privacy stack (privacy-db, privacy-proxy, privacy-ui, tunnel).
+#
+# Requires env vars:
+#   CHAIN_SERVER       - IP/hostname of the chain server
+#   MAIN_SERVER_PUBLIC - public IP/hostname of the main server (for SSO redirects)
+
+services:
+  # Build explorer from local source (rsync'd to server)
+  explorer-indexer:
+    build:
+      context: /opt/gasstorm-explorer/block-explorer/backend
+      dockerfile: Dockerfile.indexer
+    environment:
+      - RPC_URL=http://${CHAIN_SERVER}:18546
+
+  explorer-api:
+    build:
+      context: /opt/gasstorm-explorer/block-explorer/backend
+      dockerfile: Dockerfile.api
+    environment:
+      - RPC_URL=http://${CHAIN_SERVER}:13000
+      # Privacy-enhanced explorer: route through privacy proxy for SSO/auth
+      - PRIVACY_PROXY_URL=http://privacy-proxy:8080
+      # Public URL points to explorer server directly (browser redirect for OAuth)
+      - PRIVACY_PROXY_PUBLIC_URL=http://${EXPLORER_PUBLIC}:18300
+      - SSO_CLIENT_ID=explorer
+      # Callback goes through dashboard proxy so the auth cookie is set on the main server domain
+      - SSO_REDIRECT_URI=http://${MAIN_SERVER_PUBLIC}/proxy/18201/api/auth/callback
+      - EXPLORER_DATABASE_URL=postgres://explorer:explorer@explorer-db:5432/explorer?sslmode=disable
+    depends_on:
+      privacy-proxy:
+        condition: service_started
+
+  explorer-ui:
+    build:
+      context: /opt/gasstorm-explorer/block-explorer/frontend
+      dockerfile: Dockerfile
+    environment:
+      - VITE_BASE_PATH=/proxy/18201
+      - VITE_API_URL=/proxy/18201/api
+
+  explorer-l1-indexer:
+    build:
+      context: /opt/gasstorm-explorer/block-explorer/backend
+      dockerfile: Dockerfile.indexer
+    environment:
+      - RPC_URL=http://${CHAIN_SERVER}:18545
+
+  explorer-l1-api:
+    build:
+      context: /opt/gasstorm-explorer/block-explorer/backend
+      dockerfile: Dockerfile.api
+    environment:
+      - RPC_URL=http://${CHAIN_SERVER}:18545
+
+  explorer-l1-ui:
+    build:
+      context: /opt/gasstorm-explorer/block-explorer/frontend
+      dockerfile: Dockerfile
+    environment:
+      - VITE_BASE_PATH=/proxy/18203
+      - VITE_API_URL=/proxy/18203/api
+
+  # --- Privacy Stack ---
+
+  privacy-db:
+    image: postgres:15-alpine
+    container_name: gasstorm-privacy-db
+    command: postgres -c max_connections=200 -c shared_buffers=128MB
+    environment:
+      - POSTGRES_USER=privacy
+      - POSTGRES_PASSWORD=privacy
+      - POSTGRES_DB=privacy_proxy
+    volumes:
+      - privacy-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U privacy -d privacy_proxy" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  privacy-proxy:
+    build:
+      context: /opt/gasstorm-explorer/privacy-proxy
+      dockerfile: Dockerfile.backend
+      target: dev
+    depends_on:
+      privacy-db:
+        condition: service_healthy
+      explorer-db:
+        condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - proxy-backend
+    environment:
+      - NODE_URL=http://${CHAIN_SERVER}:13000
+      - DATABASE_URL=postgres://privacy:privacy@privacy-db:5432/privacy_proxy?sslmode=disable
+      - EXPLORER_DATABASE_URL=postgres://explorer:explorer@explorer-db:5432/explorer?sslmode=disable
+      - PORT=8080
+      - ENVIRONMENT=development
+      - ENABLE_TRAVEL_RULE=true
+      - MOCK_SIGNATURES=true
+      - ALLOW_MOCK_LOGIN=true
+      - JWT_SECRET=dev-jwt-secret-do-not-use-in-production-1234567890
+      - JWT_REFRESH_SECRET=dev-refresh-secret-do-not-use-in-production-0987654321
+      - ENABLE_RUNTIME_TRACING=true
+      - FRONTEND_URL=http://${EXPLORER_PUBLIC}:18301
+      # Allow redirect URIs from the explorer server (direct SSO callback)
+      - CORS_ALLOWED_ORIGINS=http://${EXPLORER_PUBLIC}:18200,http://${EXPLORER_PUBLIC}:18300,http://${EXPLORER_PUBLIC}:18301,http://${MAIN_SERVER_PUBLIC}
+    ports:
+      - "18300:8080"
+
+  privacy-ui:
+    build:
+      context: /opt/gasstorm-explorer/privacy-proxy/frontend
+      dockerfile: Dockerfile
+      target: prod
+      args:
+        - VITE_ALLOW_MOCK_LOGIN=true
+        - VITE_BACKEND_URL=http://${EXPLORER_PUBLIC}:18300
+    depends_on:
+      privacy-proxy:
+        condition: service_started
+    ports:
+      - "18301:80"
+    restart: unless-stopped
+
+  privacy-tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --url http://privacy-proxy:8080
+    depends_on:
+      privacy-proxy:
+        condition: service_started
+
+  privacy-loadtest-setup:
+    image: postgres:15-alpine
+    entrypoint: [ "sh", "-c", "apk add --no-cache curl jq > /dev/null 2>&1 && /setup.sh" ]
+    environment:
+      - PROXY_URL=http://privacy-proxy:8080
+    volumes:
+      - privacy-loadtest-config:/shared
+      - /opt/gasstorm-explorer/repo/scripts/privacy-loadtest-setup.sh:/setup.sh:ro
+    depends_on:
+      privacy-proxy:
+        condition: service_started
+    restart: "no"
+
+# Standalone network — not joining the chain server's Docker network
+networks:
+  default:
+    name: gasstorm-explorer
+
+# Volumes for privacy
+volumes:
+  privacy-db-data:
+    external: false
+  privacy-loadtest-config:
+    external: false

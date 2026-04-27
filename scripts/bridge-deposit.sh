@@ -124,7 +124,7 @@ check_relayer_health() {
 
     # Check if relayer container is running
     local relayer_status
-    relayer_status=$(docker compose -f "$PROJECT_DIR/docker-compose.yml" ps hyperlane-relayer --format '{{.State}}' 2>/dev/null || echo "unknown")
+    relayer_status=$(docker compose -f "$PROJECT_DIR/docker/docker-compose.yml" ps hyperlane-relayer --format '{{.State}}' 2>/dev/null || echo "unknown")
 
     if [ "$relayer_status" = "running" ]; then
         log_info "Relayer is running"

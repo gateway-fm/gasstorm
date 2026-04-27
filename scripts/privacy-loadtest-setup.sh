@@ -105,13 +105,20 @@ ACCESS_BODY=$(cat <<'ENDJSON'
         "eth_getBlockByHash",
         "net_version"
     ],
-    "claims": ["read", "write", "deploy"]
+    "claims": ["read", "write", "deploy", "admin"]
 }
 ENDJSON
 )
 
 api_call PUT "/api/v1/admin/orgs/${ORG_ID}/groups/${GROUP_ID}/access" "$ACCESS_BODY" > /dev/null
 log "Group access permissions set."
+
+# ---- Step 4b: Promote group to org admin (full admin dashboard access) -------
+
+log "Promoting loadtest group to org admin..."
+PGPASSWORD=privacy psql -h privacy-db -U privacy -d privacy_proxy -q \
+    -c "UPDATE groups SET is_org_admin = true WHERE id = '${GROUP_ID}';" 2>/dev/null
+log "Group promoted to org admin."
 
 # ---- Step 5: Authenticate via mock login -------------------------------------
 
@@ -188,7 +195,35 @@ if [ -z "$FINAL_TOKEN" ] || [ "$FINAL_TOKEN" = "null" ]; then
     exit 1
 fi
 
-# ---- Step 8: Write JWT to shared volume --------------------------------------
+# ---- Step 8: Link load generator ETH addresses to the loadtest user ----------
+
+# The privacy proxy's visibility filter requires ETH addresses to be linked to
+# a user's DID via eth_address_links. Without these links, all transactions from
+# the load generator are hidden in the explorer.
+
+# Anvil built-in accounts (used by load generator) — lowercase for DB consistency
+log "Linking load generator ETH addresses to loadtest user (DID: ${DID})..."
+
+LINKED=0
+for ADDR in \
+    0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266 \
+    0x70997970c51812dc3a010c7d01b50e0d17dc79c8 \
+    0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc \
+    0x90f79bf6eb2c4f870365e785982e1f101e93b906 \
+    0x15d34aaf54267db7d7c367839aaf71a00a2c6a65 \
+    0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc \
+    0x976ea74026e726554db657fa54763abd0c3a0aa9 \
+    0x14dc79964da2c08da15fd353d30fd1c45e8c0990 \
+    0x23618e81e3f5cdf7f54c3d65f7fbc0abf5b21e8f \
+    0xa0ee7a142d267c1f36714e4a8f75612f20a79720
+do
+    PGPASSWORD=privacy psql -h privacy-db -U privacy -d privacy_proxy -q \
+        -c "INSERT INTO eth_address_links (did, eth_address, link_type, verified_at) VALUES ('$DID', '$ADDR', 'system', NOW()) ON CONFLICT (did, eth_address) DO NOTHING;" 2>/dev/null \
+        && LINKED=$((LINKED + 1))
+done
+log "Linked ${LINKED} ETH addresses to loadtest user."
+
+# ---- Step 9: Write JWT to shared volume --------------------------------------
 
 log "Writing JWT to ${OUTPUT_FILE}..."
 mkdir -p "$(dirname "$OUTPUT_FILE")"
@@ -199,3 +234,4 @@ log "  Org ID:    ${ORG_ID}"
 log "  Group ID:  ${GROUP_ID}"
 log "  User ID:   ${USER_ID}"
 log "  JWT file:  ${OUTPUT_FILE}"
+log "  ETH addrs: ${LINKED} linked"

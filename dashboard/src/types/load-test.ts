@@ -138,6 +138,9 @@ export interface LoadTestConfig {
 
   // Privacy mode (routes TXs through privacy proxy)
   privacyMode?: boolean;
+
+  // Nonce gap healing (sends no-op self-transfers to fill gaps during test)
+  fixNonceGaps?: boolean;
 }
 
 export type TransactionStatus = "pending" | "confirmed" | "failed";
@@ -327,6 +330,7 @@ export const DEFAULT_LOAD_TEST_CONFIG: LoadTestConfig = {
   txValue: 1000000000000000000n, // 1 ETH
   gasLimit: 21000,
   privacyMode: false,
+  fixNonceGaps: false,
 };
 
 // Time-series point from persistent storage

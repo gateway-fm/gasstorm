@@ -9,24 +9,13 @@ GasStorm is a local-first blockchain sequencer testbed that orchestrates an op-r
 ## Quick Start
 
 ```bash
-# Recommended default: cdk-erigon + L1/L2 + blob-da + privacy + L1/L2 explorers
-make up PROFILE=cdk-erigon WITH=blob,privacy,explorer
+make up    # Start the full stack
+make down  # Stop the stack
 
-# Same services on op-reth + external block-builder
-make up PROFILE=reth WITH=blob,privacy,explorer
-
-# Full stack on op-reth (adds bridge + bridge-ui)
-make up PROFILE=reth WITH=blob,privacy,explorer,bridge,bridge-ui
-
-# Core only (no optional profiles)
-make up PROFILE=cdk-erigon WITH=
-
-# Metal mode (core services only)
-make up MODE=metal
-
-# Open dashboard
 open http://localhost:18000/load-test/
 ```
+
+This builds all services from local sibling repos with 1s block times, and includes the privacy proxy and block explorer. See [Configuration](./docs/configuration.md) for advanced options.
 
 ## Architecture
 
@@ -94,7 +83,7 @@ open http://localhost:18000/load-test/
 
 ```bash
 # Performance tuning
-BLOCK_TIME_MS=250       # Block interval (default: 1000ms)
+BLOCK_TIME_MS=1000      # Block interval (default: 1000ms)
 GAS_LIMIT=1000000000    # Block gas limit (1 gigagas)
 MAX_TXS_PER_BLOCK=50000 # Max TXs per block
 TX_ORDERING=tip_desc    # fifo | tip_desc | tip_asc
@@ -133,19 +122,15 @@ Metal mode writes PID files to `data/metal/pids/` and logs to `data/metal/logs/`
 ## Development
 
 ```bash
-# Development mode (local load-generator + dashboard with HMR)
-make dev              # reth mode
-make dev-cdk-erigon   # cdk-erigon mode
-
-# Run tests
-make test
-
-# View logs
-make logs
-
-# Stop services
-make stop
+make up               # Start full stack
+make down             # Stop full stack
+make logs             # Follow all logs
+make status           # Show service status
+make clean            # Stop + remove volumes
+make test             # Run tests
 ```
+
+For dashboard development with hot-reload, use `make dev` which runs the load generator and dashboard natively while keeping the chain infrastructure in Docker.
 
 ## Optional Profiles
 
@@ -210,16 +195,37 @@ Feature support varies by L2 engine and L1 backend. Use this matrix to find the 
 |-----------|-----|---------|----------|--------|------|-----------|---------|
 | op-reth + blockbuilder | Anvil | yes | yes | yes | yes | yes | `make up PROFILE=reth WITH=blob,privacy,explorer,bridge` |
 | op-reth + blockbuilder | Besu | yes | yes | yes | -- | yes | `make up PROFILE=reth L1=besu WITH=privacy,explorer,bridge` |
+| op-reth + blockbuilder | External | yes | yes | yes | -- | yes | `make up PROFILE=reth L1=<name> WITH=privacy,explorer,bridge` |
 | cdk-erigon | Anvil | yes | yes | yes | yes | yes | `make up PROFILE=cdk-erigon WITH=blob,privacy,explorer,bridge` |
 | cdk-erigon | Besu | yes | yes | yes | -- | yes | `make up PROFILE=cdk-erigon L1=besu WITH=privacy,explorer,bridge` |
+| cdk-erigon | External | yes | yes | yes | -- | yes | `make up PROFILE=cdk-erigon L1=<name> WITH=privacy,explorer,bridge` |
 | gravity-reth | Anvil | -- | -- | -- | -- | -- | `make up PROFILE=gravity-reth` |
 
-L1 defaults to Anvil. Use `L1=besu` to swap to Hyperledger Besu (Clique dev mode).
+L1 defaults to Anvil. Use `L1=besu` for Hyperledger Besu, or `L1=<name>` for any external chain (see [External L1](#external-l1)).
 
 **Why some combinations are not supported:**
 
-- **Blob on Besu L1** -- Besu Clique dev mode runs pre-Cancun consensus; EIP-4844 blob transactions require Cancun (use Anvil L1 for blob).
+- **Blob on Besu/External L1** -- Blob requires a local EIP-4844 chain (use Anvil L1 for blob).
 - **Features on gravity-reth** -- gravity-reth is an early integration; optional profiles have not been wired up yet.
+
+### External L1
+
+Connect to any pre-existing L1 chain (remote Besu, Geth, or custom chain) instead of running a local node. An nginx reverse proxy transparently forwards `http://l1:8545` to the external RPC. Chain ID and block time are auto-detected.
+
+```bash
+# 1. Create a config file for your chain
+cp config/l1/example.env config/l1/my-chain.env
+# Edit with your RPC URL, optional WS URL, and optional key
+
+# 2. Start the stack
+make up L1=my-chain PROFILE=reth WITH=explorer
+
+# 3. Stop / clean as usual
+make stop
+make clean
+```
+
+See `config/l1/example.env` for all available fields. The proxy handles HTTPS, basic auth (embedded in URLs), and WebSocket upgrades.
 
 ### Privacy Load Testing
 
@@ -252,10 +258,11 @@ After running tests in both modes, open the **History** tab in the dashboard to 
 
 | Document | Description |
 |----------|-------------|
-| [MCP Server](./docs/mcp.md) | AI tool integration (24 tools: stack management, builder, load generator) |
-| [System Architecture](./docs/system-architecture.md) | Service map, critical paths, design patterns, nonce management |
+| [Remote Deployment](./deploy/README.md) | Single-server and 3-way split deploy guide |
 | [Configuration](./docs/configuration.md) | Env vars, Makefile targets, Docker Compose profiles |
+| [System Architecture](./docs/system-architecture.md) | Service map, critical paths, design patterns, nonce management |
 | [Execution Layers](./docs/execution-layers.md) | reth / cdk-erigon / gravity-reth comparison |
+| [MCP Server](./docs/mcp.md) | AI tool integration (24 tools: stack management, builder, load generator) |
 | [Troubleshooting](./docs/TROUBLESHOOTING.md) | Common issues and solutions |
 | [Contributing](./CONTRIBUTING.md) | Development setup, testing, PR process |
 | [Block Builder](https://github.com/gateway-fm/blockbuilder) | Pipeline, nonce cache, Engine API (external repo) |

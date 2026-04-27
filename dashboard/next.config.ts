@@ -63,6 +63,15 @@ const nextConfig: NextConfig = {
               source: "/api/explorer/health",
               destination: "http://localhost:18200/health",
             },
+            // L2 Explorer stats + gas
+            {
+              source: "/api/explorer/stats",
+              destination: "http://localhost:18200/api/stats",
+            },
+            {
+              source: "/api/explorer/gas",
+              destination: "http://localhost:18200/api/gas",
+            },
             // Privacy Proxy health
             {
               source: "/api/privacy/health",
@@ -72,6 +81,15 @@ const nextConfig: NextConfig = {
             {
               source: "/api/explorer-l1/health",
               destination: "http://localhost:18202/health",
+            },
+            // L1 Explorer stats + gas
+            {
+              source: "/api/explorer-l1/stats",
+              destination: "http://localhost:18202/api/stats",
+            },
+            {
+              source: "/api/explorer-l1/gas",
+              destination: "http://localhost:18202/api/gas",
             },
             // Bridge Relayer health (metrics endpoint returns 200)
             {

@@ -37,12 +37,16 @@ function buildStartRequest(cfg: LoadTestConfig): StartTestRequest {
   const request: StartTestRequest = {
     pattern,
     durationSec,
-    numAccounts: 100,
+    numAccounts: 0, // Let loadgen auto-calculate based on target TPS
     transactionType: cfg.transactionType ?? "eth-transfer",
   };
 
   if (cfg.privacyMode) {
     request.privacyMode = true;
+  }
+
+  if (cfg.fixNonceGaps) {
+    request.fixNonceGaps = true;
   }
 
   switch (pattern) {

@@ -1,0 +1,39 @@
+# Production overlay for the load generator on a remote server.
+# Requires MAIN_SERVER_HOST to point at the gasstorm main stack.
+#
+# Usage:
+#   MAIN_SERVER_HOST=<main-ip> docker compose \
+#     -f docker-compose.loadgen.yaml -f deploy/docker-compose.loadgen.prod.yaml \
+#     --profile reth up --build -d
+
+services:
+  load-generator:
+    build:
+      context: /opt/gasstorm-loadgen/loadgenerator
+      dockerfile: Dockerfile
+    environment:
+      - BUILDER_RPC_URL=http://${MAIN_SERVER_HOST}:13000
+      - L2_RPC_URL=http://${MAIN_SERVER_HOST}:13000
+      - L2_WS_URL=ws://${MAIN_SERVER_HOST}:18547
+      - PRECONF_WS_URL=ws://${MAIN_SERVER_HOST}:13002/ws/preconfirmations
+      - BLOCK_TIME_MS=${BLOCK_TIME_MS:-1000}
+    ports: !override
+      - "3001:3001"
+      - "6061:6061"
+
+  load-generator-cdk:
+    build:
+      context: /opt/gasstorm-loadgen/loadgenerator
+      dockerfile: Dockerfile
+    environment:
+      - BUILDER_RPC_URL=http://${MAIN_SERVER_HOST}:18546
+      - L2_RPC_URL=http://${MAIN_SERVER_HOST}:18546
+      - L2_WS_URL=ws://${MAIN_SERVER_HOST}:18547
+      - BLOCK_TIME_MS=${BLOCK_TIME_MS:-1000}
+    ports: !override
+      - "3001:3001"
+
+# Standalone — not joining the main stack's network
+networks:
+  default:
+    name: gasstorm-loadgen

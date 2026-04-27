@@ -1,10 +1,15 @@
-.PHONY: up run run-build run-reth run-cdk-erigon run-metal stop-metal restart-metal run-attached run-hyperlane stop restart logs status resource-report clean clean-metal build test test-load-generator test-dashboard test-tx bench-load-generator polycli-install polycli-eoa polycli-erc20 polycli-erc721 polycli-uniswap polycli-store polycli-mixed polycli-help dev dev-infra dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-with-blob run-with-explorer run-with-privacy run-with-explorer-privacy pull-explorer pull-privacy run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks sbom sbom-help pull-blockbuilder pull-loadgenerator mcp-server mcp-build site-dev site-build tunnel-url _print-tunnel-url loadtest-privacy loadtest-direct
+.PHONY: up down _up run run-build run-reth run-cdk-erigon run-metal stop-metal restart-metal run-attached stop restart logs status resource-report clean clean-metal build test test-load-generator test-dashboard test-tx bench-load-generator dev dev-infra dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-with-blob run-with-explorer run-with-privacy run-with-explorer-privacy pull-explorer pull-privacy run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks pull-blockbuilder pull-loadgenerator mcp-server mcp-build site-dev site-build tunnel-url _print-tunnel-url loadtest-privacy loadtest-direct run-high-throughput run-fast-confirm run-with-preconf run-conservative run-flashblocks run-gravity-reth run-with-bridge run-agglayer stop-agglayer test-contract test-e2e test-integration test-integration-quick test-smoke balance
 
 # =============================================================================
 # Configuration: Source .env file if it exists
 # =============================================================================
 -include .env
 export
+
+COMPOSE_DIR := docker
+
+# Include deploy targets from deploy/Makefile
+include deploy/Makefile
 
 # =============================================================================
 # Execution Layer Configuration
@@ -66,14 +71,13 @@ endif
 # Run Targets
 # =============================================================================
 
-# Composable stack startup.
-# Examples:
-#   make up
-#   make up MODE=docker PROFILE=reth WITH=blob,privacy,explorer,bridge,bridge-ui
-#   make up PROFILE=cdk-erigon WITH=bridge,explorer
-#   make up PROFILE=reth L1=besu WITH=bridge,explorer
-#   make up MODE=metal
-up: mcp-build
+# Composable stack startup (internal — use 'make up' for the full dev stack).
+# Advanced usage:
+#   make _up MODE=docker PROFILE=reth WITH=blob,privacy,explorer,bridge,bridge-ui
+#   make _up PROFILE=cdk-erigon WITH=bridge,explorer
+#   make _up PROFILE=reth L1=besu WITH=bridge,explorer
+#   make _up MODE=metal
+_up: mcp-build
 	@set -e; \
 	mode="$(MODE)"; \
 	profile="$(PROFILE)"; \
@@ -86,10 +90,14 @@ up: mcp-build
 		exit 1; \
 	fi; \
 	if [ "$$mode" = "docker" ] && [ -z "$$(printf "%s" "$$with_raw" | tr -d '[:space:]')" ]; then \
-		if [ "$$profile" = "reth" ]; then \
-			with_raw="blob,privacy,explorer"; \
+		if [ "$$l1" = "anvil" ] || [ "$$l1" = "besu" ]; then \
+			if [ "$$profile" = "reth" ] && [ "$$l1" = "anvil" ]; then \
+				with_raw="blob,privacy,explorer"; \
+			else \
+				with_raw="privacy,explorer"; \
+			fi; \
 		else \
-			with_raw="privacy,explorer"; \
+			with_raw="privacy"; \
 		fi; \
 	fi; \
 	if [ "$$mode" = "metal" ]; then \
@@ -113,6 +121,8 @@ up: mcp-build
 			blob) \
 				if [ "$$l1" = "besu" ]; then \
 					echo "Error: 'blob' requires EIP-4844 (Besu Clique doesn't support Cancun). Use L1=anvil."; exit 1; \
+				elif [ "$$l1" != "anvil" ]; then \
+					echo "Error: 'blob' is not supported with external L1 (requires local EIP-4844 chain). Use L1=anvil."; exit 1; \
 				elif [ "$$profile" = "reth" ]; then \
 					profiles="$$profiles --profile blob"; \
 				elif [ "$$profile" = "cdk-erigon" ]; then \
@@ -164,16 +174,16 @@ up: mcp-build
 	fi; \
 	compose_files=""; \
 	if [ "$$build_local" = "true" ]; then \
-		compose_files="-f docker-compose.yml -f docker-compose.build.yaml"; \
+		compose_files="-f docker/docker-compose.yml -f docker/docker-compose.build.yaml"; \
 	fi; \
 	if [ -n "$$has_privacy" ] && [ -n "$$has_explorer" ]; then \
 		if [ -z "$$compose_files" ]; then \
-			compose_files="-f docker-compose.yml"; \
+			compose_files="-f docker/docker-compose.yml"; \
 		fi; \
 		if [ "$$profile" = "cdk-erigon" ]; then \
-			compose_files="$$compose_files -f docker-compose-privacy-explorer-cdk.yaml"; \
+			compose_files="$$compose_files -f docker/docker-compose-privacy-explorer-cdk.yaml"; \
 		else \
-			compose_files="$$compose_files -f docker-compose-privacy-explorer.yaml"; \
+			compose_files="$$compose_files -f docker/docker-compose-privacy-explorer.yaml"; \
 		fi; \
 	fi; \
 	if [ -n "$$has_privacy" ]; then \
@@ -182,20 +192,43 @@ up: mcp-build
 	fi; \
 	if [ "$$l1" = "besu" ]; then \
 		if [ -z "$$compose_files" ]; then \
-			compose_files="-f docker-compose.yml"; \
+			compose_files="-f docker/docker-compose.yml"; \
 		fi; \
-		compose_files="$$compose_files -f docker-compose-besu-l1.yaml"; \
+		compose_files="$$compose_files -f docker/docker-compose-besu-l1.yaml"; \
 	elif [ "$$l1" != "anvil" ]; then \
-		echo "Error: L1 must be 'anvil' or 'besu' (got '$$l1')."; exit 1; \
+		l1_config="config/l1/$$l1.env"; \
+		if [ ! -f "$$l1_config" ]; then \
+			echo "Error: L1='$$l1' is not 'anvil' or 'besu', and $$l1_config does not exist."; \
+			echo "Create it from config/l1/example.env:"; \
+			echo "  cp config/l1/example.env $$l1_config"; \
+			exit 1; \
+		fi; \
+		set -a; . ./$$l1_config; set +a; \
+		if [ -z "$${EXTERNAL_L1_RPC:-}" ]; then \
+			echo "Error: EXTERNAL_L1_RPC is not set in $$l1_config"; exit 1; \
+		fi; \
+		export L1_NAME="$$l1"; \
+		export EXTERNAL_L1_CHAIN_NAME="$${EXTERNAL_L1_CHAIN_NAME:-$$l1}"; \
+		if [ -z "$$compose_files" ]; then \
+			compose_files="-f docker/docker-compose.yml"; \
+		fi; \
+		compose_files="$$compose_files -f docker/docker-compose-external-l1.yaml"; \
+	fi; \
+	if [ "$$bridge_enabled" -eq 1 ] && [ "$$l1" != "anvil" ] && [ "$$l1" != "besu" ]; then \
+		if [ -z "$${EXTERNAL_L1_KEY:-}" ]; then \
+			echo "Error: WITH=bridge requires EXTERNAL_L1_KEY in config/l1/$$l1.env"; exit 1; \
+		fi; \
 	fi; \
 	if [ "$$bridge_enabled" -eq 1 ] && [ "$$profile" = "cdk-erigon" ]; then \
 		if [ -z "$$compose_files" ]; then \
-			compose_files="-f docker-compose.yml"; \
+			compose_files="-f docker/docker-compose.yml"; \
 		fi; \
 		if [ "$$l1" = "besu" ]; then \
-			compose_files="$$compose_files -f docker-compose-besu-cdk-erigon-bridge.yaml"; \
+			compose_files="$$compose_files -f docker/docker-compose-besu-cdk-erigon-bridge.yaml"; \
+		elif [ "$$l1" != "anvil" ]; then \
+			compose_files="$$compose_files -f docker/docker-compose-external-cdk-erigon-bridge.yaml"; \
 		else \
-			compose_files="$$compose_files -f docker-compose-cdk-erigon-bridge.yaml"; \
+			compose_files="$$compose_files -f docker/docker-compose-cdk-erigon-bridge.yaml"; \
 		fi; \
 	fi; \
 	build_flag=""; \
@@ -211,24 +244,24 @@ up: mcp-build
 
 # Start the default Docker stack using current EXECUTION_LAYER mapping.
 run:
-	@$(MAKE) --no-print-directory up MODE=docker PROFILE=$(COMPOSE_PROFILE)
+	@$(MAKE) --no-print-directory _up MODE=docker PROFILE=$(COMPOSE_PROFILE)
 
 # Build from local sibling repos (../blockbuilder, ../loadgenerator) and run everything
 run-build:
-	@$(MAKE) --no-print-directory up MODE=docker PROFILE=$(COMPOSE_PROFILE) BUILD_LOCAL=true
+	@$(MAKE) --no-print-directory _up MODE=docker PROFILE=$(COMPOSE_PROFILE) BUILD_LOCAL=true
 
 # Start op-reth core stack only (no optional profiles)
 run-reth:
-	@$(MAKE) --no-print-directory up MODE=docker PROFILE=reth WITH=
+	@$(MAKE) --no-print-directory _up MODE=docker PROFILE=reth WITH=
 
 # Start default Docker stack with logs attached
 run-attached:
-	@$(MAKE) --no-print-directory up MODE=docker PROFILE=$(COMPOSE_PROFILE) ATTACHED=true
+	@$(MAKE) --no-print-directory _up MODE=docker PROFILE=$(COMPOSE_PROFILE) ATTACHED=true
 
 # Start in native "Metal" mode (no Docker, maximum performance)
 # Requires: op-reth, go, node installed locally, sibling repos (../blockbuilder, ../loadgenerator)
 run-metal:
-	@$(MAKE) --no-print-directory up MODE=metal WITH=
+	@$(MAKE) --no-print-directory _up MODE=metal WITH=
 
 # Stop metal mode services
 stop-metal:
@@ -268,7 +301,7 @@ _print-tunnel-url:
 			if [ -n "$$URL" ]; then \
 				echo "$$URL" > data/tunnel/tunnel-url.txt; \
 				echo "Privacy tunnel: $$URL"; \
-				echo "(open localhost:18301 — QR callbacks route through tunnel automatically)"; \
+				echo "(open localhost:18301 -- QR callbacks route through tunnel automatically)"; \
 				break; \
 			fi; \
 			sleep 2; \
@@ -281,6 +314,34 @@ _print-tunnel-url:
 # =============================================================================
 # Performance Profiles (uses current EXECUTION_LAYER)
 # =============================================================================
+
+# Start the full local stack: L1/L2, block builder, load generator, privacy, explorer.
+# Builds from local sibling repos, 1s blocks, empty blocks enabled.
+up:
+	@echo "Stopping existing stack..."
+	@docker compose -f $(COMPOSE_DIR)/docker-compose.loadgen.yaml --profile reth down 2>/dev/null || true
+	@docker compose -f $(COMPOSE_DIR)/docker-compose.yml -f $(COMPOSE_DIR)/docker-compose.build.yaml -f $(COMPOSE_DIR)/docker-compose-privacy-explorer.yaml --profile reth --profile explorer --profile explorer-l1 --profile privacy down -v --remove-orphans 2>/dev/null || true
+	@docker volume create gasstorm_hyperlane-config >/dev/null 2>&1 || true
+	@docker volume create gasstorm_privacy-loadtest-config >/dev/null 2>&1 || true
+	@echo "Starting stack (1s blocks, privacy + explorer, local builds)..."
+	BLOCK_TIME_MS=1000 \
+	SKIP_EMPTY_BLOCKS=false \
+	$(MAKE) --no-print-directory _up MODE=docker PROFILE=reth BUILD_LOCAL=true WITH=privacy,explorer
+	@echo "Starting load generator..."
+	@BLOCK_TIME_MS=1000 docker compose -f $(COMPOSE_DIR)/docker-compose.loadgen.yaml --profile reth up --build -d
+	@echo ""
+	@echo "Dev stack ready:"
+	@echo "  Dashboard:    http://localhost:18000"
+	@echo "  L2 Explorer:  http://localhost:18201"
+	@echo "  L1 Explorer:  http://localhost:18203"
+	@echo "  Privacy UI:   http://localhost:18301"
+	@echo "  Privacy Proxy: http://localhost:18300"
+
+# Stop the full stack and remove volumes.
+down:
+	@docker compose -f $(COMPOSE_DIR)/docker-compose.loadgen.yaml --profile reth down 2>/dev/null || true
+	@docker compose -f $(COMPOSE_DIR)/docker-compose.yml -f $(COMPOSE_DIR)/docker-compose.build.yaml -f $(COMPOSE_DIR)/docker-compose-privacy-explorer.yaml --profile reth --profile explorer --profile explorer-l1 --profile privacy down -v --remove-orphans 2>/dev/null || true
+	@echo "Stack stopped."
 
 # High throughput: 1 gigagas, 100ms blocks
 run-high-throughput:
@@ -327,7 +388,8 @@ run-flashblocks:
 # Stop all services (stops all profiles)
 stop:
 	docker compose --profile reth --profile cdk-erigon --profile bridge --profile bridge-ui --profile blob --profile explorer --profile explorer-l1 --profile explorer-cdk --profile privacy --profile privacy-cdk down 2>/dev/null || true
-	docker compose -f docker-compose-base.yaml -f docker-compose-gravity-reth.yaml down 2>/dev/null || true
+	docker compose -f $(COMPOSE_DIR)/docker-compose.yml -f $(COMPOSE_DIR)/docker-compose-external-l1.yaml --profile reth --profile cdk-erigon --profile bridge --profile bridge-ui --profile explorer --profile explorer-l1 --profile explorer-cdk --profile privacy --profile privacy-cdk down 2>/dev/null || true
+	docker compose -f $(COMPOSE_DIR)/docker-compose-base.yaml -f $(COMPOSE_DIR)/docker-compose-gravity-reth.yaml down 2>/dev/null || true
 
 # Restart all services
 restart:
@@ -344,7 +406,8 @@ logs-service:
 # Show status of all services
 status:
 	docker compose --profile reth --profile cdk-erigon --profile bridge --profile bridge-ui --profile blob --profile explorer --profile explorer-l1 --profile explorer-cdk --profile privacy --profile privacy-cdk ps 2>/dev/null || true
-	docker compose -f docker-compose-base.yaml -f docker-compose-gravity-reth.yaml ps 2>/dev/null || true
+	docker compose -f $(COMPOSE_DIR)/docker-compose.yml -f $(COMPOSE_DIR)/docker-compose-external-l1.yaml --profile reth --profile cdk-erigon --profile bridge --profile bridge-ui --profile explorer --profile explorer-l1 --profile explorer-cdk --profile privacy --profile privacy-cdk ps 2>/dev/null || true
+	docker compose -f $(COMPOSE_DIR)/docker-compose-base.yaml -f $(COMPOSE_DIR)/docker-compose-gravity-reth.yaml ps 2>/dev/null || true
 
 # Resource usage snapshot (containers + disk)
 resource-report:
@@ -365,7 +428,8 @@ resource-report:
 # Clean up volumes and rebuild
 clean:
 	docker compose --profile reth --profile cdk-erigon --profile bridge --profile bridge-ui --profile blob --profile explorer --profile explorer-l1 --profile explorer-cdk --profile privacy --profile privacy-cdk down -v 2>/dev/null || true
-	docker compose -f docker-compose-base.yaml -f docker-compose-gravity-reth.yaml down -v 2>/dev/null || true
+	docker compose -f $(COMPOSE_DIR)/docker-compose.yml -f $(COMPOSE_DIR)/docker-compose-external-l1.yaml --profile reth --profile cdk-erigon --profile bridge --profile bridge-ui --profile explorer --profile explorer-l1 --profile explorer-cdk --profile privacy --profile privacy-cdk down -v 2>/dev/null || true
+	docker compose -f $(COMPOSE_DIR)/docker-compose-base.yaml -f $(COMPOSE_DIR)/docker-compose-gravity-reth.yaml down -v 2>/dev/null || true
 	docker system prune -f
 
 # Clean Metal mode data directory
@@ -553,34 +617,8 @@ pull-explorer:
 	docker pull gatewayfm/block-explorer-frontend:main
 	@echo "Pulled gatewayfm/block-explorer-{api,indexer,frontend}:main"
 
-# =============================================================================
-# SBOM Generation
-# =============================================================================
-
-# Generate Software Bill of Materials for all components
-sbom:
-	@./scripts/generate-sbom.sh ./sbom
-
-# SBOM help
-sbom-help:
-	@echo "SBOM Generation:"
-	@echo "  make sbom               - Generate SBOM for all components"
-	@echo ""
-	@echo "Output: ./sbom/*.sbom.json (CycloneDX format)"
-	@echo ""
-	@echo "Components covered:"
-	@echo "  - block-builder (Go)"
-	@echo "  - load-generator (Go)"
-	@echo "  - zisk-prover (Go)"
-	@echo "  - dashboard (Node.js)"
-	@echo "  - bridge-ui (Node.js)"
-	@echo ""
-	@echo "For comprehensive SBOM with vulnerability data, install syft:"
-	@echo "  brew install syft (macOS)"
-	@echo "  https://github.com/anchore/syft (other platforms)"
-
 # #############################################################################
-# OVERHANGING: Other Execution Layers (cdk-erigon, gravity-reth)
+# Other Execution Layers (cdk-erigon, gravity-reth)
 # #############################################################################
 
 # Start with cdk-erigon (standalone sequencer)
@@ -590,7 +628,7 @@ run-cdk-erigon:
 # Start with gravity-reth (high-performance parallel EVM, standalone sequencer)
 # First build takes 15-25 minutes (Rust compilation from source)
 run-gravity-reth:
-	docker compose -f docker-compose-base.yaml -f docker-compose-gravity-reth.yaml up --build -d
+	docker compose -f $(COMPOSE_DIR)/docker-compose-base.yaml -f $(COMPOSE_DIR)/docker-compose-gravity-reth.yaml up --build -d
 
 # CDK-Erigon dev mode: Start cdk-erigon in Docker, run load-generator and dashboard locally
 # Requires sibling loadgenerator repo at ../loadgenerator
@@ -646,71 +684,26 @@ dev-cdk-erigon:
 
 # Start with Blob DA enabled
 run-with-blob:
-	@$(MAKE) --no-print-directory up MODE=docker PROFILE=$(COMPOSE_PROFILE) WITH=blob
+	@$(MAKE) --no-print-directory _up MODE=docker PROFILE=$(COMPOSE_PROFILE) WITH=blob
 
 # Start with Hyperlane bridge enabled (includes Warp UI)
 run-with-bridge:
-	@$(MAKE) --no-print-directory up MODE=docker PROFILE=reth WITH=bridge,bridge-ui
-
-# Alias for run-with-bridge (includes Hyperlane)
-run-hyperlane:
-	@$(MAKE) --no-print-directory run-with-bridge
-
-# Start Besu (L1) + op-reth (L2) + Hyperlane bridge + block explorers
-# Replaces Anvil with Besu for cross-chain bridge demo
-run-besu-reth-hyperlane:
-	docker compose -f docker-compose.yml -f docker-compose-besu-l1.yaml \
-		--profile reth --profile bridge --profile explorer --profile explorer-l1 \
-		up --build -d
-
-# Stop Besu + op-reth + Hyperlane stack
-stop-besu:
-	docker compose -f docker-compose.yml -f docker-compose-besu-l1.yaml \
-		--profile reth --profile bridge --profile explorer --profile explorer-l1 \
-		down
-
-# Clean Besu stack (stop + remove volumes)
-clean-besu:
-	docker compose -f docker-compose.yml -f docker-compose-besu-l1.yaml \
-		--profile reth --profile bridge --profile explorer --profile explorer-l1 \
-		down -v
-
-# Start op-reth + Hyperlane bridge connected to an external L1 RPC
-# Requires: EXTERNAL_L1_RPC and EXTERNAL_L1_KEY env vars
-# Example: EXTERNAL_L1_RPC=http://10.0.0.5:8545 EXTERNAL_L1_KEY=0x... make run-external-l1-hyperlane
-run-external-l1-hyperlane:
-	@if [ -z "$(EXTERNAL_L1_RPC)" ]; then echo "Error: EXTERNAL_L1_RPC is required (e.g., http://besu:8545)"; exit 1; fi
-	@if [ -z "$(EXTERNAL_L1_KEY)" ]; then echo "Error: EXTERNAL_L1_KEY is required (funded private key on external L1)"; exit 1; fi
-	docker compose -f docker-compose.yml -f docker-compose-external-l1.yaml \
-		--profile reth --profile bridge --profile explorer --profile explorer-l1 \
-		up --build -d
-
-# Stop external L1 stack
-stop-external-l1:
-	docker compose -f docker-compose.yml -f docker-compose-external-l1.yaml \
-		--profile reth --profile bridge --profile explorer --profile explorer-l1 \
-		down
-
-# Clean external L1 stack (stop + remove volumes)
-clean-external-l1:
-	docker compose -f docker-compose.yml -f docker-compose-external-l1.yaml \
-		--profile reth --profile bridge --profile explorer --profile explorer-l1 \
-		down -v
+	@$(MAKE) --no-print-directory _up MODE=docker PROFILE=reth WITH=bridge,bridge-ui
 
 # Start with block explorer enabled (indexes blocks/txs)
 run-with-explorer:
-	@$(MAKE) --no-print-directory up MODE=docker PROFILE=$(COMPOSE_PROFILE) WITH=explorer
+	@$(MAKE) --no-print-directory _up MODE=docker PROFILE=$(COMPOSE_PROFILE) WITH=explorer
 
 # Start with privacy proxy enabled (RPC access control)
 run-with-privacy:
-	@$(MAKE) --no-print-directory up MODE=docker PROFILE=$(COMPOSE_PROFILE) WITH=privacy
+	@$(MAKE) --no-print-directory _up MODE=docker PROFILE=$(COMPOSE_PROFILE) WITH=privacy
 
 # Start with both explorer and privacy proxy
 run-with-explorer-privacy:
-	@$(MAKE) --no-print-directory up MODE=docker PROFILE=$(COMPOSE_PROFILE) WITH=explorer,privacy
+	@$(MAKE) --no-print-directory _up MODE=docker PROFILE=$(COMPOSE_PROFILE) WITH=explorer,privacy
 
 # #############################################################################
-# OVERHANGING: Hyperlane Bridge
+# Hyperlane Bridge
 # #############################################################################
 
 # Deploy Hyperlane core and warp route contracts
@@ -776,24 +769,9 @@ bridge-help:
 	@echo "Bridge UIs:"
 	@echo "  - Hyperlane Warp UI: http://localhost:18001  (connect any wallet)"
 	@echo "  - Dashboard Bridge:  http://localhost:18000/bridge  (test account)"
-	@echo ""
-	@echo "Besu Mode (replaces Anvil L1 with local Besu):"
-	@echo "  make run-besu-reth-hyperlane  - Besu L1 + op-reth L2 + bridge + explorers"
-	@echo "  make stop-besu               - Stop Besu stack"
-	@echo "  make clean-besu              - Stop + remove Besu volumes"
-	@echo ""
-	@echo "External L1 Mode (connect to any remote L1):"
-	@echo "  EXTERNAL_L1_RPC=http://... EXTERNAL_L1_KEY=0x... make run-external-l1-hyperlane"
-	@echo "  make stop-external-l1        - Stop external L1 stack"
-	@echo "  make clean-external-l1       - Stop + remove volumes"
-	@echo ""
-	@echo "Quick Start:"
-	@echo "  make up WITH=bridge       # Start bridge infra (Anvil L1)"
-	@echo "  make run-with-bridge      # Start bridge infra + Warp UI (Anvil L1)"
-	@echo "  make run-besu-reth-hyperlane  # Full stack with Besu L1"
 
 # #############################################################################
-# OVERHANGING: AggLayer & Provers
+# AggLayer & Provers
 # #############################################################################
 
 # Start with AggLayer profile (uses PROVER env var: sp1 or zisk)
@@ -842,139 +820,16 @@ prover-help:
 	@echo "  make prover-prove BLOCK=1   - Request proof for block (ZisK)"
 	@echo "  make prover-proofs          - List all proofs (ZisK)"
 	@echo "  make test-zisk              - Run ZisK prover tests"
-	@echo ""
-	@echo "ZisK API Endpoints (port 13337):"
-	@echo "  GET  /status  - Service status"
-	@echo "  POST /prove   - Submit block for proving"
-	@echo "  GET  /proof/:id - Get proof result"
-	@echo "  GET  /proofs  - List all proofs"
-
-# #############################################################################
-# OVERHANGING: Polycli Load Testing
-# #############################################################################
-
-# =============================================================================
-# Polycli Configuration
-# =============================================================================
-POLYCLI_RPC ?= http://localhost:13000
-POLYCLI_TPS ?= 100
-POLYCLI_DURATION ?= 30
-POLYCLI_CONCURRENCY ?= 10
-POLYCLI_ACCOUNTS ?= 10
-# WARNING: This is a well-known Anvil test key (Account #0) - DO NOT use with real funds
-# Override via environment variable or .env file for different keys
-POLYCLI_PRIVATE_KEY ?= 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-POLYCLI_GAS_MULTIPLIER ?= 1.5
-POLYCLI_FUND_AMOUNT ?= 10000000000000000000
-
-# Install polygon-cli if not found
-polycli-install:
-	@if ! command -v polygon-cli >/dev/null 2>&1; then \
-		echo "Installing polygon-cli via go install..."; \
-		go install github.com/0xPolygon/polygon-cli@latest; \
-		echo "polygon-cli installed to $(shell go env GOPATH)/bin/polygon-cli"; \
-	else \
-		echo "polygon-cli already installed: $$(which polygon-cli)"; \
-	fi
-
-# Base polycli command (requires polygon-cli in PATH)
-# Uses multiple sending accounts to avoid nonce contention with high concurrency
-POLYCLI_BASE = polygon-cli loadtest \
-	--rpc-url $(POLYCLI_RPC) \
-	--private-key $(POLYCLI_PRIVATE_KEY) \
-	--requests $(POLYCLI_TPS) \
-	--time-limit $(POLYCLI_DURATION) \
-	--concurrency $(POLYCLI_CONCURRENCY) \
-	--sending-accounts-count $(POLYCLI_ACCOUNTS) \
-	--account-funding-amount $(POLYCLI_FUND_AMOUNT) \
-	--pre-fund-sending-accounts \
-	--adaptive-rate-limit \
-	--gas-price-multiplier $(POLYCLI_GAS_MULTIPLIER)
-
-# Check polygon-cli is installed before running
-define CHECK_POLYCLI
-	@if ! command -v polygon-cli >/dev/null 2>&1; then \
-		echo "Error: polygon-cli not found. Run 'make polycli-install' first."; \
-		exit 1; \
-	fi
-endef
-
-# EOA transfers (simple ETH sends - 21k gas each)
-polycli-eoa:
-	$(CHECK_POLYCLI)
-	@echo "Running polycli EOA transfer load test..."
-	@echo "  TPS: $(POLYCLI_TPS), Duration: $(POLYCLI_DURATION)s, Concurrency: $(POLYCLI_CONCURRENCY), Accounts: $(POLYCLI_ACCOUNTS)"
-	$(POLYCLI_BASE) --mode t
-
-# ERC20 transfers
-polycli-erc20:
-	$(CHECK_POLYCLI)
-	@echo "Running polycli ERC20 transfer load test..."
-	@echo "  TPS: $(POLYCLI_TPS), Duration: $(POLYCLI_DURATION)s, Concurrency: $(POLYCLI_CONCURRENCY), Accounts: $(POLYCLI_ACCOUNTS)"
-	$(POLYCLI_BASE) --mode 2
-
-# ERC721 mints
-polycli-erc721:
-	$(CHECK_POLYCLI)
-	@echo "Running polycli ERC721 mint load test..."
-	@echo "  TPS: $(POLYCLI_TPS), Duration: $(POLYCLI_DURATION)s, Concurrency: $(POLYCLI_CONCURRENCY), Accounts: $(POLYCLI_ACCOUNTS)"
-	$(POLYCLI_BASE) --mode 7
-
-# Uniswap V3 swaps
-polycli-uniswap:
-	$(CHECK_POLYCLI)
-	@echo "Running polycli Uniswap V3 swap load test..."
-	@echo "  TPS: $(POLYCLI_TPS), Duration: $(POLYCLI_DURATION)s, Concurrency: $(POLYCLI_CONCURRENCY), Accounts: $(POLYCLI_ACCOUNTS)"
-	$(POLYCLI_BASE) --mode v3
-
-# Storage writes (contract state)
-polycli-store:
-	$(CHECK_POLYCLI)
-	@echo "Running polycli storage write load test..."
-	@echo "  TPS: $(POLYCLI_TPS), Duration: $(POLYCLI_DURATION)s, Concurrency: $(POLYCLI_CONCURRENCY), Accounts: $(POLYCLI_ACCOUNTS)"
-	$(POLYCLI_BASE) --mode s
-
-# Mixed workload (default polycli behavior)
-polycli-mixed:
-	$(CHECK_POLYCLI)
-	@echo "Running polycli mixed workload..."
-	@echo "  TPS: $(POLYCLI_TPS), Duration: $(POLYCLI_DURATION)s, Concurrency: $(POLYCLI_CONCURRENCY), Accounts: $(POLYCLI_ACCOUNTS)"
-	$(POLYCLI_BASE)
-
-# Polycli help
-polycli-help:
-	@echo "Polycli Load Test Targets:"
-	@echo "  make polycli-install  - Install polycli via go install"
-	@echo "  make polycli-eoa      - EOA transfers (21k gas)"
-	@echo "  make polycli-erc20    - ERC20 transfers"
-	@echo "  make polycli-erc721   - ERC721 mints"
-	@echo "  make polycli-uniswap  - Uniswap V3 swaps"
-	@echo "  make polycli-store    - Storage writes"
-	@echo "  make polycli-mixed    - Mixed workload"
-	@echo ""
-	@echo "Configuration (env vars or command line):"
-	@echo "  POLYCLI_TPS=100            - Requests per second (default: 100)"
-	@echo "  POLYCLI_DURATION=30        - Test duration in seconds (default: 30)"
-	@echo "  POLYCLI_CONCURRENCY=10     - Concurrent workers (default: 10)"
-	@echo "  POLYCLI_ACCOUNTS=10        - Sending accounts to generate (default: 10)"
-	@echo "  POLYCLI_GAS_MULTIPLIER=1.5 - Gas price multiplier (default: 1.5)"
-	@echo ""
-	@echo "Features enabled by default:"
-	@echo "  - Multiple sending accounts (avoids nonce contention)"
-	@echo "  - Adaptive rate limiting (AIMD congestion control)"
-	@echo "  - Pre-funded accounts (faster startup)"
-	@echo ""
-	@echo "Example: make polycli-eoa POLYCLI_TPS=500 POLYCLI_DURATION=60"
 
 # =============================================================================
 # Privacy Load Testing
 # =============================================================================
 
 loadtest-privacy: ## Start stack with privacy proxy for load testing
-	$(MAKE) up PROFILE=reth WITH=privacy,explorer
+	$(MAKE) _up PROFILE=reth WITH=privacy,explorer
 
 loadtest-direct: ## Start stack without privacy for baseline comparison
-	$(MAKE) up PROFILE=reth WITH=explorer
+	$(MAKE) _up PROFILE=reth WITH=explorer
 
 # #############################################################################
 # Documentation Site
@@ -994,115 +849,51 @@ site-build:
 
 # Show help
 help:
-	@echo "Available commands:"
+	@echo "GasStorm - EVM sequencer stress-testing toolkit"
 	@echo ""
-	@echo "  ==== CORE: Gas Storm (reth mode) ===="
-	@echo ""
-	@echo "  Run:"
-	@echo "    make up               - Lego startup (default: reth + blob + privacy + explorer)"
-	@echo "    make up MODE=metal    - Core stack in metal mode (no optional features)"
-	@echo "    make up WITH=bridge,bridge-ui,blob,privacy,explorer - Full optional stack"
-	@echo "    make run              - Alias for default docker startup"
-	@echo "    make run-build        - Build from local repos and start"
-	@echo "    make run-reth         - Start op-reth core only (no optional profiles)"
-	@echo "    make run-metal        - Native mode (no Docker, maximum performance)"
-	@echo "    make stop-metal       - Stop metal mode services"
-	@echo "    make restart-metal    - Restart metal mode services"
-	@echo "    make run-attached     - Start system with logs"
+	@echo "  Stack:"
+	@echo "    make up                    - Start default stack (reth + blob + privacy + explorer)"
+	@echo "    make up WITH=bridge,blob   - Start with specific features"
+	@echo "    make up PROFILE=cdk-erigon - Start with cdk-erigon"
+	@echo "    make up L1=besu            - Start with Besu L1"
+	@echo "    make up MODE=metal         - Native mode (no Docker)"
+	@echo "    make run-build             - Build from local repos and start"
 	@echo ""
 	@echo "  Lifecycle:"
-	@echo "    make stop             - Stop all services"
-	@echo "    make restart          - Restart all services"
-	@echo "    make logs             - Follow all logs"
-	@echo "    make status           - Show service status"
-	@echo "    make resource-report  - Show runtime CPU/RAM and Docker disk usage"
-	@echo "    make clean            - Stop and remove volumes"
-	@echo "    make clean-metal      - Remove native mode data"
-	@echo "    make build            - Build without starting"
+	@echo "    make stop / restart / logs / status / clean"
+	@echo "    make resource-report       - Container CPU/RAM + disk usage"
+	@echo ""
+	@echo "  Dev (HMR):"
+	@echo "    make dev                   - Full local dev (loadgen + dashboard locally)"
+	@echo "    make dev-stack             - Dev stack with privacy + explorer (Docker)"
+	@echo "    make dev-cdk-erigon        - CDK-Erigon dev mode"
 	@echo ""
 	@echo "  Performance Profiles:"
-	@echo "    make run-high-throughput  - 1B gas, 100ms, pipelining (max TPS)"
-	@echo "    make run-fast-confirm     - 150M gas, 50ms blocks (low latency)"
-	@echo "    make run-conservative     - 30M gas, 2s blocks (stability)"
-	@echo "    make run-flashblocks      - 500M gas, 500ms + preconfirmations"
+	@echo "    make run-high-throughput   - 1B gas, 100ms blocks"
+	@echo "    make run-fast-confirm      - 150M gas, 50ms blocks"
+	@echo "    make run-conservative      - 30M gas, 2s blocks"
+	@echo "    make run-flashblocks       - 500M gas, 500ms + preconf"
 	@echo ""
 	@echo "  Testing:"
-	@echo "    make test             - Run all tests (with race detector)"
-	@echo "    make test-dashboard   - Lint dashboard"
-	@echo "    make test-tx          - Send a test transaction"
-	@echo "    make balance          - Check test account balance"
-	@echo "    make test-contract    - API contract tests (no stack needed)"
-	@echo "    make test-e2e         - E2E tests (requires running stack)"
-	@echo "    make test-integration - Full integration suite (starts/stops stack)"
-	@echo "    make test-smoke       - Quick smoke test (requires running stack)"
+	@echo "    make test                  - Dashboard lint"
+	@echo "    make test-tx / balance     - Send test TX / check balance"
+	@echo "    make test-e2e              - E2E tests (requires running stack)"
+	@echo "    make test-integration      - Full integration suite"
 	@echo ""
-	@echo "  Local Development (HMR):"
-	@echo "    make dev              - Run load-generator and dashboard locally (op-reth mode)"
-	@echo "    make dev-infra        - Start L1/L2/block-builder in Docker"
-	@echo "    make dev-loadgen      - Run only load-generator locally"
-	@echo "    make dev-dashboard    - Run only dashboard with HMR"
-	@echo "    make dev-stop         - Stop dev infrastructure"
+	@echo "  Bridge:"
+	@echo "    make run-with-bridge       - Start with Hyperlane bridge"
+	@echo "    make bridge-help           - Full bridge options"
 	@echo ""
-	@echo "  MCP Server (AI):"
-	@echo "    make mcp-server       - Run MCP server over stdio"
-	@echo "    make mcp-build        - Build MCP server binary"
-	@echo "    (auto-discovered by Claude Code via .mcp.json)"
+	@echo "  Provers:"
+	@echo "    make run-agglayer          - Start with AggLayer"
+	@echo "    make prover-help           - Full prover options"
 	@echo ""
-	@echo "  External Images:"
-	@echo "    make pull-blockbuilder   - Pull latest block-builder image from DockerHub"
-	@echo "    make pull-loadgenerator  - Pull latest load-generator image from DockerHub"
-	@echo "    BLOCKBUILDER_VERSION=v1.0.0 make run     - Use specific block-builder version"
-	@echo "    LOADGENERATOR_VERSION=v1.0.0 make run    - Use specific load-generator version"
+	@echo "  Deploy:"
+	@echo "    make deploy-server SERVER=<ip>   - Single-server deploy"
+	@echo "    make deploy-chain SERVER=<ip>    - Chain server (3-way split)"
+	@echo "    make deploy-explorer ...         - Explorer server"
+	@echo "    make deploy-main ...             - Main server (dashboard + loadgen)"
 	@echo ""
-	@echo "  ==== OVERHANGING: Other Execution Layers ===="
-	@echo ""
-	@echo "    make run-cdk-erigon   - Start with cdk-erigon (standalone sequencer)"
-	@echo "    make run-gravity-reth - Start with gravity-reth (high-perf parallel EVM)"
-	@echo "    make dev-cdk-erigon   - Run with cdk-erigon in Docker, rest locally"
-	@echo ""
-	@echo "  ==== OVERHANGING: Block Explorer ===="
-	@echo ""
-	@echo "    make run-with-explorer          - Start with L1 + L2 block explorers"
-	@echo "    make run-with-explorer-privacy   - Start with explorers + privacy proxy"
-	@echo "    make pull-explorer              - Pull latest explorer image"
-	@echo "    L2 Explorer: http://localhost:18201  L1 Explorer: http://localhost:18203"
-	@echo ""
-	@echo "  ==== OVERHANGING: Privacy Proxy ===="
-	@echo ""
-	@echo "    make run-with-privacy           - Start with privacy proxy"
-	@echo "    make pull-privacy               - Pull latest privacy proxy image"
-	@echo ""
-	@echo "  ==== OVERHANGING: Blob DA ===="
-	@echo ""
-	@echo "    make run-with-blob    - Start with Blob DA enabled"
-	@echo ""
-	@echo "  ==== OVERHANGING: Hyperlane Bridge ===="
-	@echo ""
-	@echo "    make run-with-bridge  - Start with Hyperlane bridge + Warp UI (Anvil L1)"
-	@echo "    make run-besu-reth-hyperlane - Besu L1 + op-reth + bridge + explorers"
-	@echo "    EXTERNAL_L1_RPC=... EXTERNAL_L1_KEY=... make run-external-l1-hyperlane"
-	@echo "    make bridge-setup     - Full setup (deploy + start relayer)"
-	@echo "    make bridge-help      - Full bridge options"
-	@echo ""
-	@echo "  ==== OVERHANGING: AggLayer & Provers ===="
-	@echo ""
-	@echo "    make run-agglayer     - Start with AggLayer stack"
-	@echo "    make run-zisk         - Shortcut for ZisK prover"
-	@echo "    make prover-help      - Full prover options"
-	@echo ""
-	@echo "  ==== OVERHANGING: Polycli ===="
-	@echo ""
-	@echo "    make polycli-eoa      - EOA transfers (21k gas)"
-	@echo "    make polycli-help     - Full polycli options"
-	@echo ""
-	@echo "  Configuration (.env file - sourced automatically):"
-	@echo "    EXECUTION_LAYER       - reth (default), cdk-erigon, or gravity-reth"
-	@echo "    GAS_LIMIT             - Block gas limit (default: 1000000000)"
-	@echo "    MAX_TXS_PER_BLOCK     - Max txs per block (default: 25000)"
-	@echo "    BLOCK_TIME_MS         - Block interval ms (default: 1000)"
-	@echo "    TX_ORDERING           - fifo (default), tip_desc, tip_asc"
-	@echo "    ENABLE_PRECONFIRMATIONS - WebSocket tx streaming (default: true, reth only)"
-	@echo ""
-	@echo "  Example: Override .env on command line:"
-	@echo "    EXECUTION_LAYER=cdk-erigon make run"
-	@echo "    BLOCK_TIME_MS=200 make run"
+	@echo "  Config (.env):"
+	@echo "    EXECUTION_LAYER, GAS_LIMIT, BLOCK_TIME_MS, TX_ORDERING,"
+	@echo "    MAX_TXS_PER_BLOCK, ENABLE_PRECONFIRMATIONS, SKIP_EMPTY_BLOCKS"

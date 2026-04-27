@@ -3,5 +3,5 @@
 import { ServiceIframe } from "@/components/layout/service-iframe";
 
 export default function ExplorerL1Page() {
-  return <ServiceIframe port={18203} title="L1 Block Explorer" syncHash />;
+  return <ServiceIframe key={18203} port={18203} title="L1 Block Explorer" syncHash />;
 }

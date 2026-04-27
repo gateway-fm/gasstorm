@@ -92,7 +92,7 @@ services:
         "-vvv"
       ]
     volumes:
-      - ./genesis:/config:ro
+      - ../genesis:/config:ro
       - l2-data:/data
     ports:
       - "18546:8545" # L2 RPC (changed from 8546)
@@ -134,7 +134,7 @@ services:
     # --db.read.concurrency increases roTxsLimiter (default: GOMAXPROCS*64, bottleneck at >3500 TPS)
     command: [ "--config", "/config/cdk-erigon.yaml", "--db.read.concurrency", "9000" ]
     volumes:
-      - ./config/cdk-erigon:/config:ro
+      - ../config/cdk-erigon:/config:ro
       - cdk-erigon-data:/data
     ports:
       - "18546:8545" # L2 RPC (same external port as op-reth for consistency)
@@ -144,7 +144,7 @@ services:
   # Documentation Site (Next.js static export + nginx) - for op-reth mode
   docs-site:
     build:
-      context: ./site
+      context: ../site
       dockerfile: Dockerfile
       args:
         - DOCS_BASE_PATH=
@@ -163,7 +163,7 @@ services:
   # Documentation Site for cdk-erigon mode
   docs-site-cdk:
     build:
-      context: ./site
+      context: ../site
       dockerfile: Dockerfile
     container_name: gasstorm-docs
     profiles: [ "cdk-erigon" ]
@@ -180,7 +180,7 @@ services:
   # Dashboard with RPC proxy (Next.js static build) - for op-reth mode
   dashboard:
     build:
-      context: ./dashboard
+      context: ../dashboard
       dockerfile: Dockerfile
     container_name: gasstorm-dashboard
     profiles: [ "reth" ]
@@ -188,6 +188,17 @@ services:
       - l1
       - l2-reth
       - block-builder
+    environment:
+      - LOADGEN_HOST=${LOADGEN_HOST:-load-generator:3001}
+      - CHAIN_HOST_RPC=${CHAIN_HOST_RPC:-block-builder:3000}
+      - CHAIN_HOST_BUILDER_WS=${CHAIN_HOST_BUILDER_WS:-block-builder:3001}
+      - CHAIN_HOST_L2_RPC=${CHAIN_HOST_L2_RPC:-l2-reth:8545}
+      - CHAIN_HOST_L2_WS=${CHAIN_HOST_L2_WS:-l2-reth:8546}
+      - CHAIN_HOST_L1=${CHAIN_HOST_L1:-l1:8545}
+      - EXPLORER_HOST_API=${EXPLORER_HOST_API:-explorer-api:8080}
+      - EXPLORER_HOST_L1_API=${EXPLORER_HOST_L1_API:-explorer-l1-api:8080}
+      - EXPLORER_HOST_UI=${EXPLORER_HOST_UI:-explorer-ui:80}
+      - EXPLORER_HOST_L1_UI=${EXPLORER_HOST_L1_UI:-explorer-l1-ui:80}
     volumes:
       - hyperlane-config:/usr/share/nginx/html/api/hyperlane:ro
     ports:
@@ -203,15 +214,26 @@ services:
   # Dashboard for cdk-erigon mode
   dashboard-cdk:
     build:
-      context: ./dashboard
+      context: ../dashboard
       dockerfile: Dockerfile
     container_name: gasstorm-dashboard
     profiles: [ "cdk-erigon" ]
     depends_on:
       - l1
       - l2-cdk-erigon
+    environment:
+      - LOADGEN_HOST=${LOADGEN_HOST:-load-generator:3001}
+      - CHAIN_HOST_RPC=${CHAIN_HOST_RPC:-l2-cdk-erigon:8545}
+      - CHAIN_HOST_BUILDER_WS=${CHAIN_HOST_BUILDER_WS:-l2-cdk-erigon:8545}
+      - CHAIN_HOST_L2_RPC=${CHAIN_HOST_L2_RPC:-l2-cdk-erigon:8545}
+      - CHAIN_HOST_L2_WS=${CHAIN_HOST_L2_WS:-l2-cdk-erigon:8546}
+      - CHAIN_HOST_L1=${CHAIN_HOST_L1:-l1:8545}
+      - EXPLORER_HOST_API=${EXPLORER_HOST_API:-explorer-api:8080}
+      - EXPLORER_HOST_L1_API=${EXPLORER_HOST_L1_API:-explorer-l1-api:8080}
+      - EXPLORER_HOST_UI=${EXPLORER_HOST_UI:-explorer-ui:80}
+      - EXPLORER_HOST_L1_UI=${EXPLORER_HOST_L1_UI:-explorer-l1-ui:80}
     volumes:
-      - ./dashboard/nginx-cdk.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../dashboard/nginx-cdk.conf:/etc/nginx/templates/default.conf.template:ro
     ports:
       - "18000:80"
     healthcheck:
@@ -226,7 +248,7 @@ services:
   # Build from local source for development/testing
   block-builder:
     build:
-      context: ../blockbuilder
+      context: ../../blockbuilder
       dockerfile: Dockerfile
     image: gatewayfm/blockbuilder:local
     container_name: gasstorm-builder
@@ -262,8 +284,10 @@ services:
       # Debug options
       - DEBUG_REJECTION_REASONS=${DEBUG_REJECTION_REASONS:-true}
       - STRESS_THRESHOLD_PCT=${STRESS_THRESHOLD_PCT:-80}
+      # Loadtest-only: enables /reset-nonces and /flush-mempool. Never set on real-network deploys.
+      - ENABLE_LOADTEST_ENDPOINTS=${ENABLE_LOADTEST_ENDPOINTS:-1}
     volumes:
-      - ./genesis/jwt.hex:/config/jwt.hex:ro
+      - ../genesis/jwt.hex:/config/jwt.hex:ro
     ports:
       - "13000:3000" # RPC for tx submission
       - "13002:3001" # Preconfirmation WebSocket (when enabled)
@@ -278,7 +302,7 @@ services:
   # Used when PROVER=zisk, alternative to op-succinct
   zisk-prover:
     build:
-      context: ./zisk-prover
+      context: ../zisk-prover
       dockerfile: Dockerfile
     container_name: gasstorm-prover
     profiles: [ "prover-zisk" ]
@@ -300,66 +324,8 @@ services:
 
   # Load Generator Service (Go) - for op-reth mode (profile: reth)
   # Build from local source for development/testing
-  load-generator:
-    build:
-      context: ../loadgenerator
-      dockerfile: Dockerfile
-    image: gatewayfm/loadgenerator:local
-    container_name: gasstorm-loadgen
-    profiles: [ "reth" ]
-    depends_on:
-      - block-builder
-      - l2-reth
-    environment:
-      - EXECUTION_LAYER=reth
-      - BUILDER_RPC_URL=http://block-builder:3000 # Internal connection to builder
-      - L2_RPC_URL=http://block-builder:3000 # Route through block-builder for consistency
-      - L2_WS_URL=ws://l2-reth:8546 # L2 WebSocket for block metrics (newHeads)
-      - PRECONF_WS_URL=ws://block-builder:3001/ws/preconfirmations # Preconfirmation WebSocket
-      - LISTEN_ADDR=:3001
-      - DATABASE_PATH=/data/loadgen.db # SQLite database for test history
-      - BLOCK_TIME_MS=${BLOCK_TIME_MS:-150} # Must match block-builder for account scaling
-      - PRIVACY_RPC_URL=${PRIVACY_RPC_URL:-http://privacy-proxy:8080}
-      - PRIVACY_AUTH_TOKEN_FILE=${PRIVACY_AUTH_TOKEN_FILE:-/shared/loadtest-jwt.txt}
-    tmpfs:
-      - /data:mode=1777
-    volumes:
-      - privacy-loadtest-config:/shared:ro
-    ports:
-      - "13001:3001" # REST API for load test control
-      - "16061:6061" # pprof for profiling
-    restart: unless-stopped
-
-  # Load Generator Service (Go) - for cdk-erigon mode (profile: cdk-erigon)
-  # Sends transactions directly to cdk-erigon RPC (no block-builder)
-  load-generator-cdk:
-    build:
-      context: ../loadgenerator
-      dockerfile: Dockerfile
-    image: gatewayfm/loadgenerator:local
-    container_name: gasstorm-loadgen
-    profiles: [ "cdk-erigon" ]
-    networks:
-      default:
-        aliases:
-          - load-generator
-    depends_on:
-      - l2-cdk-erigon
-    environment:
-      - EXECUTION_LAYER=cdk-erigon
-      - BUILDER_RPC_URL=http://l2-cdk-erigon:8545 # Direct to cdk-erigon RPC
-      - L2_RPC_URL=http://l2-cdk-erigon:8545 # Same as builder in this mode
-      - L2_WS_URL=ws://l2-cdk-erigon:8546 # L2 WebSocket for block metrics
-      - PRECONF_WS_URL= # No preconfirmations in cdk-erigon mode
-      - LISTEN_ADDR=:3001
-      - DATABASE_PATH=/data/loadgen.db
-      - PRIVACY_RPC_URL=${PRIVACY_RPC_URL:-}
-      - PRIVACY_AUTH_TOKEN_FILE=${PRIVACY_AUTH_TOKEN_FILE:-}
-    tmpfs:
-      - /data:mode=1777
-    ports:
-      - "13001:3001" # REST API for load test control
-    restart: unless-stopped
+  # Load generator has been moved to docker-compose.loadgen.yaml
+  # Run separately: docker compose -f docker-compose.loadgen.yaml --profile reth up --build -d
 
   # ===========================================================================
   # OVERHANGING: Hyperlane Bridge
@@ -369,7 +335,7 @@ services:
   # Automatically runs when bridge profile is enabled
   hyperlane-init:
     build:
-      context: .
+      context: ..
       dockerfile: ./hyperlane-init/Dockerfile
     container_name: gasstorm-hyperlane-init
     profiles: [ "bridge" ]
@@ -427,7 +393,7 @@ services:
   # Connect any wallet to bridge ETH between L1 and L2
   hyperlane-bridge-ui:
     build:
-      context: ./bridge-ui
+      context: ../bridge-ui
       dockerfile: Dockerfile
       args:
         - NEXT_PUBLIC_WALLET_CONNECT_ID=${WALLET_CONNECT_ID:-00000000000000000000000000000000}
@@ -463,7 +429,7 @@ services:
       - POSTGRES_DB=agglayer
     volumes:
       - agglayer-db-data:/var/lib/postgresql/data
-      - ./config/init-agglayer-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ../config/init-agglayer-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
       - "15432:5432"
     healthcheck:
@@ -491,7 +457,7 @@ services:
       - SEQUENCER_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
       - ADMIN_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
     volumes:
-      - ./output/contracts:/output
+      - ../output/contracts:/output
     working_dir: /app
     entrypoint: [ "/bin/sh", "-c" ]
     command:
@@ -542,7 +508,7 @@ services:
       agglayer-db:
         condition: service_healthy
     volumes:
-      - ./config/agglayer.toml:/etc/agglayer/agglayer-config.toml:ro
+      - ../config/agglayer.toml:/etc/agglayer/agglayer-config.toml:ro
       - agglayer-data:/etc/agglayer/storage
     entrypoint: [ "/usr/local/bin/agglayer" ]
     command: [ "run", "--cfg", "/etc/agglayer/agglayer-config.toml" ]
@@ -574,7 +540,7 @@ services:
       l2-reth:
         condition: service_started
     volumes:
-      - ./config/aggkit.toml:/etc/aggkit/config.toml:ro
+      - ../config/aggkit.toml:/etc/aggkit/config.toml:ro
       - aggkit-data:/data
     command: [ "run", "--cfg", "/etc/aggkit/config.toml", "--components", "aggsender,bridgesync,l1infotreesync" ]
     environment:
@@ -594,7 +560,7 @@ services:
       agglayer:
         condition: service_healthy
     volumes:
-      - ./config/bridge-service.toml:/etc/bridge/config.toml:ro
+      - ../config/bridge-service.toml:/etc/bridge/config.toml:ro
     command: [ "run", "--cfg", "/etc/bridge/config.toml" ]
     environment:
       - BRIDGE_LOG_LEVEL=debug
@@ -658,7 +624,7 @@ services:
   # Blob DA Service
   blob-da:
     build:
-      context: ../blob-da
+      context: ../../blob-da
       dockerfile: Dockerfile
     container_name: gasstorm-blob-da
     profiles: [ "blob" ]
@@ -692,14 +658,14 @@ services:
   # Blob DA UI (frontend for blob-da service)
   blob-da-ui:
     build:
-      context: ../blob-da/frontend
+      context: ../../blob-da/frontend
       dockerfile: Dockerfile
     container_name: gasstorm-blob-da-ui
     profiles: [ "blob" ]
     depends_on:
       - blob-da
     volumes:
-      - ../blob-da/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../../blob-da/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
       - "18126:80"
     restart: unless-stopped
@@ -707,7 +673,7 @@ services:
   # Blob DA Service (cdk-erigon mode)
   blob-da-cdk:
     build:
-      context: ../blob-da
+      context: ../../blob-da
       dockerfile: Dockerfile
     container_name: gasstorm-blob-da-cdk
     profiles: [ "blob-cdk" ]
@@ -745,14 +711,14 @@ services:
   # Blob DA UI (frontend for blob-da service, cdk-erigon mode)
   blob-da-ui-cdk:
     build:
-      context: ../blob-da/frontend
+      context: ../../blob-da/frontend
       dockerfile: Dockerfile
     container_name: gasstorm-blob-da-ui-cdk
     profiles: [ "blob-cdk" ]
     depends_on:
       - blob-da-cdk
     volumes:
-      - ../blob-da/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../../blob-da/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
       - "18126:80"
     restart: unless-stopped
@@ -919,7 +885,7 @@ services:
     depends_on:
       - explorer-l1-api
     volumes:
-      - ./config/explorer-l1-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../config/explorer-l1-nginx.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
       - "18203:80"
     healthcheck:
@@ -1034,12 +1000,16 @@ services:
   # Privacy Proxy - RPC access control with ZK proofs (reth mode)
   privacy-proxy:
     build:
-      context: ../privacy-proxy
+      context: ../../privacy-proxy
       dockerfile: Dockerfile.backend
       target: dev
     image: gatewayfm/privacy-proxy:${PRIVACY_PROXY_VERSION:-local}
     container_name: gasstorm-privacy-proxy
     profiles: [ "privacy" ]
+    networks:
+      default:
+        aliases:
+          - proxy-backend
     depends_on:
       block-builder:
         condition: service_started
@@ -1057,8 +1027,9 @@ services:
       - JWT_REFRESH_SECRET=dev-refresh-secret-do-not-use-in-production-0987654321
       - TUNNEL_URL_FILE=/shared/tunnel-url.txt
       - ENABLE_RUNTIME_TRACING=true
+      - FRONTEND_URL=http://localhost:18301
     volumes:
-      - ./data/tunnel:/shared:ro
+      - ../data/tunnel:/shared:ro
     ports:
       - "18300:8080"
     restart: unless-stopped
@@ -1066,18 +1037,18 @@ services:
   # Privacy UI - Management web interface (reth mode)
   privacy-ui:
     build:
-      context: ../privacy-proxy/frontend
+      context: ../../privacy-proxy/frontend
       dockerfile: Dockerfile
+      target: prod
+      args:
+        - VITE_ALLOW_MOCK_LOGIN=true
+        - VITE_BACKEND_URL=${PRIVACY_BACKEND_URL:-}
     container_name: gasstorm-privacy-ui
     profiles: [ "privacy" ]
     depends_on:
       - privacy-proxy
-    environment:
-      - VITE_API_TARGET=http://privacy-proxy:8080
-      - VITE_BACKEND_URL=${PRIVACY_BACKEND_URL:-}
-      - VITE_ALLOW_MOCK_LOGIN=true
     ports:
-      - "18301:5173"
+      - "18301:80"
     restart: unless-stopped
 
   # Cloudflared tunnel - exposes privacy-proxy backend via public HTTPS URL
@@ -1095,16 +1066,16 @@ services:
 
   # Privacy Load Test Setup - creates RBAC config and JWT token for load generator
   privacy-loadtest-setup:
-    image: alpine/curl:latest
+    image: postgres:15-alpine
     container_name: gasstorm-privacy-loadtest-setup
     profiles: [ "privacy" ]
     depends_on:
       privacy-proxy:
         condition: service_started
     volumes:
-      - ./scripts/privacy-loadtest-setup.sh:/setup.sh:ro
+      - ../scripts/privacy-loadtest-setup.sh:/setup.sh:ro
       - privacy-loadtest-config:/shared
-    entrypoint: ["sh", "-c", "apk add --no-cache jq > /dev/null 2>&1 && sh /setup.sh"]
+    entrypoint: ["sh", "-c", "apk add --no-cache curl jq > /dev/null 2>&1 && sh /setup.sh"]
     restart: "no"
 
   # --- Privacy CDK-Erigon variants ---
@@ -1130,12 +1101,16 @@ services:
 
   privacy-proxy-cdk:
     build:
-      context: ../privacy-proxy
+      context: ../../privacy-proxy
       dockerfile: Dockerfile.backend
       target: dev
     image: gatewayfm/privacy-proxy:${PRIVACY_PROXY_VERSION:-local}
     container_name: gasstorm-privacy-proxy
     profiles: [ "privacy-cdk" ]
+    networks:
+      default:
+        aliases:
+          - proxy-backend
     depends_on:
       l2-cdk-erigon:
         condition: service_started
@@ -1153,26 +1128,27 @@ services:
       - JWT_REFRESH_SECRET=dev-refresh-secret-do-not-use-in-production-0987654321
       - TUNNEL_URL_FILE=/shared/tunnel-url.txt
       - ENABLE_RUNTIME_TRACING=true
+      - FRONTEND_URL=http://localhost:18301
     volumes:
-      - ./data/tunnel:/shared:ro
+      - ../data/tunnel:/shared:ro
     ports:
       - "18300:8080"
     restart: unless-stopped
 
   privacy-ui-cdk:
     build:
-      context: ../privacy-proxy/frontend
+      context: ../../privacy-proxy/frontend
       dockerfile: Dockerfile
+      target: prod
+      args:
+        - VITE_ALLOW_MOCK_LOGIN=true
+        - VITE_BACKEND_URL=${PRIVACY_BACKEND_URL:-}
     container_name: gasstorm-privacy-ui
     profiles: [ "privacy-cdk" ]
     depends_on:
       - privacy-proxy-cdk
-    environment:
-      - VITE_API_TARGET=http://privacy-proxy-cdk:8080
-      - VITE_BACKEND_URL=${PRIVACY_BACKEND_URL:-}
-      - VITE_ALLOW_MOCK_LOGIN=true
     ports:
-      - "18301:5173"
+      - "18301:80"
     restart: unless-stopped
 
   # Cloudflared tunnel for cdk-erigon mode

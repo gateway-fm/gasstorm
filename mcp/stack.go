@@ -229,27 +229,27 @@ func registerStackUp(s *server.MCPServer, dir string) {
 			if features["blob"] {
 				return mcp.NewToolResultError("Feature 'blob' requires EIP-4844 (Besu Clique doesn't support Cancun). Use L1=anvil."), nil
 			}
-			composeFiles = append(composeFiles, "docker-compose-besu-l1.yaml")
+			composeFiles = append(composeFiles, "docker/docker-compose-besu-l1.yaml")
 		}
 
 		if features["bridge"] && profile == "cdk-erigon" {
 			if l1 == "besu" {
-				composeFiles = append(composeFiles, "docker-compose-besu-cdk-erigon-bridge.yaml")
+				composeFiles = append(composeFiles, "docker/docker-compose-besu-cdk-erigon-bridge.yaml")
 			} else {
-				composeFiles = append(composeFiles, "docker-compose-cdk-erigon-bridge.yaml")
+				composeFiles = append(composeFiles, "docker/docker-compose-cdk-erigon-bridge.yaml")
 			}
 		}
 
 		if features["privacy"] && features["explorer"] {
 			if profile == "cdk-erigon" {
-				composeFiles = append(composeFiles, "docker-compose-privacy-explorer-cdk.yaml")
+				composeFiles = append(composeFiles, "docker/docker-compose-privacy-explorer-cdk.yaml")
 			} else {
-				composeFiles = append(composeFiles, "docker-compose-privacy-explorer.yaml")
+				composeFiles = append(composeFiles, "docker/docker-compose-privacy-explorer.yaml")
 			}
 		}
 
 		if gasless {
-			composeFiles = append(composeFiles, "docker-compose-op-reth.yaml", "docker-compose-gasless.yaml")
+			composeFiles = append(composeFiles, "docker/docker-compose-op-reth.yaml", "docker/docker-compose-gasless.yaml")
 		}
 
 		// Build compose args: profiles, then file overrides, then command.
@@ -258,7 +258,7 @@ func registerStackUp(s *server.MCPServer, dir string) {
 			args = append(args, "--profile", p)
 		}
 		if len(composeFiles) > 0 {
-			args = append(args, "-f", "docker-compose.yml")
+			args = append(args, "-f", "docker/docker-compose.yml")
 			for _, f := range composeFiles {
 				args = append(args, "-f", f)
 			}

@@ -1,7 +1,7 @@
 services:
   l2-reth:
     volumes:
-      - ./genesis/genesis-gasless.json:/config/genesis.json:ro
+      - ../genesis/genesis-gasless.json:/config/genesis.json:ro
 
   block-builder:
     environment:

@@ -158,11 +158,20 @@ async function main() {
   await (await l2EthContract.enrollRemoteRouter(l1Meta.domainId, l1RouterBytes32)).wait();
   console.log('  Routers enrolled');
 
-  // Fund ETH warp routes
+  // Fund ETH warp routes (may fail on gasless chains — non-fatal)
   console.log('Funding ETH warp routes...');
-  await (await l1Wallet.sendTransaction({ to: result.ethWarpL1, value: ethers.parseEther('10') })).wait();
-  await (await l2Wallet.sendTransaction({ to: result.ethWarpL2, value: ethers.parseEther('10') })).wait();
-  console.log('  Funded with 10 ETH each');
+  try {
+    await (await l1Wallet.sendTransaction({ to: result.ethWarpL1, value: ethers.parseEther('10') })).wait();
+    console.log('  L1 funded with 10 ETH');
+  } catch (e) {
+    console.log(`  L1 funding skipped (${e.message?.substring(0, 80)})`);
+  }
+  try {
+    await (await l2Wallet.sendTransaction({ to: result.ethWarpL2, value: ethers.parseEther('10') })).wait();
+    console.log('  L2 funded with 10 ETH');
+  } catch (e) {
+    console.log(`  L2 funding skipped (${e.message?.substring(0, 80)})`);
+  }
 
   // --- Deploy ERC20 warp routes ---
   if (MOCK_USDC_ADDR) {

@@ -1,0 +1,154 @@
+# Standalone chain stack (L1 + L2 + block-builder).
+# Runs on the chain server in the 3-way split topology.
+#
+# Local (same machine, shared Docker network):
+#   docker compose -f docker-compose.chain.yaml --profile reth up -d
+#
+# Remote (standalone chain server):
+#   docker compose -f docker-compose.chain.yaml --profile reth up -d
+
+services:
+  # Layer 1 - Anvil (local Ethereum node)
+  l1:
+    image: ghcr.io/foundry-rs/foundry:latest
+    container_name: gasstorm-l1
+    entrypoint: [ "anvil" ]
+    command: [ "--host", "0.0.0.0", "--port", "8545", "--block-time", "12", "--accounts", "20", "--balance", "100", "--chain-id", "1337", "--gas-limit", "30000000" ]
+    ports:
+      - "18545:8545"
+    healthcheck:
+      test: [ "CMD", "cast", "chain-id", "--rpc-url", "http://localhost:8545" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Layer 2 - op-reth with Engine API (profile: reth)
+  l2-reth:
+    image: ghcr.io/paradigmxyz/op-reth:v1.9.3
+    container_name: gasstorm-l2
+    profiles: [ "reth" ]
+    depends_on:
+      l1:
+        condition: service_healthy
+    command:
+      [
+        "node",
+        "--chain",
+        "/config/genesis.json",
+        "--datadir",
+        "/data",
+        "--http",
+        "--http.addr",
+        "0.0.0.0",
+        "--http.port",
+        "8545",
+        "--http.api",
+        "eth,net,web3,debug,trace",
+        "--http.corsdomain",
+        "*",
+        "--ws",
+        "--ws.addr",
+        "0.0.0.0",
+        "--ws.port",
+        "8546",
+        "--ws.api",
+        "eth,net,web3",
+        "--authrpc.addr",
+        "0.0.0.0",
+        "--authrpc.port",
+        "8551",
+        "--authrpc.jwtsecret",
+        "/config/jwt.hex",
+        "--rollup.disable-tx-pool-gossip",
+        "--txpool.pending-max-count",
+        "1",
+        "--txpool.basefee-max-count",
+        "1",
+        "--txpool.queued-max-count",
+        "1",
+        "--txpool.max-account-slots",
+        "1",
+        "--db.sync-mode",
+        "safe-no-sync",
+        "--db.growth-step",
+        "4GB",
+        "--db.max-readers",
+        "512",
+        "--engine.multiproof-chunking",
+        "--engine.multiproof-chunk-size",
+        "100",
+        "--rpc.max-connections",
+        "1000",
+        "--rpc.max-request-size",
+        "100",
+        "--rpc.max-response-size",
+        "200",
+        "--rpc.max-tracing-requests",
+        "50",
+        "--log.stdout.format",
+        "terminal",
+        "-vvv"
+      ]
+    volumes:
+      - ../genesis:/config:ro
+      - l2-data:/data
+    ports:
+      - "18546:8545"   # L2 RPC
+      - "18547:8546"   # L2 WebSocket
+      - "18551:8551"   # Engine API
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 16G
+        reservations:
+          cpus: '4'
+          memory: 8G
+    restart: unless-stopped
+
+  # Block Builder Service (Go) - only used with op-reth (profile: reth)
+  block-builder:
+    build:
+      context: ../../blockbuilder
+      dockerfile: Dockerfile
+    image: gatewayfm/blockbuilder:local
+    container_name: gasstorm-builder
+    profiles: [ "reth" ]
+    depends_on:
+      - l2-reth
+    environment:
+      - ENGINE_RPC_URL=http://l2-reth:8551
+      - L2_RPC_URL=http://l2-reth:8545
+      - JWT_SECRET_PATH=/config/jwt.hex
+      - SEQUENCER_ADDRESS=0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+      - LISTEN_ADDR=:3000
+      - BLOCK_TIME_MS=${BLOCK_TIME_MS:-150}
+      - SKIP_EMPTY_BLOCKS=${SKIP_EMPTY_BLOCKS:-true}
+      - GAS_LIMIT=${GAS_LIMIT:-3000000000}
+      - MAX_TXS_PER_BLOCK=${MAX_TXS_PER_BLOCK:-100000}
+      - INCLUDE_DEPOSIT_TX=${INCLUDE_DEPOSIT_TX:-false}
+      - TX_ORDERING=${TX_ORDERING:-fifo}
+      - ENABLE_PRECONFIRMATIONS=${ENABLE_PRECONFIRMATIONS:-true}
+      - PRECONF_LISTEN_ADDR=${PRECONF_LISTEN_ADDR:-:3001}
+      - PRECONF_BUFFER_SIZE=${PRECONF_BUFFER_SIZE:-10000}
+      - BLOCK_ATTESTATION_ENABLED=${BLOCK_ATTESTATION_ENABLED:-false}
+      - MAX_REQUEUE_COUNT=${MAX_REQUEUE_COUNT:-100}
+      - MAX_PENDING_CAPACITY=${MAX_PENDING_CAPACITY:-1000000}
+      - NONCE_TIMEOUT_MS=${NONCE_TIMEOUT_MS:-500}
+      - DEBUG_REJECTION_REASONS=${DEBUG_REJECTION_REASONS:-true}
+      - STRESS_THRESHOLD_PCT=${STRESS_THRESHOLD_PCT:-80}
+    volumes:
+      - ../genesis/jwt.hex:/config/jwt.hex:ro
+    ports:
+      - "13000:3000"   # RPC for tx submission
+      - "13002:3001"   # Preconfirmation WebSocket
+      - "16060:6060"   # pprof
+    restart: unless-stopped
+
+volumes:
+  l2-data:
+
+networks:
+  default:
+    name: gasstorm

@@ -9,6 +9,8 @@ import { useGoLoadTestStore } from "@/stores/go-load-test-store";
 import { formatDuration } from "@/lib/statistics";
 import { cn } from "@/lib/utils";
 
+const hideFailed = !!process.env.NEXT_PUBLIC_LOADTEST_HIDE_FAILED;
+
 const statusColors: Record<string, string> = {
   idle: "bg-muted text-muted-foreground",
   initializing: "bg-warning text-warning-foreground",
@@ -64,16 +66,16 @@ export function LoadTestRunner() {
   const remainingTime = Math.max(0, duration - elapsedTime);
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+    <Card className="h-full flex flex-col">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <CardTitle className="text-base font-semibold font-mono">Load Test Runner</CardTitle>
         <Badge className={cn(statusColors[status], "capitalize border-0")}>
           {status}
         </Badge>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 flex-1 flex flex-col">
         {/* Progress Bar */}
-        <div className="space-y-2">
+        <div className="space-y-1">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Progress</span>
             <span className="font-mono">
@@ -88,8 +90,8 @@ export function LoadTestRunner() {
         </div>
 
         {/* Current Rate */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="rounded-lg border p-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-lg border p-2.5">
             <p className="text-xs text-muted-foreground font-mono">
               Current TPS
             </p>
@@ -107,7 +109,7 @@ export function LoadTestRunner() {
               </p>
             )}
           </div>
-          <div className="rounded-lg border p-3">
+          <div className="rounded-lg border p-2.5">
             <p className="text-xs text-muted-foreground font-mono">TX Sent</p>
             <p className="text-2xl font-bold font-mono">{txSentCount.toLocaleString()}</p>
             {averageTps > 0 && (
@@ -119,21 +121,23 @@ export function LoadTestRunner() {
         </div>
 
         {/* TX Stats */}
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-lg bg-muted p-2">
+        <div className={`grid ${hideFailed ? "grid-cols-2" : "grid-cols-3"} gap-2 text-center flex-1`}>
+          <div className="rounded-lg bg-muted px-2 py-4 flex flex-col items-center justify-center">
             <p className="text-xs text-muted-foreground font-mono">Pending</p>
-            <p className="font-mono font-semibold">
-              {Math.max(0, txSentCount - txConfirmedCount - txFailedCount)}
+            <p className="text-xl font-mono font-bold mt-1">
+              {Math.max(0, txSentCount - txConfirmedCount - txFailedCount).toLocaleString()}
             </p>
           </div>
-          <div className="rounded-lg bg-success/10 p-2">
+          <div className="rounded-lg bg-success/10 px-2 py-4 flex flex-col items-center justify-center">
             <p className="text-xs text-muted-foreground font-mono">Confirmed</p>
-            <p className="font-mono font-semibold text-success">{txConfirmedCount.toLocaleString()}</p>
+            <p className="text-xl font-mono font-bold text-success mt-1">{txConfirmedCount.toLocaleString()}</p>
           </div>
-          <div className="rounded-lg bg-destructive/10 p-2">
-            <p className="text-xs text-muted-foreground font-mono">Failed</p>
-            <p className="font-mono font-semibold text-destructive">{txFailedCount.toLocaleString()}</p>
-          </div>
+          {!hideFailed && (
+            <div className="rounded-lg bg-destructive/10 px-2 py-4 flex flex-col items-center justify-center">
+              <p className="text-xs text-muted-foreground font-mono">Failed</p>
+              <p className="text-xl font-mono font-bold text-destructive mt-1">{txFailedCount.toLocaleString()}</p>
+            </div>
+          )}
         </div>
 
         {/* Initialization Progress */}
@@ -246,7 +250,7 @@ export function LoadTestRunner() {
         )}
 
         {/* Controls */}
-        <div className="flex gap-2 pt-2">
+        <div className="flex gap-2 mt-auto pt-2">
           {status === "idle" && (
             <Button className="flex-1" onClick={start} disabled={isStarting}>
               {isStarting ? (

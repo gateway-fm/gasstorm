@@ -9,17 +9,23 @@ interface ServiceIframeProps {
   title: string;
   /** Persist the iframe's subpath in the URL hash across refreshes */
   syncHash?: boolean;
+  /** Direct URL override — bypasses /proxy/ path prefix for SPAs that can't handle it */
+  directUrl?: string;
 }
 
-export function ServiceIframe({ port, path = "", title, syncHash }: ServiceIframeProps) {
+export function ServiceIframe({ port, path = "", title, syncHash, directUrl }: ServiceIframeProps) {
   const ref = useRef<HTMLIFrameElement>(null);
 
   // On mount, restore subpath from URL hash (e.g. #/block/123?tab=txs)
+  // Ignore the hash if it belongs to a different service port (stale from previous page)
   const [hashPath] = useState(() => {
     if (!syncHash || typeof window === "undefined") return "";
     const h = window.location.hash;
     if (!h || h === "#" || h === "#/") return "";
-    return h.slice(1); // strip leading #
+    const decoded = h.slice(1); // strip leading #
+    // In single-port mode, hash contains /proxy/{port}/... — ignore if port doesn't match
+    if (decoded.startsWith("/proxy/") && !decoded.startsWith(`/proxy/${port}/`)) return "";
+    return decoded;
   });
 
   const effectivePath = hashPath || path;
@@ -29,7 +35,8 @@ export function ServiceIframe({ port, path = "", title, syncHash }: ServiceIfram
       if (el) {
         // Cache buster prevents stale JS bundles from being served after image rebuilds
         const sep = effectivePath.includes("?") ? "&" : "?";
-        el.src = getServiceUrl(port, effectivePath) + sep + "_v=" + Date.now();
+        const base = directUrl ? `${directUrl}${effectivePath}` : getServiceUrl(port, effectivePath);
+        el.src = base + sep + "_v=" + Date.now();
       }
       (ref as React.MutableRefObject<HTMLIFrameElement | null>).current = el;
     },

@@ -6,15 +6,15 @@
 services:
   block-builder:
     build:
-      context: ../blockbuilder
+      context: ../../blockbuilder
       dockerfile: Dockerfile
 
   load-generator:
     build:
-      context: ../loadgenerator
+      context: ../../loadgenerator
       dockerfile: Dockerfile
 
   load-generator-cdk:
     build:
-      context: ../loadgenerator
+      context: ../../loadgenerator
       dockerfile: Dockerfile

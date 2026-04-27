@@ -55,8 +55,8 @@ const cspHeader = `
   frame-src 'self' ${FRAME_SRC_HOSTS.join(' ')};
   frame-ancestors *;
   media-src 'self' ${MEDIA_SRC_HOSTS.join(' ')};
-  ${!isDev ? 'block-all-mixed-content;' : ''}
-  ${!isDev ? 'upgrade-insecure-requests;' : ''}
+  ${!isDev && !process.env.NEXT_PUBLIC_DISABLE_HTTPS_UPGRADE ? 'block-all-mixed-content;' : ''}
+  ${!isDev && !process.env.NEXT_PUBLIC_DISABLE_HTTPS_UPGRADE ? 'upgrade-insecure-requests;' : ''}
 `
   .replace(/\s{2,}/g, ' ')
   .trim();
@@ -90,6 +90,9 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  // When running behind a reverse proxy path prefix (e.g. /proxy/18001/),
+  // set NEXT_PUBLIC_BASE_PATH to match so assets and routing work correctly.
+  basePath: process.env.NEXT_PUBLIC_BASE_PATH || '',
   webpack(config, { isServer }) {
     config.module.rules.push({
       test: /\.ya?ml$/,

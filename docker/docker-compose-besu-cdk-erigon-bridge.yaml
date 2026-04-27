@@ -22,8 +22,9 @@ services:
 
   hyperlane-bridge-ui:
     build:
-      context: ./bridge-ui
+      context: ../bridge-ui
       dockerfile: Dockerfile
       args:
         - NEXT_PUBLIC_WALLET_CONNECT_ID=${WALLET_CONNECT_ID:-00000000000000000000000000000000}
+        - NEXT_PUBLIC_L1_CHAIN_NAME=besulocal
         - NEXT_PUBLIC_RPC_OVERRIDES={"besulocal":{"http":"http://host.docker.internal:18545"},"l2local":{"http":"http://host.docker.internal:18546"}}

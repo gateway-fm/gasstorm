@@ -18,7 +18,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Gateway R&D Test Rig",
+  title: "GasStorm",
   description: "GasStorm | Engine API Block Builder | Load Testing",
 };
 

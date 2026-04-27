@@ -27,7 +27,8 @@ export function getLoadGenWsUrl(): string {
   if (typeof window === "undefined") return "ws://localhost:13001/ws";
 
   if (isDevMode()) {
-    return getServiceWsUrl(13001, "/ws");
+    // Use Next.js dev server proxy to avoid cross-port WebSocket issues
+    return `ws://${window.location.host}/ws/loadgen`;
   }
 
   // Production: use nginx proxy path
@@ -143,6 +144,8 @@ export interface StartTestRequest {
   realisticConfig?: RealisticTestConfig;
   // Privacy mode (route through privacy proxy)
   privacyMode?: boolean;
+  // Nonce gap healing
+  fixNonceGaps?: boolean;
 }
 
 // Types for historical data hydration

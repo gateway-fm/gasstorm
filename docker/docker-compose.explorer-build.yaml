@@ -1,0 +1,34 @@
+# Build overlay - builds block-explorer from local sibling repo
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.explorer-build.yaml --profile reth --profile explorer --profile explorer-l1 up --build -d
+
+services:
+  explorer-indexer:
+    build:
+      context: ../../block-explorer/backend
+      dockerfile: Dockerfile.indexer
+
+  explorer-api:
+    build:
+      context: ../../block-explorer/backend
+      dockerfile: Dockerfile.api
+
+  explorer-ui:
+    build:
+      context: ../../block-explorer/frontend
+      dockerfile: Dockerfile
+
+  explorer-l1-indexer:
+    build:
+      context: ../../block-explorer/backend
+      dockerfile: Dockerfile.indexer
+
+  explorer-l1-api:
+    build:
+      context: ../../block-explorer/backend
+      dockerfile: Dockerfile.api
+
+  explorer-l1-ui:
+    build:
+      context: ../../block-explorer/frontend
+      dockerfile: Dockerfile

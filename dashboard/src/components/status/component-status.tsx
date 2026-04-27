@@ -27,15 +27,15 @@ function Row({ row }: { row: ComponentRow }) {
   return (
     <div className="flex items-center gap-3 px-3 py-2 border-b border-border/50 last:border-b-0">
       <StatusDot online={row.online} />
-      <span className="text-sm min-w-[140px]">{row.name}</span>
-      {row.metrics && (
-        <span className="text-sm font-mono text-muted-foreground">{row.metrics}</span>
-      )}
-      <div className="flex-1" />
+      <span className="text-sm">{row.name}</span>
       {row.href && (
-        <Link href={row.href} className="text-sm text-blue-400 hover:underline">
+        <Link href={row.href} className="text-xs text-blue-400 hover:underline">
           Open
         </Link>
+      )}
+      <div className="flex-1" />
+      {row.metrics && (
+        <span className="text-xs font-mono text-muted-foreground">{row.metrics}</span>
       )}
     </div>
   );

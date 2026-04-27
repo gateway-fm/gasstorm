@@ -145,6 +145,7 @@ export const l1 = {
 export const l2 = {
   getBlockNumber: () => getBlockNumber(RPC_ENDPOINTS.L2_RPC),
   getChainId: () => getChainId(RPC_ENDPOINTS.L2_RPC),
+  getClientVersion: () => getClientVersion(RPC_ENDPOINTS.L2_RPC),
   getGasPrice: () => getGasPrice(RPC_ENDPOINTS.L2_RPC),
   getBalance: (address: string) => getBalance(RPC_ENDPOINTS.L2_RPC, address),
   getTransactionCount: (address: string, blockTag?: "latest" | "pending") => getTransactionCount(RPC_ENDPOINTS.L2_RPC, address, blockTag),

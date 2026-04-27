@@ -68,11 +68,13 @@ type ExecutionLayerCapabilities struct {
 |-----------|-----|---------|----------|--------|------|---------|
 | op-reth + blockbuilder | Anvil | yes | yes | yes | yes | `make up PROFILE=reth WITH=blob,privacy,explorer,bridge` |
 | op-reth + blockbuilder | Besu | yes | yes | yes | -- | `make up PROFILE=reth L1=besu WITH=privacy,explorer,bridge` |
+| op-reth + blockbuilder | External | yes | yes | yes | -- | `make up PROFILE=reth L1=<name> WITH=privacy,explorer,bridge` |
 | cdk-erigon | Anvil | yes | yes | yes | yes | `make up PROFILE=cdk-erigon WITH=blob,privacy,explorer,bridge` |
 | cdk-erigon | Besu | yes | yes | yes | -- | `make up PROFILE=cdk-erigon L1=besu WITH=privacy,explorer,bridge` |
+| cdk-erigon | External | yes | yes | yes | -- | `make up PROFILE=cdk-erigon L1=<name> WITH=privacy,explorer,bridge` |
 | gravity-reth | Anvil | -- | -- | -- | -- | `make up PROFILE=gravity-reth` |
 
-Unsupported: blob requires EIP-4844 L1 (Besu Clique is pre-Cancun), gravity-reth has no optional profiles yet. L1 defaults to Anvil; use `L1=besu` to swap.
+Unsupported: blob requires local EIP-4844 L1 (Anvil only), gravity-reth has no optional profiles yet. L1 defaults to Anvil; use `L1=besu` for Besu or `L1=<name>` for any external chain (config at `config/l1/<name>.env`).
 
 ### Adding a New Execution Layer
 

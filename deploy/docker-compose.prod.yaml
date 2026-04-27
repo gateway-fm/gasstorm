@@ -1,0 +1,99 @@
+# Production overlay for the gasstorm stack on a remote server.
+#
+# The dashboard's nginx already proxies all API calls (loadgen, builder, RPC,
+# WebSockets) to backend services via Docker internal DNS — so only the
+# dashboard needs to be exposed. Everything else is internal.
+#
+# The load generator runs separately (see docker-compose.loadgen.yaml).
+# Set LOADGEN_HOST to point the dashboard at the loadgen server.
+
+services:
+  # Bind dashboard directly to port 80, configure loadgen endpoint
+  dashboard:
+    ports: !override
+      - "80:80"
+    environment:
+      - LOADGEN_HOST=${LOADGEN_HOST:-load-generator:3001}
+      - CHAIN_HOST_RPC=${CHAIN_HOST_RPC:-block-builder:3000}
+      - CHAIN_HOST_BUILDER_WS=${CHAIN_HOST_BUILDER_WS:-block-builder:3001}
+      - CHAIN_HOST_L2_RPC=${CHAIN_HOST_L2_RPC:-l2-reth:8545}
+      - CHAIN_HOST_L2_WS=${CHAIN_HOST_L2_WS:-l2-reth:8546}
+      - CHAIN_HOST_L1=${CHAIN_HOST_L1:-l1:8545}
+      - EXPLORER_HOST_API=${EXPLORER_HOST_API:-explorer-api:8080}
+      - EXPLORER_HOST_L1_API=${EXPLORER_HOST_L1_API:-explorer-l1-api:8080}
+      - EXPLORER_HOST_UI=${EXPLORER_HOST_UI:-explorer-ui:80}
+      - EXPLORER_HOST_L1_UI=${EXPLORER_HOST_L1_UI:-explorer-l1-ui:80}
+
+  dashboard-cdk:
+    ports: !override
+      - "80:80"
+    environment:
+      - LOADGEN_HOST=${LOADGEN_HOST:-load-generator:3001}
+      - CHAIN_HOST_RPC=${CHAIN_HOST_RPC:-l2-cdk-erigon:8545}
+      - CHAIN_HOST_BUILDER_WS=${CHAIN_HOST_BUILDER_WS:-l2-cdk-erigon:8545}
+      - CHAIN_HOST_L2_RPC=${CHAIN_HOST_L2_RPC:-l2-cdk-erigon:8545}
+      - CHAIN_HOST_L2_WS=${CHAIN_HOST_L2_WS:-l2-cdk-erigon:8546}
+      - CHAIN_HOST_L1=${CHAIN_HOST_L1:-l1:8545}
+      - EXPLORER_HOST_API=${EXPLORER_HOST_API:-explorer-api:8080}
+      - EXPLORER_HOST_L1_API=${EXPLORER_HOST_L1_API:-explorer-l1-api:8080}
+      - EXPLORER_HOST_UI=${EXPLORER_HOST_UI:-explorer-ui:80}
+      - EXPLORER_HOST_L1_UI=${EXPLORER_HOST_L1_UI:-explorer-l1-ui:80}
+
+  # Override build contexts for sibling repos (rsync'd alongside the repo)
+  block-builder:
+    build:
+      context: /opt/gasstorm/blockbuilder
+      dockerfile: Dockerfile
+
+  # Expose ports needed by the remote load generator
+  # block-builder RPC (13000) + preconf WS (13002) + L2 WS (18547)
+  l1:                 { ports: !override [] }
+  l2-reth:
+    ports: !override
+      - "18547:8546"
+  l2-cdk-erigon:      { ports: !override [] }
+  agglayer-db:        { ports: !override [] }
+  blob-da-db:         { ports: !override [] }
+  explorer-db:        { ports: !override [] }
+  explorer-db-cdk:    { ports: !override [] }
+  explorer-l1-db:     { ports: !override [] }
+  # Explorer: override images to build from local source (private registry)
+  explorer-indexer:
+    build:
+      context: /opt/gasstorm/block-explorer/backend
+      dockerfile: Dockerfile.indexer
+  explorer-api:
+    build:
+      context: /opt/gasstorm/block-explorer/backend
+      dockerfile: Dockerfile.api
+  explorer-ui:
+    build:
+      context: /opt/gasstorm/block-explorer/frontend
+      dockerfile: Dockerfile
+    environment:
+      - VITE_BASE_PATH=/proxy/18201
+      - VITE_API_URL=/proxy/18201/api
+  explorer-l1-indexer:
+    build:
+      context: /opt/gasstorm/block-explorer/backend
+      dockerfile: Dockerfile.indexer
+  explorer-l1-api:
+    build:
+      context: /opt/gasstorm/block-explorer/backend
+      dockerfile: Dockerfile.api
+  explorer-l1-ui:
+    build:
+      context: /opt/gasstorm/block-explorer/frontend
+      dockerfile: Dockerfile
+    environment:
+      - VITE_BASE_PATH=/proxy/18203
+      - VITE_API_URL=/proxy/18203/api
+  explorer-api-cdk:   { ports: !override [] }
+  explorer-ui-cdk:    { ports: !override [] }
+  privacy-db:         { ports: !override [] }
+  privacy-db-cdk:     { ports: !override [] }
+  agglayer:           { ports: !override [] }
+  aggkit:             { ports: !override [] }
+  hyperlane-relayer:  { ports: !override [] }
+  zisk-prover:        { ports: !override [] }
+  op-succinct:        { ports: !override [] }

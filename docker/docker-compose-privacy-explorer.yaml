@@ -12,6 +12,8 @@ services:
     environment:
       - PRIVACY_PROXY_URL=http://privacy-proxy:8080
       - PRIVACY_PROXY_PUBLIC_URL=http://localhost:18300
+      - SSO_CLIENT_ID=explorer
+      - SSO_REDIRECT_URI=http://localhost:18200/api/auth/callback
     depends_on:
       privacy-proxy:
         condition: service_started

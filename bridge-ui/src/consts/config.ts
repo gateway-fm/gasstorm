@@ -11,6 +11,7 @@ const walletConnectProjectId = process?.env?.NEXT_PUBLIC_WALLET_CONNECT_ID || ''
 const transferBlacklist = process?.env?.NEXT_PUBLIC_TRANSFER_BLACKLIST || '';
 const chainWalletWhitelists = JSON.parse(process?.env?.NEXT_PUBLIC_CHAIN_WALLET_WHITELISTS || '{}');
 const rpcOverrides = process?.env?.NEXT_PUBLIC_RPC_OVERRIDES || '';
+const l1ChainName = process?.env?.NEXT_PUBLIC_L1_CHAIN_NAME || 'l1local';
 const explorerApiUrl =
   process?.env?.NEXT_PUBLIC_EXPLORER_API_URL || 'https://explorer4.hasura.app/v1/graphql';
 
@@ -41,7 +42,7 @@ export const config: Config = Object.freeze({
   chainWalletWhitelists,
   enableExplorerLink: false,
   explorerApiUrl,
-  defaultOriginToken: 'besulocal-ETH',
+  defaultOriginToken: `${l1ChainName}-ETH`,
   defaultDestinationToken: 'l2local-ETH',
   isDevMode,
   registryUrl,
@@ -63,7 +64,7 @@ export const config: Config = Object.freeze({
   rpcOverrides,
   enableTrackingEvents: false,
   featuredTokens: [
-    'besulocal-ETH',
+    `${l1ChainName}-ETH`,
     'l2local-ETH',
   ],
 });

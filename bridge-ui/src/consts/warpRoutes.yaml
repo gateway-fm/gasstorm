@@ -1,20 +1,20 @@
-# GasStorm local warp routes
+# Warp routes for DTCC Besu ↔ L2 (op-reth) bridge
 ---
 tokens:
-  - chainName: besulocal
+  - chainName: dtccbesu
     standard: EvmHypNative
-    addressOrDenom: "0xAfe1b5bdEbD4ae65AF2024738bf0735fbb65d44b"
+    addressOrDenom: "0x0Eb3cdE9018154eD1A2fC4263934b0Cb1b0c9f13"
     decimals: 18
     symbol: ETH
     name: Ether
     connections:
-      - token: "ethereum|l2local|0x85C5Dd61585773423e378146D4bEC6f8D149E248"
+      - token: "ethereum|l2local|0x3Ae6De8f252D24bd87b9817aF4eEbE8E2Ba8236E"
   - chainName: l2local
     standard: EvmHypNative
-    addressOrDenom: "0x85C5Dd61585773423e378146D4bEC6f8D149E248"
+    addressOrDenom: "0x3Ae6De8f252D24bd87b9817aF4eEbE8E2Ba8236E"
     decimals: 18
     symbol: ETH
     name: Ether
     connections:
-      - token: "ethereum|besulocal|0xAfe1b5bdEbD4ae65AF2024738bf0735fbb65d44b"
+      - token: "ethereum|dtccbesu|0x0Eb3cdE9018154eD1A2fC4263934b0Cb1b0c9f13"
 options: {}

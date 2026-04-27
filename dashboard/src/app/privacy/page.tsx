@@ -10,11 +10,23 @@ const tabs: { id: TabId; label: string; path: string }[] = [
   { id: "admin", label: "Admin", path: "/admin/dashboard" },
 ];
 
+// Direct URL to the privacy UI (bypasses /proxy/ path prefix which breaks SPA routing).
+// Set NEXT_PUBLIC_PRIVACY_UI_URL at build time for remote deploys where the privacy UI
+// is on a separate server (e.g. http://explorer-ip:18301).
+const privacyUiUrl = process.env.NEXT_PUBLIC_PRIVACY_UI_URL || "";
+
+function getPrivacyUrl(path: string): string {
+  if (privacyUiUrl) {
+    return `${privacyUiUrl}${path}`;
+  }
+  return getServiceUrl(18301, path);
+}
+
 function PrivacyIframe({ path, title, visible }: { path: string; title: string; visible: boolean }) {
   const setRef = useCallback(
     (el: HTMLIFrameElement | null) => {
       if (el) {
-        el.src = getServiceUrl(18301, path);
+        el.src = getPrivacyUrl(path);
       }
     },
     [path],

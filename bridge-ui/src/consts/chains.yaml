@@ -40,7 +40,7 @@ l2local:
   chainId: 42069
   domainId: 42069
   name: l2local
-  displayName: L2 (op-reth)
+  displayName: CDK-L2 (reth)
   protocol: ethereum
   rpcUrls:
     - http: http://localhost:13000
@@ -52,4 +52,23 @@ l2local:
     confirmations: 1
     reorgPeriod: 0
     estimateBlockTime: 1
+  isTestnet: true
+
+# External Besu chain (DTCC QA)
+dtccbesu:
+  chainId: 2026
+  domainId: 2026
+  name: dtccbesu
+  displayName: DTCC Hermes (Besu)
+  protocol: ethereum
+  rpcUrls:
+    - http: http://localhost:18549
+  nativeToken:
+    name: Ether
+    symbol: ETH
+    decimals: 18
+  blocks:
+    confirmations: 1
+    reorgPeriod: 0
+    estimateBlockTime: 5
   isTestnet: true
