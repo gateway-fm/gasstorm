@@ -1,0 +1,9 @@
+{
+  "name": "aleo-empty-stub",
+  "version": "0.0.0",
+  "description": "Stub for unused Aleo dependencies pulled in transitively by @hyperlane-xyz/widgets. GasStorm does not bridge to Aleo; this avoids shipping GPL-3.0 code.",
+  "license": "MIT",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "private": true
+}

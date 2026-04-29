@@ -28,8 +28,6 @@
     "@intercom/messenger-js-sdk": "^0.0.18",
     "@metamask/post-message-stream": "6.1.2",
     "@metamask/providers": "10.2.1",
-    "@provablehq/aleo-wallet-adaptor-react": "0.3.0-alpha.1",
-    "@provablehq/aleo-wallet-adaptor-shield": "0.3.0-alpha.1",
     "@radixdlt/babylon-gateway-api-sdk": "^1.10.1",
     "@radixdlt/radix-dapp-toolkit": "^2.2.1",
     "@rainbow-me/rainbowkit": "2.2.10",
@@ -155,7 +153,15 @@
       "form-data": "4.0.4",
       "lodash@<=4.18.1": "4.18.1",
       "lodash-es@<=4.18.1": "4.18.1",
-      "protobufjs@<6.11.5": "6.11.5"
+      "protobufjs@<6.11.5": "6.11.5",
+      "@provablehq/sdk": "link:./stubs/aleo-empty",
+      "@provablehq/wasm": "link:./stubs/aleo-empty",
+      "@provablehq/aleo-types": "link:./stubs/aleo-empty",
+      "@provablehq/aleo-wallet-adaptor-core": "link:./stubs/aleo-empty",
+      "@provablehq/aleo-wallet-adaptor-react": "link:./stubs/aleo-empty",
+      "@provablehq/aleo-wallet-adaptor-shield": "link:./stubs/aleo-empty",
+      "@provablehq/aleo-wallet-standard": "link:./stubs/aleo-empty",
+      "@hyperlane-xyz/aleo-sdk": "link:./stubs/aleo-empty"
     },
     "patchedDependencies": {
       "starknetkit@2.6.1": "patches/starknetkit@2.6.1.patch"
