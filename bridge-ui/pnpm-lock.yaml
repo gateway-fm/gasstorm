@@ -24,7 +24,6 @@ overrides:
   form-data: 4.0.4
   lodash@<=4.18.1: 4.18.1
   lodash-es@<=4.18.1: 4.18.1
-  protobufjs@<6.11.5: 6.11.5
   protobufjs@>=7.0.0 <7.5.5: 7.5.5
   '@provablehq/sdk': link:./stubs/aleo-empty
   '@provablehq/wasm': link:./stubs/aleo-empty
@@ -34,6 +33,7 @@ overrides:
   '@provablehq/aleo-wallet-adaptor-shield': link:./stubs/aleo-empty
   '@provablehq/aleo-wallet-standard': link:./stubs/aleo-empty
   '@hyperlane-xyz/aleo-sdk': link:./stubs/aleo-empty
+  protobufjs@<=7.5.5: 7.5.5
 
 patchedDependencies:
   starknetkit@2.6.1:
@@ -1012,6 +1012,7 @@ packages:
 
   '@drift-labs/snap-wallet-adapter@0.3.0':
     resolution: {integrity: sha512-Il7/FQAIgimhWbAGZvk6b3B3YupMDzR/0pppFgktTayHGg5HGuJHYtHPtjl3uKXj8zvQLkn0WSI5NVjY2dHRfA==}
+    deprecated: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
 
   '@ecies/ciphers@0.2.5':
     resolution: {integrity: sha512-GalEZH4JgOMHYYcYmVqnFirFsjZHeoGMDt9IxEnM9F7GRUUyUksJ7Ou53L83WHJq3RWKD3AcBpo0iQh0oMpf8A==}
@@ -4706,9 +4707,6 @@ packages:
   '@types/lodash@4.17.21':
     resolution: {integrity: sha512-FOvQ0YPD5NOfPgMzJihoT+Za5pdkDJWcbpuj1DjaKZIr/gxodQjY/uWEFlTNqW2ugXHUiL8lRQgw63dzKHZdeQ==}
 
-  '@types/long@4.0.2':
-    resolution: {integrity: sha512-MqTGEo5bj5t157U6fA/BiDynNkn0YknVdh48CMPkTSpFTVmvao5UQmm7uEF6xBEo7qIMAlY/JSleYaE6VOdpaA==}
-
   '@types/ms@2.1.0':
     resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
 
@@ -8235,10 +8233,6 @@ packages:
     resolution: {integrity: sha512-vGrhOavPSTz4QVNuBNdcNXePNdNMaO1xj9yBeH1ScQPjk/rhg9sSlCXPhMkFuaNNW/syTvYqsnbIJxMBfRbbag==}
     engines: {node: '>= 8'}
 
-  protobufjs@6.11.5:
-    resolution: {integrity: sha512-OKjVH3hDoXdIZ/s5MLv8O2X0s+wOxGfV7ar6WFSKGaSAxi/6gYn3px5POS4vi+mc/0zCOdL7Jkwrj0oT1Yst2A==}
-    hasBin: true
-
   protobufjs@7.5.5:
     resolution: {integrity: sha512-3wY1AxV+VBNW8Yypfd1yQY9pXnqTAN+KwQxL8iYm3/BjKYMNg4i0owhEe26PWDOMaIrzeeF98Lqd5NGz4omiIg==}
     engines: {node: '>=12.0.0'}
@@ -10771,7 +10765,7 @@ snapshots:
   '@confio/ics23@0.6.8':
     dependencies:
       '@noble/hashes': 1.8.0
-      protobufjs: 6.11.5
+      protobufjs: 7.5.5
 
   '@cosmjs/amino@0.32.4':
     dependencies:
@@ -12723,7 +12717,7 @@ snapshots:
       bech32: 1.1.4
       buffer: 6.0.3
       long: 4.0.0
-      protobufjs: 6.11.5
+      protobufjs: 7.5.5
 
   '@keplr-wallet/crypto@0.12.28':
     dependencies:
@@ -12739,7 +12733,7 @@ snapshots:
   '@keplr-wallet/proto-types@0.12.28':
     dependencies:
       long: 4.0.0
-      protobufjs: 6.11.5
+      protobufjs: 7.5.5
 
   '@keplr-wallet/provider-extension@0.12.300(starknet@7.6.4)':
     dependencies:
@@ -17624,8 +17618,6 @@ snapshots:
       '@types/lodash': 4.17.21
 
   '@types/lodash@4.17.21': {}
-
-  '@types/long@4.0.2': {}
 
   '@types/ms@2.1.0': {}
 
@@ -22660,22 +22652,6 @@ snapshots:
       react-is: 16.13.1
 
   propagate@2.0.1: {}
-
-  protobufjs@6.11.5:
-    dependencies:
-      '@protobufjs/aspromise': 1.1.2
-      '@protobufjs/base64': 1.1.2
-      '@protobufjs/codegen': 2.0.4
-      '@protobufjs/eventemitter': 1.1.0
-      '@protobufjs/fetch': 1.1.0
-      '@protobufjs/float': 1.0.2
-      '@protobufjs/inquire': 1.1.0
-      '@protobufjs/path': 1.1.2
-      '@protobufjs/pool': 1.1.0
-      '@protobufjs/utf8': 1.1.0
-      '@types/long': 4.0.2
-      '@types/node': 24.10.9
-      long: 4.0.0
 
   protobufjs@7.5.5:
     dependencies:
