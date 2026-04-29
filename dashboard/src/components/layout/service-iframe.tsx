@@ -40,7 +40,7 @@ export function ServiceIframe({ port, path = "", title, syncHash, directUrl }: S
       }
       (ref as React.MutableRefObject<HTMLIFrameElement | null>).current = el;
     },
-    [port, effectivePath],
+    [port, effectivePath, directUrl, ref],
   );
 
   // Sync iframe URL back to parent hash on navigation (best-effort, cross-origin may block)
