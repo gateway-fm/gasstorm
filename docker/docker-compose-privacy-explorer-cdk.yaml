@@ -1,14 +1,21 @@
-# Privacy-enhanced block explorer overlay (CDK variant)
+# Privacy-enhanced block explorer overlay (CDK variant).
+# See docker-compose-privacy-explorer.yaml for the wiring rationale.
 services:
   privacy-proxy-cdk:
     depends_on:
       explorer-db-cdk:
         condition: service_healthy
+      chain-indexer-cdk:
+        condition: service_started
     environment:
       - EXPLORER_DATABASE_URL=postgres://explorer:explorer@explorer-db-cdk:5432/explorer?sslmode=disable
+      - INDEXER_URL=chain-indexer-cdk:50051
 
   explorer-api-cdk:
+    build:
+      target: privacy
     environment:
+      - INDEXER_URL=
       - PRIVACY_PROXY_URL=http://privacy-proxy-cdk:8080
       - PRIVACY_PROXY_PUBLIC_URL=http://localhost:18300
     depends_on:

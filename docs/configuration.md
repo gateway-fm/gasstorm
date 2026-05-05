@@ -205,8 +205,9 @@ polycli-help
 | `gravity-reth` | gravity-reth, l1-anvil | Parallel EVM sequencer |
 | `bridge` | hyperlane-init, hyperlane-relayer | Hyperlane bridge infrastructure |
 | `bridge-ui` | hyperlane-bridge-ui | Hyperlane Warp UI |
-| `explorer` | explorer-api, explorer-indexer, explorer-ui, explorer-db | Block explorer (reth mode) |
-| `explorer-cdk` | explorer-api-cdk, explorer-indexer-cdk, explorer-ui-cdk, explorer-db-cdk | Block explorer (cdk-erigon mode) |
+| `explorer` | explorer-api, explorer-ui, explorer-db, chain-indexer, chain-indexer-db | Block explorer (reth mode) — chain data via chain-indexer gRPC |
+| `explorer-cdk` | explorer-api-cdk, explorer-ui-cdk, explorer-db-cdk, chain-indexer-cdk, chain-indexer-db-cdk | Block explorer (cdk-erigon mode) |
+| `explorer-l1` | explorer-l1-api, explorer-l1-ui, explorer-l1-db, chain-indexer-l1, chain-indexer-l1-db | L1 block explorer |
 | `privacy` | privacy-proxy, privacy-ui, privacy-db | Privacy proxy (reth mode) |
 | `privacy-cdk` | privacy-proxy-cdk, privacy-ui-cdk, privacy-db-cdk | Privacy proxy (cdk-erigon mode) |
 | `prover-sp1` | op-succinct, agglayer-db | SP1 prover stack |

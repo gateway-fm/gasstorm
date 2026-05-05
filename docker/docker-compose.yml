@@ -747,20 +747,42 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # Explorer Indexer - indexes blocks/txs from block-builder RPC (reth mode)
-  explorer-indexer:
-    image: gatewayfm/block-explorer-indexer:${BLOCK_EXPLORER_VERSION:-main}
-    container_name: gasstorm-explorer-indexer
+  # Chain Indexer DB - holds indexed chain data (separate from block-explorer's
+  # verification metadata DB). internal split chain data out of block-explorer
+  # into the standalone chain-indexer service.
+  chain-indexer-db:
+    image: postgres:16-alpine
+    container_name: gasstorm-chain-indexer-db
     profiles: [ "explorer" ]
-    entrypoint: [ "/indexer" ]
+    environment:
+      - POSTGRES_USER=indexer
+      - POSTGRES_PASSWORD=indexer
+      - POSTGRES_DB=chain_indexer
+    volumes:
+      - chain-indexer-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U indexer -d chain_indexer" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Chain Indexer - indexes blocks/txs from L2 RPC, serves chain data over
+  # gRPC to consumers (block-explorer api, privacy-proxy). Replaces the
+  # retired block-explorer-indexer (internal Phase 6).
+  chain-indexer:
+    image: ghcr.io/gateway-fm/chain-indexer:${CHAIN_INDEXER_VERSION:-main}
+    container_name: gasstorm-chain-indexer
+    profiles: [ "explorer" ]
     depends_on:
       block-builder:
         condition: service_started
-      explorer-db:
+      chain-indexer-db:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgres://explorer:explorer@explorer-db:5432/explorer?sslmode=disable
+      - DATABASE_URL=postgres://indexer:indexer@chain-indexer-db:5432/chain_indexer?sslmode=disable
       - RPC_URL=http://l2-reth:8545
+      - GRPC_LISTEN_ADDR=:50051
       - POLL_INTERVAL=2s
       - START_BLOCK=0
       - CATCHUP_WORKERS=${CATCHUP_WORKERS:-10}
@@ -769,9 +791,12 @@ services:
       - ENABLE_TRACING=true
       - TRACE_WORKERS=10
       - TRACE_RATE_LIMIT=50
+      - HIDDEN_TX_TYPES=126
     restart: unless-stopped
 
-  # Explorer API - REST API for block/tx queries (reth mode)
+  # Explorer API - REST API for block/tx queries (reth mode). Reads chain
+  # data from chain-indexer over gRPC (INDEXER_URL); the explorer-db only
+  # holds contract verification metadata.
   explorer-api:
     image: gatewayfm/block-explorer-api:${BLOCK_EXPLORER_VERSION:-main}
     container_name: gasstorm-explorer-api
@@ -783,9 +808,12 @@ services:
     depends_on:
       explorer-db:
         condition: service_healthy
+      chain-indexer:
+        condition: service_started
     environment:
       - DATABASE_URL=postgres://explorer:explorer@explorer-db:5432/explorer?sslmode=disable
       - RPC_URL=http://block-builder:3000
+      - INDEXER_URL=chain-indexer:50051
       - API_PORT=8080
       - HIDDEN_TX_TYPES=126
     ports:
@@ -832,20 +860,40 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # L1 Explorer Indexer - indexes blocks/txs from Anvil L1
-  explorer-l1-indexer:
-    image: gatewayfm/block-explorer-indexer:${BLOCK_EXPLORER_VERSION:-main}
-    container_name: gasstorm-explorer-l1-indexer
+  # L1 Chain Indexer DB - private DB for chain-indexer's L1 chain data.
+  chain-indexer-l1-db:
+    image: postgres:16-alpine
+    container_name: gasstorm-chain-indexer-l1-db
     profiles: [ "explorer-l1" ]
-    entrypoint: [ "/indexer" ]
+    environment:
+      - POSTGRES_USER=indexer
+      - POSTGRES_PASSWORD=indexer
+      - POSTGRES_DB=chain_indexer
+    volumes:
+      - chain-indexer-l1-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U indexer -d chain_indexer" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # L1 Chain Indexer - indexes L1 (Anvil) blocks/txs, serves chain data
+  # over gRPC to explorer-l1-api. Replaces the retired
+  # block-explorer-indexer for L1 (internal Phase 6).
+  chain-indexer-l1:
+    image: ghcr.io/gateway-fm/chain-indexer:${CHAIN_INDEXER_VERSION:-main}
+    container_name: gasstorm-chain-indexer-l1
+    profiles: [ "explorer-l1" ]
     depends_on:
       l1:
         condition: service_healthy
-      explorer-l1-db:
+      chain-indexer-l1-db:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgres://explorer:explorer@explorer-l1-db:5432/explorer?sslmode=disable
+      - DATABASE_URL=postgres://indexer:indexer@chain-indexer-l1-db:5432/chain_indexer?sslmode=disable
       - RPC_URL=http://l1:8545
+      - GRPC_LISTEN_ADDR=:50051
       - POLL_INTERVAL=2s
       - START_BLOCK=0
       - CATCHUP_WORKERS=${CATCHUP_WORKERS:-10}
@@ -856,7 +904,8 @@ services:
       - TRACE_RATE_LIMIT=50
     restart: unless-stopped
 
-  # L1 Explorer API - REST API for L1 block/tx queries
+  # L1 Explorer API - REST API for L1 block/tx queries. Reads chain data
+  # from chain-indexer-l1 over gRPC.
   explorer-l1-api:
     image: gatewayfm/block-explorer-api:${BLOCK_EXPLORER_VERSION:-main}
     container_name: gasstorm-explorer-l1-api
@@ -868,9 +917,12 @@ services:
     depends_on:
       explorer-l1-db:
         condition: service_healthy
+      chain-indexer-l1:
+        condition: service_started
     environment:
       - DATABASE_URL=postgres://explorer:explorer@explorer-l1-db:5432/explorer?sslmode=disable
       - RPC_URL=http://l1:8545
+      - INDEXER_URL=chain-indexer-l1:50051
       - API_PORT=8080
     ports:
       - "18202:8080"
@@ -917,18 +969,36 @@ services:
       retries: 10
     restart: unless-stopped
 
-  explorer-indexer-cdk:
-    image: gatewayfm/block-explorer-indexer:${BLOCK_EXPLORER_VERSION:-main}
-    container_name: gasstorm-explorer-indexer
+  chain-indexer-db-cdk:
+    image: postgres:16-alpine
+    container_name: gasstorm-chain-indexer-db-cdk
+    profiles: [ "explorer-cdk" ]
+    environment:
+      - POSTGRES_USER=indexer
+      - POSTGRES_PASSWORD=indexer
+      - POSTGRES_DB=chain_indexer
+    volumes:
+      - chain-indexer-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U indexer -d chain_indexer" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  chain-indexer-cdk:
+    image: ghcr.io/gateway-fm/chain-indexer:${CHAIN_INDEXER_VERSION:-main}
+    container_name: gasstorm-chain-indexer-cdk
     profiles: [ "explorer-cdk" ]
     depends_on:
       l2-cdk-erigon:
         condition: service_started
-      explorer-db-cdk:
+      chain-indexer-db-cdk:
         condition: service_healthy
     environment:
-      - DATABASE_URL=postgres://explorer:explorer@explorer-db-cdk:5432/explorer?sslmode=disable
+      - DATABASE_URL=postgres://indexer:indexer@chain-indexer-db-cdk:5432/chain_indexer?sslmode=disable
       - RPC_URL=http://l2-cdk-erigon:8545
+      - GRPC_LISTEN_ADDR=:50051
       - POLL_INTERVAL=2s
       - START_BLOCK=0
       - CATCHUP_WORKERS=${CATCHUP_WORKERS:-10}
@@ -948,9 +1018,12 @@ services:
     depends_on:
       explorer-db-cdk:
         condition: service_healthy
+      chain-indexer-cdk:
+        condition: service_started
     environment:
       - DATABASE_URL=postgres://explorer:explorer@explorer-db-cdk:5432/explorer?sslmode=disable
       - RPC_URL=http://l2-cdk-erigon:8545
+      - INDEXER_URL=chain-indexer-cdk:50051
       - API_PORT=8080
     ports:
       - "18200:8080"
@@ -1174,6 +1247,8 @@ volumes:
   blobda-db-data:
   explorer-db-data:
   explorer-l1-db-data:
+  chain-indexer-db-data:
+  chain-indexer-l1-db-data:
   privacy-db-data:
   privacy-loadtest-config:
 

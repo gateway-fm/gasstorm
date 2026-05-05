@@ -7,11 +7,15 @@
 #   MAIN_SERVER_PUBLIC - public IP/hostname of the main server (for SSO redirects)
 
 services:
-  # Build explorer from local source (rsync'd to server)
-  explorer-indexer:
+  # Build chain-indexer + explorer from local source (rsync'd to server).
+  # Chain-indexer is the source of chain data over gRPC (internal Phase 6);
+  # explorer-api reads chain data from it and merges with its own
+  # contract-verification metadata DB.
+  chain-indexer:
     build:
-      context: /opt/gasstorm-explorer/block-explorer/backend
-      dockerfile: Dockerfile.indexer
+      context: /opt/gasstorm-explorer/chain-indexer
+      dockerfile: Dockerfile
+    image: gatewayfm/chain-indexer:local
     environment:
       - RPC_URL=http://${CHAIN_SERVER}:18546
 
@@ -41,10 +45,11 @@ services:
       - VITE_BASE_PATH=/proxy/18201
       - VITE_API_URL=/proxy/18201/api
 
-  explorer-l1-indexer:
+  chain-indexer-l1:
     build:
-      context: /opt/gasstorm-explorer/block-explorer/backend
-      dockerfile: Dockerfile.indexer
+      context: /opt/gasstorm-explorer/chain-indexer
+      dockerfile: Dockerfile
+    image: gatewayfm/chain-indexer:local
     environment:
       - RPC_URL=http://${CHAIN_SERVER}:18545
 

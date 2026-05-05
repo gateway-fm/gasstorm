@@ -1,32 +1,52 @@
-# Build overlay - builds block-explorer from local sibling repo
+# Build overlay - builds block-explorer + chain-indexer from local sibling repos.
 #
-# Usage: docker compose -f docker-compose.yml -f docker-compose.explorer-build.yaml --profile reth --profile explorer --profile explorer-l1 up --build -d
+# Expects sibling clones at:
+#   ../../block-explorer    (block-explorer api, public-api, frontend)
+#   ../../chain-indexer     (chain-indexer service)
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.explorer-build.yaml \
+#       --profile reth --profile explorer --profile explorer-l1 up --build -d
 
 services:
-  explorer-indexer:
+  chain-indexer:
     build:
-      context: ../../block-explorer/backend
-      dockerfile: Dockerfile.indexer
+      context: ../../chain-indexer
+      dockerfile: Dockerfile
+    image: gatewayfm/chain-indexer:local
 
+  chain-indexer-l1:
+    build:
+      context: ../../chain-indexer
+      dockerfile: Dockerfile
+    image: gatewayfm/chain-indexer:local
+
+  chain-indexer-cdk:
+    build:
+      context: ../../chain-indexer
+      dockerfile: Dockerfile
+    image: gatewayfm/chain-indexer:local
+
+  # Default to the standalone build target — it supports both INDEXER_URL
+  # (chain-indexer gRPC) and PRIVACY_PROXY_URL modes. The privacy overlay
+  # (docker-compose-privacy-explorer.yaml) flips this to target: privacy
+  # so the binary physically cannot speak chain-indexer gRPC.
   explorer-api:
     build:
       context: ../../block-explorer/backend
       dockerfile: Dockerfile.api
+      target: standalone
 
   explorer-ui:
     build:
       context: ../../block-explorer/frontend
       dockerfile: Dockerfile
 
-  explorer-l1-indexer:
-    build:
-      context: ../../block-explorer/backend
-      dockerfile: Dockerfile.indexer
-
   explorer-l1-api:
     build:
       context: ../../block-explorer/backend
       dockerfile: Dockerfile.api
+      target: standalone
 
   explorer-l1-ui:
     build:

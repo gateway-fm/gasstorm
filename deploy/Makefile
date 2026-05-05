@@ -36,7 +36,7 @@ define DEPLOY_RECIPE
 	  --exclude 'lib/forge-std' --exclude '*.log' --exclude 'deploy/' \
 	  -e "ssh $(SSH_OPTS)" \
 	  ./ $(SSH_USER)@$(SERVER):$(REMOTE_DIR)/repo/
-	@echo ">>> Syncing sibling repos (blockbuilder, loadgenerator, block-explorer)"
+	@echo ">>> Syncing sibling repos (blockbuilder, loadgenerator, block-explorer, chain-indexer)"
 	rsync -az --delete --exclude '.git' --exclude 'node_modules' \
 	  -e "ssh $(SSH_OPTS)" \
 	  ../blockbuilder/ $(SSH_USER)@$(SERVER):$(REMOTE_DIR)/blockbuilder/
@@ -46,6 +46,9 @@ define DEPLOY_RECIPE
 	rsync -az --delete --exclude '.git' --exclude 'node_modules' \
 	  -e "ssh $(SSH_OPTS)" \
 	  ../block-explorer/ $(SSH_USER)@$(SERVER):$(REMOTE_DIR)/block-explorer/
+	rsync -az --delete --exclude '.git' --exclude 'node_modules' \
+	  -e "ssh $(SSH_OPTS)" \
+	  ../chain-indexer/ $(SSH_USER)@$(SERVER):$(REMOTE_DIR)/chain-indexer/
 	@echo ">>> Running deploy script"
 	ssh $(SSH_OPTS) $(SSH_USER)@$(SERVER) \
 	  "cd $(REMOTE_DIR) && chmod +x deploy.sh && \
@@ -187,6 +190,10 @@ define DEPLOY_EXPLORER_RECIPE
 	rsync -az --delete --exclude '.git' --exclude 'node_modules' \
 	  -e "ssh $(SSH_OPTS)" \
 	  ../block-explorer/ $(SSH_USER)@$(EXPLORER_SERVER):$(EXPLORER_REMOTE_DIR)/block-explorer/
+	@echo ">>> Syncing chain-indexer source"
+	rsync -az --delete --exclude '.git' --exclude 'node_modules' \
+	  -e "ssh $(SSH_OPTS)" \
+	  ../chain-indexer/ $(SSH_USER)@$(EXPLORER_SERVER):$(EXPLORER_REMOTE_DIR)/chain-indexer/
 	@echo ">>> Syncing privacy-proxy source"
 	rsync -az --delete --exclude '.git' --exclude 'node_modules' \
 	  -e "ssh $(SSH_OPTS)" \

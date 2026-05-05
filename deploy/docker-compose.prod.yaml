@@ -57,11 +57,13 @@ services:
   explorer-db:        { ports: !override [] }
   explorer-db-cdk:    { ports: !override [] }
   explorer-l1-db:     { ports: !override [] }
-  # Explorer: override images to build from local source (private registry)
-  explorer-indexer:
+  # Explorer: override images to build from local source (private registry).
+  # Chain-indexer (internal Phase 6) replaces the retired block-explorer-indexer.
+  chain-indexer:
     build:
-      context: /opt/gasstorm/block-explorer/backend
-      dockerfile: Dockerfile.indexer
+      context: /opt/gasstorm/chain-indexer
+      dockerfile: Dockerfile
+    image: gatewayfm/chain-indexer:local
   explorer-api:
     build:
       context: /opt/gasstorm/block-explorer/backend
@@ -73,10 +75,11 @@ services:
     environment:
       - VITE_BASE_PATH=/proxy/18201
       - VITE_API_URL=/proxy/18201/api
-  explorer-l1-indexer:
+  chain-indexer-l1:
     build:
-      context: /opt/gasstorm/block-explorer/backend
-      dockerfile: Dockerfile.indexer
+      context: /opt/gasstorm/chain-indexer
+      dockerfile: Dockerfile
+    image: gatewayfm/chain-indexer:local
   explorer-l1-api:
     build:
       context: /opt/gasstorm/block-explorer/backend

@@ -176,6 +176,9 @@ _up: mcp-build
 	if [ "$$build_local" = "true" ]; then \
 		compose_files="-f docker/docker-compose.yml -f docker/docker-compose.build.yaml"; \
 	fi; \
+	if [ "$$build_local" = "true" ] && [ -n "$$has_explorer" ]; then \
+		compose_files="$$compose_files -f docker/docker-compose.explorer-build.yaml"; \
+	fi; \
 	if [ -n "$$has_privacy" ] && [ -n "$$has_explorer" ]; then \
 		if [ -z "$$compose_files" ]; then \
 			compose_files="-f docker/docker-compose.yml"; \
@@ -610,12 +613,12 @@ pull-loadgenerator:
 	docker pull gatewayfm/loadgenerator:latest
 	@echo "Pulled gatewayfm/loadgenerator:latest"
 
-# Pull latest block-explorer images from DockerHub
+# Pull latest block-explorer + chain-indexer images
 pull-explorer:
 	docker pull gatewayfm/block-explorer-api:main
-	docker pull gatewayfm/block-explorer-indexer:main
 	docker pull gatewayfm/block-explorer-frontend:main
-	@echo "Pulled gatewayfm/block-explorer-{api,indexer,frontend}:main"
+	docker pull ghcr.io/gateway-fm/chain-indexer:main
+	@echo "Pulled gatewayfm/block-explorer-{api,frontend}:main and ghcr.io/gateway-fm/chain-indexer:main"
 
 # #############################################################################
 # Other Execution Layers (cdk-erigon, gravity-reth)

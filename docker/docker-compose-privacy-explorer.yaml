@@ -1,15 +1,35 @@
 # Privacy-enhanced block explorer overlay
-# Auto-included when both privacy and explorer profiles are active
+# Auto-included when both privacy and explorer profiles are active.
+#
+# Wiring (internal Phase 6):
+#   privacy-proxy --gRPC--> chain-indexer (chain data, with redaction)
+#   explorer-api  --HTTP--> privacy-proxy (visibility-filtered chain data)
+#   explorer-api  --SQL--> explorer-db (contract verification metadata only)
+#
+# explorer-api MUST NOT have INDEXER_URL set in this mode — block-explorer's
+# api rejects having both INDEXER_URL and PRIVACY_PROXY_URL set, since
+# bypassing privacy-proxy would defeat redaction.
 services:
   privacy-proxy:
     depends_on:
       explorer-db:
         condition: service_healthy
+      chain-indexer:
+        condition: service_started
     environment:
       - EXPLORER_DATABASE_URL=postgres://explorer:explorer@explorer-db:5432/explorer?sslmode=disable
+      - INDEXER_URL=chain-indexer:50051
 
   explorer-api:
+    # In privacy mode use the privacy-tagged image: indexerclient is
+    # compiled out so the binary cannot bypass privacy-proxy's redaction.
+    build:
+      target: privacy
     environment:
+      # Empty INDEXER_URL overrides the base compose value so this image
+      # exclusively uses PRIVACY_PROXY_URL (chain reads go through the
+      # privacy-proxy redaction layer).
+      - INDEXER_URL=
       - PRIVACY_PROXY_URL=http://privacy-proxy:8080
       - PRIVACY_PROXY_PUBLIC_URL=http://localhost:18300
       - SSO_CLIENT_ID=explorer

@@ -1,4 +1,6 @@
-# Build overlay - builds block-builder and load-generator from local sibling repos
+# Build overlay - builds block-builder, load-generator, and chain-indexer from
+# local sibling repos. Block-explorer is also pulled by default; build it
+# locally with docker-compose.explorer-build.yaml when needed.
 #
 # Usage: make run-build
 # Or manually: docker compose -f docker-compose.yml -f docker-compose.build.yaml --profile reth up --build -d
@@ -18,3 +20,21 @@ services:
     build:
       context: ../../loadgenerator
       dockerfile: Dockerfile
+
+  chain-indexer:
+    build:
+      context: ../../chain-indexer
+      dockerfile: Dockerfile
+    image: gatewayfm/chain-indexer:local
+
+  chain-indexer-l1:
+    build:
+      context: ../../chain-indexer
+      dockerfile: Dockerfile
+    image: gatewayfm/chain-indexer:local
+
+  chain-indexer-cdk:
+    build:
+      context: ../../chain-indexer
+      dockerfile: Dockerfile
+    image: gatewayfm/chain-indexer:local
