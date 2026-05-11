@@ -23,6 +23,9 @@ services:
   explorer-api:
     # In privacy mode use the privacy-tagged image: indexerclient is
     # compiled out so the binary cannot bypass privacy-proxy's redaction.
+    # Distinct image tag so this build doesn't clobber the standalone
+    # build used by explorer-l1-api (same Dockerfile, different target).
+    image: gatewayfm/block-explorer-api:local-privacy
     build:
       target: privacy
     environment:
