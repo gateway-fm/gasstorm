@@ -16,6 +16,10 @@ function matchExact(href: string) {
   return (p: string) => p === href || p === `${href}/`;
 }
 
+function matchPrefix(href: string) {
+  return (p: string) => p === href || p === `${href}/` || p.startsWith(`${href}/`);
+}
+
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/", match: (p) => p === "/" || p === "" },
   { label: "Load Test", href: "/load-test", match: matchExact("/load-test") },
@@ -55,10 +59,10 @@ export function Header() {
       ? [{ label: "Blob DA", href: "/blob-da", match: matchExact("/blob-da") }]
       : []),
     ...(explorerL1.isOnline
-      ? [{ label: "L1 Explorer", href: "/explorer-l1", match: matchExact("/explorer-l1") }]
+      ? [{ label: "L1 Explorer", href: "/explorer-l1", match: matchPrefix("/explorer-l1") }]
       : []),
     ...(explorer.isOnline
-      ? [{ label: "L2 Explorer", href: "/explorer-l2", match: matchExact("/explorer-l2") }]
+      ? [{ label: "L2 Explorer", href: "/explorer-l2", match: matchPrefix("/explorer-l2") }]
       : []),
     ...(privacyProxy.isOnline
       ? [{ label: "Privacy", href: "/privacy", match: matchExact("/privacy") }]

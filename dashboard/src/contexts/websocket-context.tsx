@@ -54,6 +54,14 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
   // Get loadGen connection status from its store
   const loadGenConnected = useGoLoadTestStore((s) => s.wsConnected);
+  const connectLoadGenWs = useGoLoadTestStore((s) => s.connectWebSocket);
+
+  // Open the load generator WebSocket app-wide so the header indicator
+  // reflects loadgen reachability on every page, not just /load-test.
+  // connect() is idempotent and the page-level effect can still call it.
+  useEffect(() => {
+    connectLoadGenWs();
+  }, [connectLoadGenWs]);
 
   // Subscriber lists for new block events
   const l1Subscribers = useRef<Set<(head: NewHeadResult) => void>>(new Set());

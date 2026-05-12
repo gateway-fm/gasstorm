@@ -7,28 +7,35 @@ interface ServiceIframeProps {
   port: number;
   path?: string;
   title: string;
-  /** Persist the iframe's subpath in the URL hash across refreshes */
+  /** Mirror the iframe's subpath under the parent's pathname (e.g. /explorer-l2/block/123).
+   *  Requires the iframed app to post `gasstorm-iframe-route` messages (injected via
+   *  nginx sub_filter for the explorer; see config/explorer-nginx.conf). */
   syncHash?: boolean;
   /** Direct URL override — bypasses /proxy/ path prefix for SPAs that can't handle it */
   directUrl?: string;
 }
 
+// The dashboard route this iframe is mounted under (e.g. "/explorer-l2"). First path segment.
+function getRoutePrefix(): string {
+  if (typeof window === "undefined") return "";
+  const m = window.location.pathname.match(/^\/[^/]+/);
+  return m ? m[0] : "";
+}
+
 export function ServiceIframe({ port, path = "", title, syncHash, directUrl }: ServiceIframeProps) {
   const ref = useRef<HTMLIFrameElement>(null);
 
-  // On mount, restore subpath from URL hash (e.g. #/block/123?tab=txs)
-  // Ignore the hash if it belongs to a different service port (stale from previous page)
-  const [hashPath] = useState(() => {
+  // Recover the iframe's initial subpath from the parent URL so refresh/deep links land
+  // on the right page inside the iframe.
+  const [initialSubpath] = useState(() => {
     if (!syncHash || typeof window === "undefined") return "";
-    const h = window.location.hash;
-    if (!h || h === "#" || h === "#/") return "";
-    const decoded = h.slice(1); // strip leading #
-    // In single-port mode, hash contains /proxy/{port}/... — ignore if port doesn't match
-    if (decoded.startsWith("/proxy/") && !decoded.startsWith(`/proxy/${port}/`)) return "";
-    return decoded;
+    const prefix = getRoutePrefix();
+    const rest = window.location.pathname.slice(prefix.length) + window.location.search;
+    if (rest === "" || rest === "/") return "";
+    return rest;
   });
 
-  const effectivePath = hashPath || path;
+  const effectivePath = initialSubpath || path;
 
   const setRef = useCallback(
     (el: HTMLIFrameElement | null) => {
@@ -40,37 +47,40 @@ export function ServiceIframe({ port, path = "", title, syncHash, directUrl }: S
       }
       (ref as React.MutableRefObject<HTMLIFrameElement | null>).current = el;
     },
-    [port, effectivePath, directUrl, ref],
+    [port, effectivePath, directUrl],
   );
 
-  // Sync iframe URL back to parent hash on navigation (best-effort, cross-origin may block)
+  // Listen for route messages posted by the iframe and mirror them in the parent URL.
   useEffect(() => {
     if (!syncHash) return;
     const iframe = ref.current;
-    if (!iframe) return;
 
-    const syncUrl = () => {
+    const stripCacheBuster = (sub: string): string => {
       try {
-        const loc = iframe.contentWindow?.location;
-        if (!loc) return;
-        const iframePath = (loc.pathname ?? "") + (loc.search ?? "") + (loc.hash ?? "");
-        if (iframePath === "/" || iframePath === "") {
-          if (window.location.hash) {
-            window.history.replaceState(null, "", window.location.pathname + window.location.search);
-          }
-        } else {
-          const newHash = `#${iframePath}`;
-          if (newHash !== window.location.hash) {
-            window.history.replaceState(null, "", window.location.pathname + window.location.search + newHash);
-          }
-        }
+        const u = new URL(sub, "http://x");
+        u.searchParams.delete("_v");
+        const q = u.searchParams.toString();
+        return u.pathname + (q ? "?" + q : "") + u.hash;
       } catch {
-        // Cross-origin — can't read iframe URL, skip sync
+        return sub;
       }
     };
 
-    iframe.addEventListener("load", syncUrl);
-    return () => iframe.removeEventListener("load", syncUrl);
+    const onMessage = (ev: MessageEvent) => {
+      if (iframe && ev.source !== iframe.contentWindow) return;
+      const data = ev.data as { type?: string; path?: string } | null;
+      if (!data || data.type !== "gasstorm-iframe-route") return;
+      const sub = stripCacheBuster(typeof data.path === "string" ? data.path : "/");
+      const routePrefix = getRoutePrefix();
+      const newPath = routePrefix + (sub === "/" ? "" : sub);
+      const current = window.location.pathname + window.location.search + window.location.hash;
+      if (newPath !== current) {
+        window.history.replaceState(null, "", newPath || "/");
+      }
+    };
+
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
   }, [syncHash]);
 
   return (

@@ -26,7 +26,7 @@ import type { BlockMetrics, Statistics } from "@/types/metrics";
 import { calculateStatistics } from "@/lib/statistics";
 
 export default function LoadTestPage() {
-  const { status, connectWebSocket, disconnectWebSocket, latencyStats: goLatencyStats, preconfLatencyStats: goPreconfLatencyStats } = useGoLoadTestStore();
+  const { status, latencyStats: goLatencyStats, preconfLatencyStats: goPreconfLatencyStats } = useGoLoadTestStore();
   const { addBlockMetrics, timeSeries } = useMetricsStore();
   const { builder } = useChainStore();
   const prevStatusRef = useRef(status);
@@ -39,13 +39,6 @@ export default function LoadTestPage() {
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
-
-  // Maintain a persistent WebSocket connection to the load generator.
-  // This picks up tests started via API/MCP without polling.
-  useEffect(() => {
-    connectWebSocket();
-    return () => disconnectWebSocket();
-  }, [connectWebSocket, disconnectWebSocket]);
 
   // Connect to the builder's block-metrics WebSocket for build cycle timing
   useEffect(() => {
