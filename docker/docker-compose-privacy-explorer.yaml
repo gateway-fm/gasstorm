@@ -36,7 +36,15 @@ services:
       - PRIVACY_PROXY_URL=http://privacy-proxy:8080
       - PRIVACY_PROXY_PUBLIC_URL=http://localhost:18300
       - SSO_CLIENT_ID=explorer
-      - SSO_REDIRECT_URI=http://localhost:18200/api/auth/callback
+      # Callback goes through the UI (18201) — its nginx proxies /api/* to
+      # this API, so the handler's final redirect resolves to the SPA
+      # origin instead of the API host (which has no UI to serve).
+      - SSO_REDIRECT_URI=http://localhost:18201/api/auth/callback
+      # Override the post-OAuth redirect target so the user lands back in
+      # the gasstorm dashboard (which iframes this explorer) instead of
+      # the standalone explorer origin — gives them the dashboard nav
+      # back for switching between apps.
+      - POST_LOGIN_REDIRECT_URL=http://localhost:18000/explorer-l2
     depends_on:
       privacy-proxy:
         condition: service_started
