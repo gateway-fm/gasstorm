@@ -5,36 +5,28 @@ import { useMetricsStore } from "@/stores/metrics-store";
 import { useGoLoadTestStore } from "@/stores/go-load-test-store";
 import { formatGas, formatPercent } from "@/lib/statistics";
 
-// Format block time in ms with appropriate precision
-// Always returns a plain number string; the unit is handled separately
 function formatBlockTime(ms: number): string {
   if (ms === 0) return "N/A";
   if (ms < 1000) return `${Math.round(ms)}`;
   return `${(ms / 1000).toFixed(2)}`;
 }
 
-// Get the appropriate unit suffix for a block time value
 function getBlockTimeUnit(ms: number): string {
   if (ms === 0) return "";
   if (ms < 1000) return "ms";
   return "s";
 }
 
-// Get color based on block time relative to target
-// Green: within ±20% of target
-// Yellow: within ±50% of target
-// Red: more than 50% off target
 function getBlockTimeColor(ms: number, targetMs: number): string {
   if (ms === 0) return "text-muted-foreground";
 
   const deviation = Math.abs(ms - targetMs) / targetMs;
 
-  if (deviation <= 0.2) return "text-success";  // Within 20%
-  if (deviation <= 0.5) return "text-warning"; // Within 50%
-  return "text-destructive";                    // More than 50% off
+  if (deviation <= 0.2) return "text-success";
+  if (deviation <= 0.5) return "text-warning";
+  return "text-destructive";
 }
 
-// Format gas price - show more precision for very low values
 function formatGasPrice(gwei: number): string {
   if (gwei === 0) return "—";
   if (gwei < 0.001) return gwei.toExponential(1);
@@ -42,6 +34,8 @@ function formatGasPrice(gwei: number): string {
   if (gwei < 1) return gwei.toFixed(3);
   return gwei.toFixed(2);
 }
+
+type Metric = { label: string; value: string; unit: string; color: string };
 
 export function MetricsSnapshot() {
   const { snapshot, blockMetrics, timeSeries } = useMetricsStore();
@@ -54,7 +48,6 @@ export function MetricsSnapshot() {
     currentRate: goCurrentTps,
     averageTps: goAverageTps,
     peakTps: goPeakTps,
-    // Aggregate block metrics from Go load generator
     totalGasUsed: goTotalGasUsed,
     blockCount: goBlockCount,
     peakMgasPerSec: goPeakMgasPerSec,
@@ -66,149 +59,194 @@ export function MetricsSnapshot() {
     hsmFailoverEnabled,
   } = useGoLoadTestStore();
 
-  // goIsHistorical = true ONLY when viewing DB-hydrated history (hydrateFromHistory).
-  // For data source branching: DB history → metricsStore snapshot, everything else → goLoadTestStore.
   const isLiveRunning = goStatus === "running" || goStatus === "initializing" || goStatus === "verifying";
 
-  // DB-hydrated history → use metricsStore snapshot. Everything else → goLoadTestStore.
   const totalTxs = goIsHistorical ? snapshot.totalTransactions : txConfirmedCount;
 
-  // Check if we have block metrics from Go load generator (live mode) or from metrics-store
   const hasGoBlockMetrics = goBlockCount > 0 || goTotalGasUsed > 0;
   const hasBlockMetrics = blockMetrics.length > 0 || hasGoBlockMetrics;
 
-  // In DB historical mode, check if we have Mgas/s data either in time series OR in snapshot aggregates
-  const hasHistoricalMgasData = goIsHistorical && (
-    timeSeries.mgasPerSec.some(v => v > 0) ||
-    snapshot.currentMgasPerSec > 0 ||
-    snapshot.peakMgasPerSec > 0
-  );
+  const hasHistoricalMgasData =
+    goIsHistorical &&
+    (timeSeries.mgasPerSec.some((v) => v > 0) ||
+      snapshot.currentMgasPerSec > 0 ||
+      snapshot.peakMgasPerSec > 0);
 
-  // Use Mgas display if we have live block metrics OR historical Mgas data
   const showMgasMetrics = hasBlockMetrics || hasHistoricalMgasData;
 
-  // Target block time - only relevant for live mode
   const targetBlockTimeMs = 2000;
 
-  // DB history → metricsStore snapshot values. Live/completed → goLoadTestStore values.
   const peakMgasPerSec = goIsHistorical ? snapshot.peakMgasPerSec : goPeakMgasPerSec;
   const avgMgasPerSec = goIsHistorical ? snapshot.currentMgasPerSec : goAvgMgasPerSec;
   const avgFillRate = goIsHistorical ? snapshot.averageFillRate : goAvgFillRate;
   const blocksProduced = goIsHistorical ? snapshot.blocksProduced : goBlockCount;
   const totalGasUsed = goIsHistorical ? snapshot.totalGasUsed : BigInt(goTotalGasUsed);
 
-  const attestationState = blockAttestationEnabled === null
-    ? "—"
-    : (blockAttestationEnabled ? "ON" : "OFF");
-  const attestationColor = blockAttestationEnabled === null
-    ? "text-muted-foreground"
-    : (blockAttestationEnabled ? "text-success" : "text-warning");
+  const attestationState =
+    blockAttestationEnabled === null ? "—" : blockAttestationEnabled ? "ON" : "OFF";
+  const attestationColor =
+    blockAttestationEnabled === null
+      ? "text-muted-foreground"
+      : blockAttestationEnabled
+        ? "text-success"
+        : "text-warning";
   const hsmProviderLabel = hsmProvider || "—";
   const hsmKeyIdLabel = hsmKeyIdActive || "—";
-  const hsmFailoverLabel = hsmFailoverEnabled === null
-    ? "—"
-    : (hsmFailoverEnabled ? "ON" : "OFF");
+  const hsmFailoverLabel =
+    hsmFailoverEnabled === null ? "—" : hsmFailoverEnabled ? "ON" : "OFF";
 
-  const metrics = [
+  const sections: { heading: string; metrics: Metric[] }[] = [
     {
-      label: isLiveRunning ? "Now" : "Avg",
-      value: showMgasMetrics ? avgMgasPerSec.toFixed(1) : snapshot.currentTxPerSec.toFixed(1),
-      unit: showMgasMetrics ? "Mgas/s" : "tx/s",
-      color: showMgasMetrics ? "text-info" : "text-primary",
+      heading: "Throughput",
+      metrics: [
+        {
+          label: isLiveRunning ? "Now" : "Avg",
+          value: showMgasMetrics ? avgMgasPerSec.toFixed(1) : snapshot.currentTxPerSec.toFixed(1),
+          unit: showMgasMetrics ? "Mgas/s" : "tx/s",
+          color: showMgasMetrics ? "text-info" : "text-primary",
+        },
+        {
+          label: "Peak",
+          value: showMgasMetrics ? peakMgasPerSec.toFixed(1) : snapshot.peakTxPerSec.toFixed(1),
+          unit: showMgasMetrics ? "Mgas/s" : "tx/s",
+          color: "text-success",
+        },
+        {
+          label: isLiveRunning ? "TPS" : "Avg TPS",
+          value: showMgasMetrics
+            ? (isLiveRunning ? goCurrentTps : goAverageTps).toFixed(0)
+            : snapshot.totalTransactions.toLocaleString(),
+          unit: showMgasMetrics ? "" : "txs",
+          color: "text-primary",
+        },
+        {
+          label: "Peak TPS",
+          value: showMgasMetrics
+            ? goPeakTps.toFixed(0)
+            : snapshot.totalTransactions > 0
+              ? "100%"
+              : "—",
+          unit: "",
+          color: showMgasMetrics ? "text-primary" : "text-success",
+        },
+      ],
     },
     {
-      label: "Peak",
-      value: showMgasMetrics ? peakMgasPerSec.toFixed(1) : snapshot.peakTxPerSec.toFixed(1),
-      unit: showMgasMetrics ? "Mgas/s" : "tx/s",
-      color: "text-success",
+      heading: "Blocks",
+      metrics: [
+        {
+          label: "Block",
+          value:
+            blockMetrics.length > 0 || snapshot.currentBlockTimeMs > 0
+              ? formatBlockTime(snapshot.currentBlockTimeMs)
+              : "—",
+          unit:
+            blockMetrics.length > 0 || snapshot.currentBlockTimeMs > 0
+              ? getBlockTimeUnit(snapshot.currentBlockTimeMs)
+              : "",
+          color:
+            blockMetrics.length > 0 || snapshot.currentBlockTimeMs > 0
+              ? getBlockTimeColor(snapshot.currentBlockTimeMs, targetBlockTimeMs)
+              : "text-muted-foreground",
+        },
+        {
+          label: "Avg Block",
+          value:
+            blockMetrics.length > 0 || snapshot.avgBlockTimeMs > 0
+              ? formatBlockTime(snapshot.avgBlockTimeMs)
+              : "—",
+          unit:
+            blockMetrics.length > 0 || snapshot.avgBlockTimeMs > 0
+              ? getBlockTimeUnit(snapshot.avgBlockTimeMs)
+              : "",
+          color:
+            blockMetrics.length > 0 || snapshot.avgBlockTimeMs > 0
+              ? getBlockTimeColor(snapshot.avgBlockTimeMs, targetBlockTimeMs)
+              : "text-muted-foreground",
+        },
+        {
+          label: "Fill",
+          value: showMgasMetrics ? formatPercent(avgFillRate) : "—",
+          unit: "",
+          color: showMgasMetrics ? "text-warning" : "text-muted-foreground",
+        },
+        {
+          label: "Blocks",
+          value: showMgasMetrics ? blocksProduced.toString() : "—",
+          unit: "",
+          color: "text-muted-foreground",
+        },
+      ],
     },
     {
-      label: isLiveRunning ? "TPS" : "Avg TPS",
-      value: showMgasMetrics
-        ? (isLiveRunning ? goCurrentTps : goAverageTps).toFixed(0)
-        : snapshot.totalTransactions.toLocaleString(),
-      unit: showMgasMetrics ? "" : "txs",
-      color: "text-primary",
+      heading: "Gas",
+      metrics: [
+        {
+          label: "Base Fee",
+          value: formatGasPrice(goIsHistorical ? snapshot.baseFeeGwei ?? 0 : latestBaseFeeGwei),
+          unit:
+            (goIsHistorical ? (snapshot.baseFeeGwei ?? 0) > 0 : latestBaseFeeGwei > 0) ? "gwei" : "",
+          color:
+            (goIsHistorical ? (snapshot.baseFeeGwei ?? 0) : latestBaseFeeGwei) > 1.5
+              ? "text-destructive"
+              : (goIsHistorical ? (snapshot.baseFeeGwei ?? 0) : latestBaseFeeGwei) > 1.0
+                ? "text-warning"
+                : "text-success",
+        },
+        {
+          label: "Gas Price",
+          value: formatGasPrice(goIsHistorical ? snapshot.gasPriceGwei ?? 0 : latestGasPriceGwei),
+          unit:
+            (goIsHistorical ? (snapshot.gasPriceGwei ?? 0) > 0 : latestGasPriceGwei > 0) ? "gwei" : "",
+          color:
+            (goIsHistorical ? (snapshot.gasPriceGwei ?? 0) : latestGasPriceGwei) > 2.0
+              ? "text-destructive"
+              : (goIsHistorical ? (snapshot.gasPriceGwei ?? 0) : latestGasPriceGwei) > 1.5
+                ? "text-warning"
+                : "text-success",
+        },
+        {
+          label: "Total Gas",
+          value: showMgasMetrics ? formatGas(totalGasUsed) : "—",
+          unit: "",
+          color: "text-info",
+        },
+        {
+          label: "Total Txs",
+          value: totalTxs.toLocaleString(),
+          unit: "",
+          color: "text-warning",
+        },
+      ],
     },
     {
-      label: "Peak TPS",
-      value: showMgasMetrics
-        ? goPeakTps.toFixed(0)
-        : snapshot.totalTransactions > 0 ? "100%" : "-",
-      unit: "",
-      color: showMgasMetrics ? "text-primary" : "text-success",
-    },
-    {
-      label: "Block",
-      value: (blockMetrics.length > 0 || snapshot.currentBlockTimeMs > 0) ? formatBlockTime(snapshot.currentBlockTimeMs) : "—",
-      unit: (blockMetrics.length > 0 || snapshot.currentBlockTimeMs > 0) ? getBlockTimeUnit(snapshot.currentBlockTimeMs) : "",
-      color: (blockMetrics.length > 0 || snapshot.currentBlockTimeMs > 0) ? getBlockTimeColor(snapshot.currentBlockTimeMs, targetBlockTimeMs) : "text-muted-foreground",
-    },
-    {
-      label: "Avg Block",
-      value: (blockMetrics.length > 0 || snapshot.avgBlockTimeMs > 0) ? formatBlockTime(snapshot.avgBlockTimeMs) : "—",
-      unit: (blockMetrics.length > 0 || snapshot.avgBlockTimeMs > 0) ? getBlockTimeUnit(snapshot.avgBlockTimeMs) : "",
-      color: (blockMetrics.length > 0 || snapshot.avgBlockTimeMs > 0) ? getBlockTimeColor(snapshot.avgBlockTimeMs, targetBlockTimeMs) : "text-muted-foreground",
-    },
-    {
-      label: "Fill",
-      value: showMgasMetrics ? formatPercent(avgFillRate) : "—",
-      unit: "",
-      color: showMgasMetrics ? "text-warning" : "text-muted-foreground",
-    },
-    {
-      label: "Blocks",
-      value: showMgasMetrics ? blocksProduced.toString() : "—",
-      unit: "",
-      color: "text-muted-foreground",
-    },
-    {
-      label: "Base Fee",
-      value: formatGasPrice(goIsHistorical ? snapshot.baseFeeGwei ?? 0 : latestBaseFeeGwei),
-      unit: (goIsHistorical ? (snapshot.baseFeeGwei ?? 0) > 0 : latestBaseFeeGwei > 0) ? "gwei" : "",
-      color: (goIsHistorical ? (snapshot.baseFeeGwei ?? 0) : latestBaseFeeGwei) > 1.5 ? "text-destructive" : ((goIsHistorical ? (snapshot.baseFeeGwei ?? 0) : latestBaseFeeGwei) > 1.0 ? "text-warning" : "text-success"),
-    },
-    {
-      label: "Gas Price",
-      value: formatGasPrice(goIsHistorical ? snapshot.gasPriceGwei ?? 0 : latestGasPriceGwei),
-      unit: (goIsHistorical ? (snapshot.gasPriceGwei ?? 0) > 0 : latestGasPriceGwei > 0) ? "gwei" : "",
-      color: (goIsHistorical ? (snapshot.gasPriceGwei ?? 0) : latestGasPriceGwei) > 2.0 ? "text-destructive" : ((goIsHistorical ? (snapshot.gasPriceGwei ?? 0) : latestGasPriceGwei) > 1.5 ? "text-warning" : "text-success"),
-    },
-    {
-      label: "Total Gas",
-      value: showMgasMetrics ? formatGas(totalGasUsed) : "—",
-      unit: "",
-      color: "text-info",
-    },
-    {
-      label: "Total Txs",
-      value: totalTxs.toLocaleString(),
-      unit: "",
-      color: "text-warning",
-    },
-    {
-      label: "Attestation",
-      value: attestationState,
-      unit: "",
-      color: attestationColor,
-    },
-    {
-      label: "HSM Provider",
-      value: hsmProviderLabel,
-      unit: "",
-      color: hsmProviderLabel === "—" ? "text-muted-foreground" : "text-info",
-    },
-    {
-      label: "HSM Key",
-      value: hsmKeyIdLabel,
-      unit: "",
-      color: hsmKeyIdLabel === "—" ? "text-muted-foreground" : "text-info",
-    },
-    {
-      label: "HSM Failover",
-      value: hsmFailoverLabel,
-      unit: "",
-      color: hsmFailoverLabel === "—" ? "text-muted-foreground" : (hsmFailoverLabel === "ON" ? "text-success" : "text-warning"),
+      heading: "Provenance",
+      metrics: [
+        { label: "Attestation", value: attestationState, unit: "", color: attestationColor },
+        {
+          label: "HSM Provider",
+          value: hsmProviderLabel,
+          unit: "",
+          color: hsmProviderLabel === "—" ? "text-muted-foreground" : "text-info",
+        },
+        {
+          label: "HSM Key",
+          value: hsmKeyIdLabel,
+          unit: "",
+          color: hsmKeyIdLabel === "—" ? "text-muted-foreground" : "text-info",
+        },
+        {
+          label: "HSM Failover",
+          value: hsmFailoverLabel,
+          unit: "",
+          color:
+            hsmFailoverLabel === "—"
+              ? "text-muted-foreground"
+              : hsmFailoverLabel === "ON"
+                ? "text-success"
+                : "text-warning",
+        },
+      ],
     },
   ];
 
@@ -216,23 +254,45 @@ export function MetricsSnapshot() {
     <Card>
       <CardHeader>
         <CardTitle className="text-base font-semibold font-mono">
-          {goIsHistorical ? "Historical Metrics" : isLiveRunning ? "Live Metrics" : (goStatus === "completed" || goStatus === "error") ? "Test Results" : "Test Metrics"}
+          {goIsHistorical
+            ? "Historical Metrics"
+            : isLiveRunning
+              ? "Live Metrics"
+              : goStatus === "completed" || goStatus === "error"
+                ? "Test Results"
+                : "Test Metrics"}
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-3 gap-2">
-          {metrics.map((metric) => (
-            <div key={metric.label} className="rounded-lg border p-2 min-w-0 overflow-hidden h-[68px]">
-              <p className="text-[10px] text-muted-foreground font-mono truncate">{metric.label}</p>
-              <p className={`text-base font-bold font-mono ${metric.color} truncate`}>
-                {metric.value}
-              </p>
-              <p className="text-[10px] text-muted-foreground font-mono truncate h-[14px]">
-                {metric.unit || "\u00A0"}
-              </p>
+      <CardContent className="space-y-4">
+        {sections.map((section, idx) => (
+          <div
+            key={section.heading}
+            className={idx > 0 ? "pt-3 border-t border-border/60" : ""}
+          >
+            <p className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground mb-2">
+              {section.heading}
+            </p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+              {section.metrics.map((metric) => (
+                <div key={metric.label} className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground font-mono truncate">
+                    {metric.label}
+                  </p>
+                  <p
+                    className={`text-base font-bold font-mono ${metric.color} truncate leading-tight`}
+                  >
+                    {metric.value}
+                    {metric.unit && (
+                      <span className="text-[10px] font-normal text-muted-foreground ml-1">
+                        {metric.unit}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </CardContent>
     </Card>
   );

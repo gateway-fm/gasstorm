@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { LoadTestConfig } from "@/components/load-test/load-test-config";
-import { LoadTestRunner } from "@/components/load-test/load-test-runner";
+import { LoadTestPanel } from "@/components/load-test/load-test-panel";
 import { RealTimeChart } from "@/components/metrics/real-time-chart";
 import { LatencyHistogram } from "@/components/metrics/latency-histogram";
 import { MetricsSnapshot } from "@/components/metrics/metrics-snapshot";
@@ -26,9 +25,18 @@ import type { BlockMetrics, Statistics } from "@/types/metrics";
 import { calculateStatistics } from "@/lib/statistics";
 
 export default function LoadTestPage() {
-  const { status, latencyStats: goLatencyStats, preconfLatencyStats: goPreconfLatencyStats } = useGoLoadTestStore();
+  const {
+    status,
+    latencyStats: goLatencyStats,
+    preconfLatencyStats: goPreconfLatencyStats,
+    isHistoricalMode,
+    config,
+  } = useGoLoadTestStore();
   const { addBlockMetrics, timeSeries } = useMetricsStore();
   const { builder } = useChainStore();
+  const hasTestData = status !== "idle" || isHistoricalMode;
+  const isRealisticMode =
+    config?.pattern === "realistic" || config?.pattern === "adaptive-realistic";
   const prevStatusRef = useRef(status);
   // Track previous block arrival time in a ref to avoid stale closure issues
   const lastBlockArrivalRef = useRef<number | null>(null);
@@ -168,46 +176,49 @@ export default function LoadTestPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <main className="container mx-auto px-4 py-6 space-y-6">
+        <LoadTestPanel />
 
-      <main className="container mx-auto px-4 py-6">
-        {/* Configuration and Runner */}
-        <div className="grid gap-4 md:grid-cols-2 mb-6">
-          <LoadTestConfig />
-          <LoadTestRunner />
-        </div>
-
-        {/* Bottleneck Analysis - Always visible during/after test (including initialization and verification) */}
-        {(status === "initializing" || status === "running" || status === "verifying" || status === "completed") && (
-          <div className="mb-6">
-            <BottleneckAnalysis />
+        {/* Quiet pointer to history when there's no live run */}
+        {!hasTestData && (
+          <div className="flex items-center justify-end px-1">
+            <a
+              href="/load-test/history"
+              className="font-mono text-xs text-muted-foreground hover:text-primary transition-colors"
+            >
+              Browse run history &rarr;
+            </a>
           </div>
         )}
 
-        {/* Real-time Charts */}
-        <div className="grid gap-4 md:grid-cols-3 mb-6">
-          <RealTimeChart />
-          <MetricsSnapshot />
-        </div>
+        {hasTestData && (
+          <>
+            {/* Bottleneck Analysis */}
+            {(status === "initializing" || status === "running" || status === "verifying" || status === "completed") && (
+              <BottleneckAnalysis />
+            )}
 
-        {/* Verification Summary */}
-        <div className="mb-6">
-          <VerificationSummary />
-        </div>
+            {/* Real-time Charts + Metrics snapshot */}
+            <div className="grid gap-4 md:grid-cols-3">
+              <RealTimeChart />
+              <MetricsSnapshot />
+            </div>
 
-        {/* Latency Histograms (Preconf + Confirmation) */}
-        <div className="mb-6">
-          <LatencyHistogram />
-        </div>
+            {/* Verification Summary */}
+            <VerificationSummary />
 
-        {/* Realistic Test Metrics - only shown for realistic mode */}
-        <div className="grid gap-4 md:grid-cols-2 mb-6">
-          <TipHistogram />
-          <TxTypeBreakdown />
-        </div>
+            {/* Latency Histograms (Preconf + Confirmation) */}
+            <LatencyHistogram />
 
-        {/* Statistics Table - Full width for better readability */}
-        {(status === "initializing" || status === "running" || status === "verifying" || status === "completed") && (
-          <div className="mb-6">
+            {/* Realistic-only TX mix metrics */}
+            {isRealisticMode && (
+              <div className="grid gap-4 md:grid-cols-2">
+                <TipHistogram />
+                <TxTypeBreakdown />
+              </div>
+            )}
+
+            {/* Statistics Table */}
             <PercentileTable
               latencyStats={stats.latencyStats}
               preconfLatencyStats={stats.preconfLatencyStats}
@@ -215,13 +226,11 @@ export default function LoadTestPage() {
               txsStats={stats.txsStats}
               fillStats={stats.fillStats}
             />
-          </div>
-        )}
 
-        {/* Export Controls */}
-        <div className="mb-6">
-          <ExportControls />
-        </div>
+            {/* Export — only meaningful once a run is complete */}
+            {(status === "completed" || isHistoricalMode) && <ExportControls />}
+          </>
+        )}
       </main>
     </div>
   );
