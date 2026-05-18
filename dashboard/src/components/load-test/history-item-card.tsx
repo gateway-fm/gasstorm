@@ -144,6 +144,7 @@ export function HistoryItemCard({
               onToggleCompareSelect?.();
             }}
             className="p-1 hover:bg-accent rounded -ml-1 mr-1"
+            aria-label={selectedForCompare ? "Deselect from comparison" : "Select for comparison"}
           >
             {selectedForCompare ? (
               <CheckSquare className="h-4 w-4 text-info" />
@@ -161,6 +162,7 @@ export function HistoryItemCard({
               onToggleFavorite();
             }}
             className="p-1 hover:bg-accent rounded -ml-1 mr-1"
+            aria-label={result.isFavorite ? "Remove from favorites" : "Add to favorites"}
           >
             <Star
               className={`h-4 w-4 ${
@@ -203,6 +205,7 @@ export function HistoryItemCard({
                 }}
                 className="p-1 hover:bg-accent rounded opacity-50 hover:opacity-100 transition-opacity"
                 title="Edit name"
+                aria-label="Edit test name"
               >
                 <Pencil className="h-3 w-3" />
               </button>
