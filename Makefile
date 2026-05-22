@@ -334,10 +334,9 @@ up:
 	@BLOCK_TIME_MS=1000 docker compose -f $(COMPOSE_DIR)/docker-compose.loadgen.yaml --profile reth up --build -d
 	@echo ""
 	@echo "Dev stack ready:"
-	@echo "  Dashboard:    http://localhost:18000"
-	@echo "  L2 Explorer:  http://localhost:18201"
-	@echo "  L1 Explorer:  http://localhost:18203"
-	@echo "  Privacy UI:   http://localhost:18301"
+	@echo "  Dashboard:     http://localhost:18000"
+	@echo "  Explorer:      http://localhost:18201  (L2 default; switch to L1 via Networks dropdown — backend on :18203)"
+	@echo "  Privacy UI:    http://localhost:18301"
 	@echo "  Privacy Proxy: http://localhost:18300"
 
 # Stop the full stack and remove volumes.

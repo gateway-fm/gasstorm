@@ -1,0 +1,12 @@
+[
+  {
+    "title": "L2 (gasstorm)",
+    "url": "http://localhost:18201",
+    "group": "GasStorm"
+  },
+  {
+    "title": "L1",
+    "url": "http://localhost:18203",
+    "group": "GasStorm"
+  }
+]

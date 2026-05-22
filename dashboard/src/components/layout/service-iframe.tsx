@@ -7,7 +7,7 @@ interface ServiceIframeProps {
   port: number;
   path?: string;
   title: string;
-  /** Mirror the iframe's subpath under the parent's pathname (e.g. /explorer-l2/block/123).
+  /** Mirror the iframe's subpath under the parent's pathname (e.g. /explorer/block/123).
    *  Requires the iframed app to post `gasstorm-iframe-route` messages (injected via
    *  nginx sub_filter for the explorer; see config/explorer-nginx.conf). */
   syncHash?: boolean;
@@ -15,7 +15,7 @@ interface ServiceIframeProps {
   directUrl?: string;
 }
 
-// The dashboard route this iframe is mounted under (e.g. "/explorer-l2"). First path segment.
+// The dashboard route this iframe is mounted under (e.g. "/explorer"). First path segment.
 function getRoutePrefix(): string {
   if (typeof window === "undefined") return "";
   const m = window.location.pathname.match(/^\/[^/]+/);

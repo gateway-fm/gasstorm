@@ -58,11 +58,8 @@ export function Header() {
     ...(blobDA.isOnline
       ? [{ label: "Blob DA", href: "/blob-da", match: matchExact("/blob-da") }]
       : []),
-    ...(explorerL1.isOnline
-      ? [{ label: "L1 Explorer", href: "/explorer-l1", match: matchPrefix("/explorer-l1") }]
-      : []),
-    ...(explorer.isOnline
-      ? [{ label: "L2 Explorer", href: "/explorer-l2", match: matchPrefix("/explorer-l2") }]
+    ...(explorer.isOnline || explorerL1.isOnline
+      ? [{ label: "Explorer", href: "/explorer", match: matchPrefix("/explorer") }]
       : []),
     ...(privacyProxy.isOnline
       ? [{ label: "Privacy", href: "/privacy", match: matchExact("/privacy") }]

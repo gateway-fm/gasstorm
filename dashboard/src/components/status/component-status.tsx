@@ -77,14 +77,16 @@ export function ComponentStatus() {
         : undefined,
     },
     {
-      name: "L2 Block Explorer",
-      online: explorer.isOnline,
-      href: "/explorer-l2",
-    },
-    {
-      name: "L1 Block Explorer",
-      online: explorerL1.isOnline,
-      href: "/explorer-l1",
+      name: "Block Explorer",
+      online: explorer.isOnline || explorerL1.isOnline,
+      metrics: explorer.isOnline && explorerL1.isOnline
+        ? "L1 + L2"
+        : explorer.isOnline
+          ? "L2 only"
+          : explorerL1.isOnline
+            ? "L1 only"
+            : undefined,
+      href: "/explorer",
     },
     {
       name: "Privacy Proxy",

@@ -116,6 +116,7 @@ services:
       - explorer-api
     volumes:
       - ../config/explorer-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../config/featured-networks.json:/usr/share/nginx/html/featured-networks.json:ro
     ports:
       - "18201:80"
     healthcheck:
@@ -223,6 +224,7 @@ services:
       - explorer-l1-api
     volumes:
       - ../config/explorer-l1-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../config/featured-networks.json:/usr/share/nginx/html/featured-networks.json:ro
     ports:
       - "18203:80"
     healthcheck:
