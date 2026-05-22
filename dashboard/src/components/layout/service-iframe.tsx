@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { getServiceUrl } from "@/lib/host";
 
 interface ServiceIframeProps {
@@ -15,22 +16,25 @@ interface ServiceIframeProps {
   directUrl?: string;
 }
 
-// The dashboard route this iframe is mounted under (e.g. "/explorer"). First path segment.
-function getRoutePrefix(): string {
-  if (typeof window === "undefined") return "";
-  const m = window.location.pathname.match(/^\/[^/]+/);
+// First path segment of the dashboard route this iframe is mounted under (e.g. "/explorer").
+function getRoutePrefix(pathname: string): string {
+  const m = pathname.match(/^\/[^/]+/);
   return m ? m[0] : "";
 }
 
 export function ServiceIframe({ port, path = "", title, syncHash, directUrl }: ServiceIframeProps) {
   const ref = useRef<HTMLIFrameElement>(null);
+  // usePathname is Next.js's authoritative routing state. window.location.pathname can
+  // still read the previous route during a client-side navigation transition, which
+  // would cause initialSubpath to leak the old route's tail into the new iframe URL.
+  const pathname = usePathname();
 
   // Recover the iframe's initial subpath from the parent URL so refresh/deep links land
   // on the right page inside the iframe.
   const [initialSubpath] = useState(() => {
-    if (!syncHash || typeof window === "undefined") return "";
-    const prefix = getRoutePrefix();
-    const rest = window.location.pathname.slice(prefix.length) + window.location.search;
+    if (!syncHash) return "";
+    const prefix = getRoutePrefix(pathname);
+    const rest = pathname.slice(prefix.length);
     if (rest === "" || rest === "/") return "";
     return rest;
   });
@@ -71,7 +75,7 @@ export function ServiceIframe({ port, path = "", title, syncHash, directUrl }: S
       const data = ev.data as { type?: string; path?: string } | null;
       if (!data || data.type !== "gasstorm-iframe-route") return;
       const sub = stripCacheBuster(typeof data.path === "string" ? data.path : "/");
-      const routePrefix = getRoutePrefix();
+      const routePrefix = getRoutePrefix(pathname);
       const newPath = routePrefix + (sub === "/" ? "" : sub);
       const current = window.location.pathname + window.location.search + window.location.hash;
       if (newPath !== current) {
@@ -81,7 +85,7 @@ export function ServiceIframe({ port, path = "", title, syncHash, directUrl }: S
 
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [syncHash]);
+  }, [syncHash, pathname]);
 
   return (
     <iframe

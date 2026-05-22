@@ -12,12 +12,18 @@
 services:
   privacy-proxy:
     depends_on:
-      explorer-db:
+      chain-indexer-db:
         condition: service_healthy
       chain-indexer:
         condition: service_started
     environment:
-      - EXPLORER_DATABASE_URL=postgres://explorer:explorer@explorer-db:5432/explorer?sslmode=disable
+      # Point at the chain-indexer Postgres (has blocks/transactions/address_stats/token_transfers).
+      # The privacy-proxy's explorer SQL store reads chain data from here for the few methods
+      # that haven't been ported to the gRPC indexer client yet — currently GetChainStatsFiltered
+      # and GetTransactionHistoryFiltered. Pointing at the block-explorer's metadata-only DB
+      # (explorer-db) makes those queries 500 with "relation \"blocks\" does not exist".
+      # Matches the canonical config in privacy-proxy/docker-compose.privacy.yml.
+      - EXPLORER_DATABASE_URL=postgres://indexer:indexer@chain-indexer-db:5432/chain_indexer?sslmode=disable
       - INDEXER_URL=chain-indexer:50051
 
   explorer-api:
