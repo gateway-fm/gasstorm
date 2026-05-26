@@ -18,7 +18,7 @@ services:
       context: ../dashboard
       dockerfile: Dockerfile
     container_name: gasstorm-dashboard
-    profiles: [ "reth" ]
+    profiles: [ "reth", "reth-ext" ]
     environment:
       - LOADGEN_HOST=${LOADGEN_HOST:-load-generator:3001}
       - CHAIN_HOST_RPC=${CHAIN_HOST_RPC:-block-builder:3000}
@@ -79,7 +79,7 @@ services:
       args:
         - DOCS_BASE_PATH=
     container_name: gasstorm-docs
-    profiles: [ "reth" ]
+    profiles: [ "reth", "reth-ext" ]
     ports:
       - "18002:80"
     healthcheck:
@@ -112,9 +112,9 @@ services:
       dockerfile: Dockerfile
     image: gatewayfm/loadgenerator:local
     container_name: gasstorm-loadgen
-    profiles: [ "reth" ]
+    profiles: [ "reth", "reth-ext" ]
     environment:
-      - EXECUTION_LAYER=reth
+      - EXECUTION_LAYER=${EXECUTION_LAYER:-reth}
       - BUILDER_RPC_URL=${BUILDER_RPC_URL:-http://block-builder:3000}
       - L2_RPC_URL=${L2_RPC_URL:-http://block-builder:3000}
       - L2_WS_URL=${L2_WS_URL:-ws://l2-reth:8546}
@@ -124,10 +124,9 @@ services:
       - BLOCK_TIME_MS=${BLOCK_TIME_MS:-150}
       - PRIVACY_RPC_URL=${PRIVACY_RPC_URL:-http://privacy-proxy:8080}
       - PRIVACY_AUTH_TOKEN_FILE=${PRIVACY_AUTH_TOKEN_FILE:-/shared/loadtest-jwt.txt}
-    tmpfs:
-      - /data:mode=1777
     volumes:
       - privacy-loadtest-config:/shared:ro
+      - loadgen-data:/data
     ports:
       - "${LOADGEN_PORT:-13001}:3001"
       - "16061:6061"
@@ -167,6 +166,7 @@ volumes:
   hyperlane-config:
     name: gasstorm_hyperlane-config
     external: true
+  loadgen-data: {}
 
 networks:
   default:

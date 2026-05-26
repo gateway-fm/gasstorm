@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Flip the gasstorm load-generator between the two reth-ext modes:
+#   bb     -> blockbuilder-driven (default, talks to gasstorm-builder:3000)
+#   native -> direct native txpool (talks to gasstorm-l2-dev:8545, --dev mode)
+#
+# Bring the matching L2 backend up as well. Both backends can coexist on
+# different ports; only the loadgen target changes.
+#
+# Usage:
+#   scripts/loadgen-mode bb
+#   scripts/loadgen-mode native
+set -euo pipefail
+
+MODE=${1:-}
+cd "$(dirname "$0")/.."
+
+case "$MODE" in
+  bb|blockbuilder)
+    echo "[loadgen-mode] switching to blockbuilder mode"
+    # Make sure the blockbuilder + l2-reth (engine-API) are up
+    docker compose --profile reth-ext \
+      -f docker/docker-compose.yml \
+      -f docker/docker-compose.loadgen.yaml \
+      -f docker/docker-compose-reth-ext.yaml \
+      up -d block-builder l2-reth
+    # Recreate loadgen with default env (blockbuilder URL)
+    docker compose --profile reth-ext \
+      -f docker/docker-compose.yml \
+      -f docker/docker-compose.loadgen.yaml \
+      -f docker/docker-compose-reth-ext.yaml \
+      up -d --force-recreate load-generator
+    ;;
+  native)
+    echo "[loadgen-mode] switching to native (reth-ext --dev) mode"
+    # Make sure the dev-mode l2 backend is up
+    docker compose -f docker/docker-compose-reth-ext-dev.yaml up -d l2-reth-dev
+    # Recreate loadgen pointed at l2-reth-dev
+    docker compose --profile reth-ext \
+      -f docker/docker-compose.yml \
+      -f docker/docker-compose.loadgen.yaml \
+      -f docker/docker-compose-reth-ext.yaml \
+      -f docker/docker-compose-loadgen-native.yaml \
+      up -d --force-recreate load-generator
+    ;;
+  *)
+    echo "usage: $0 {bb|native}" >&2
+    exit 2
+    ;;
+esac
+
+# Show what the loadgen now thinks
+sleep 2
+docker inspect gasstorm-loadgen --format='current: EXECUTION_LAYER={{range .Config.Env}}{{println .}}{{end}}' \
+  | grep -E "EXECUTION_LAYER|BUILDER_RPC_URL|L2_RPC_URL"

@@ -1,0 +1,104 @@
+# Overlay applied alongside docker/docker-compose.yml when running the
+# `reth-ext` profile. Swaps the upstream op-reth L2 image for the locally-built
+# `gatewayfm/reth-ext` (vanilla L1 reth + OP-style payload-attr extensions:
+# transactions / noTxPool / gasLimit).
+#
+# Use via the MCP `gasstorm__stack_up` with `profile=reth-ext`, or:
+#   docker compose --profile reth-ext \
+#     -f docker/docker-compose.yml \
+#     -f docker/docker-compose-reth-ext.yaml up -d
+#
+# NOTES
+# - The blockbuilder runs unchanged: with INCLUDE_DEPOSIT_TX=false (the
+#   default) it omits the L1-attributes deposit tx, so the forced tx set is
+#   exactly what reth-ext expects.
+# - Vanilla L1 enforces EIP-1559's max-gas-limit-change-per-block rule
+#   (parent.gas_limit/1024 per block). To avoid the verifier rejecting blocks
+#   the blockbuilder's `GAS_LIMIT` env var must match the genesis gas_limit
+#   (both 3_000_000_000 here), or be stepped up gradually from the genesis.
+
+services:
+  # Override dashboard upstream hosts to existing services so nginx can resolve
+  # them at startup. The explorer panels will be empty (no explorer running in
+  # the reth-ext profile) but the load-test page and metrics work.
+  dashboard:
+    environment:
+      - EXPLORER_HOST_API=l1:8545
+      - EXPLORER_HOST_L1_API=l1:8545
+      - EXPLORER_HOST_UI=l1:8545
+      - EXPLORER_HOST_L1_UI=l1:8545
+      - PRIVACY_HOST_API=l1:8545
+      - PRIVACY_HOST_UI=l1:8545
+      - BRIDGE_L1=l1:8545
+
+  block-builder:
+    # Vanilla L1 reth-ext rejects FCU to an unknown head as SYNCING. We need
+    # the builder to deliver the block via newPayload first, then advance the
+    # head via FCU. This env flag enables that path (see builder.go change).
+    environment:
+      - USE_NEW_PAYLOAD=true
+
+  l2-reth:
+    image: gatewayfm/reth-ext:${RETH_EXT_VERSION:-dev}
+    command:
+      [
+        "node",
+        "--chain",
+        "/config/genesis-ext.json",
+        "--datadir",
+        "/data",
+        "--http",
+        "--http.addr",
+        "0.0.0.0",
+        "--http.port",
+        "8545",
+        "--http.api",
+        "eth,net,web3,debug",
+        "--http.corsdomain",
+        "*",
+        "--ws",
+        "--ws.addr",
+        "0.0.0.0",
+        "--ws.port",
+        "8546",
+        "--ws.api",
+        "eth,net,web3",
+        "--authrpc.addr",
+        "0.0.0.0",
+        "--authrpc.port",
+        "8551",
+        "--authrpc.jwtsecret",
+        "/config/jwt.hex",
+        # External-builder sequencer mode: shrink the local mempool so we
+        # rely entirely on the blockbuilder-supplied forced tx set.
+        "--txpool.pending-max-count",
+        "1",
+        "--txpool.basefee-max-count",
+        "1",
+        "--txpool.queued-max-count",
+        "1",
+        "--txpool.max-account-slots",
+        "1",
+        # MDBX perf tuning (only flags supported by vanilla reth)
+        "--db.growth-step",
+        "4GB",
+        # RPC capacity
+        "--rpc.max-connections",
+        "1000",
+        "--rpc.max-request-size",
+        "100",
+        "--rpc.max-response-size",
+        "200",
+        "--rpc.max-tracing-requests",
+        "50",
+        "--ipcdisable",
+        "--disable-discovery",
+        "--no-persist-peers",
+        "--port",
+        "0",
+        "--log.stdout.format",
+        "terminal",
+        "-vvv",
+      ]
+    volumes:
+      - ../genesis:/config:ro

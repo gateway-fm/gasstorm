@@ -18,7 +18,7 @@ services:
   l2-reth:
     image: ghcr.io/paradigmxyz/op-reth:v1.9.3
     container_name: gasstorm-l2
-    profiles: [ "reth" ]
+    profiles: [ "reth", "reth-ext" ]
     depends_on:
       l1:
         condition: service_healthy
@@ -149,7 +149,7 @@ services:
       args:
         - DOCS_BASE_PATH=
     container_name: gasstorm-docs
-    profiles: [ "reth" ]
+    profiles: [ "reth", "reth-ext" ]
     ports:
       - "18002:80"
     healthcheck:
@@ -183,7 +183,7 @@ services:
       context: ../dashboard
       dockerfile: Dockerfile
     container_name: gasstorm-dashboard
-    profiles: [ "reth" ]
+    profiles: [ "reth", "reth-ext" ]
     depends_on:
       - l1
       - l2-reth
@@ -252,7 +252,7 @@ services:
       dockerfile: Dockerfile
     image: gatewayfm/blockbuilder:local
     container_name: gasstorm-builder
-    profiles: [ "reth" ]
+    profiles: [ "reth", "reth-ext" ]
     depends_on:
       - l2-reth
     environment:

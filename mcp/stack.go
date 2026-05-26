@@ -26,6 +26,40 @@ func registerStackTools(s *server.MCPServer, gasstormDir string) {
 	registerStackLogs(s, gasstormDir)
 	registerStackConfig(s, gasstormDir)
 	registerStackConfigSet(s, gasstormDir)
+	registerLoadgenMode(s, gasstormDir)
+}
+
+// registerLoadgenMode adds the loadgen_mode tool that flips the running
+// load-generator between blockbuilder-driven and native-txpool reth-ext modes.
+// Both backends (gasstorm-builder + gasstorm-l2-dev) stay running; only the
+// loadgen's target is switched.
+func registerLoadgenMode(s *server.MCPServer, dir string) {
+	tool := mcp.NewTool("loadgen_mode",
+		mcp.WithDescription("Flip the load-generator between blockbuilder-driven ('bb') and native reth-ext --dev ('native') modes. MUTATING. Restarts gasstorm-loadgen with the matching env vars; both L2 backends stay online."),
+		mcp.WithString("mode",
+			mcp.Description("Target mode: 'bb' (blockbuilder-driven, default) or 'native' (direct reth-ext --dev txpool)"),
+			mcp.Required(),
+			mcp.Enum("bb", "native"),
+		),
+	)
+	s.AddTool(tool, func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		mode := req.GetString("mode", "")
+		if mode != "bb" && mode != "native" {
+			return mcp.NewToolResultError("mode must be 'bb' or 'native'"), nil
+		}
+		out, err := runScript(dir, "scripts/loadgen-mode", mode)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("loadgen-mode %s failed: %v\n%s", mode, err, out)), nil
+		}
+		label := "blockbuilder-driven"
+		if mode == "native" {
+			label = "native txpool (reth-ext --dev)"
+		}
+		return mcp.NewToolResultText(joinLines(
+			sectionf(fmt.Sprintf("Loadgen mode → %s", label)),
+			out,
+		)), nil
+	})
 }
 
 // metalPidDir returns the path to the metal mode PID directory.
@@ -119,7 +153,7 @@ func registerStackUp(s *server.MCPServer, dir string) {
 	tool := mcp.NewTool("stack_up",
 		mcp.WithDescription("Start the GasStorm stack with a profile. MUTATING."),
 		mcp.WithString("profile",
-			mcp.Description("Docker Compose profile: reth (default), cdk-erigon, gravity-reth"),
+			mcp.Description("Docker Compose profile: reth (default), reth-ext, cdk-erigon, gravity-reth"),
 		),
 		mcp.WithString("with",
 			mcp.Description("Optional features (comma-separated): blob, privacy, explorer, bridge, bridge-ui. Defaults: reth=blob,privacy,explorer; others=privacy,explorer."),
@@ -172,9 +206,14 @@ func registerStackUp(s *server.MCPServer, dir string) {
 		}
 
 		if withRaw == "" {
-			if profile == "reth" {
+			switch profile {
+			case "reth":
 				withRaw = "blob,privacy,explorer"
-			} else {
+			case "reth-ext":
+				// Core sequencer-only experiment: skip the bulky optional
+				// services until we've proven the pipeline works.
+				withRaw = ""
+			default:
 				withRaw = "privacy,explorer"
 			}
 		}
@@ -252,6 +291,10 @@ func registerStackUp(s *server.MCPServer, dir string) {
 			composeFiles = append(composeFiles, "docker/docker-compose-op-reth.yaml", "docker/docker-compose-gasless.yaml")
 		}
 
+		if profile == "reth-ext" {
+			composeFiles = append(composeFiles, "docker/docker-compose-reth-ext.yaml")
+		}
+
 		// Build compose args: profiles, then file overrides, then command.
 		args := []string{}
 		for _, p := range profiles {
@@ -318,8 +361,8 @@ func parseWithFeatures(withRaw string) (map[string]bool, error) {
 }
 
 func resolveOptionalProfiles(profile string, features map[string]bool) ([]string, error) {
-	if profile != "reth" && profile != "cdk-erigon" && profile != "gravity-reth" {
-		return nil, fmt.Errorf("unsupported profile '%s'. Valid: reth, cdk-erigon, gravity-reth", profile)
+	if profile != "reth" && profile != "reth-ext" && profile != "cdk-erigon" && profile != "gravity-reth" {
+		return nil, fmt.Errorf("unsupported profile '%s'. Valid: reth, reth-ext, cdk-erigon, gravity-reth", profile)
 	}
 
 	profiles := []string{}
@@ -665,11 +708,12 @@ func mapToEnv(m map[string]string) []string {
 }
 
 // runScript runs a shell script in the gasstorm directory with a timeout.
-func runScript(dir, script string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+func runScript(dir, script string, extraArgs ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "bash", script)
+	args := append([]string{script}, extraArgs...)
+	cmd := exec.CommandContext(ctx, "bash", args...)
 	cmd.Dir = dir
 
 	var stdout, stderr bytes.Buffer

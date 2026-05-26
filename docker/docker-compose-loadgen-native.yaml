@@ -1,0 +1,17 @@
+# Loadgen overlay that points the loadgen at the reth-ext --dev node directly,
+# bypassing the blockbuilder. Use alongside docker-compose-reth-ext-dev.yaml.
+#
+# Apply with the helper:
+#   scripts/loadgen-mode native   # flips loadgen to talk to l2-reth-dev
+#   scripts/loadgen-mode bb       # back to blockbuilder
+
+services:
+  load-generator:
+    environment:
+      - EXECUTION_LAYER=reth-ext-native
+      - BUILDER_RPC_URL=http://l2-reth-dev:8545
+      - L2_RPC_URL=http://l2-reth-dev:8545
+      # WS / preconf endpoints are not used in native mode but we still
+      # set them so the loadgen container can start cleanly.
+      - L2_WS_URL=ws://l2-reth-dev:8546
+      - PRECONF_WS_URL=ws://l2-reth-dev:8546

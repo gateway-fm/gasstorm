@@ -1,0 +1,94 @@
+# Standalone reth-ext in --dev mode with native txpool, parallel to the
+# blockbuilder-driven stack. The loadgen can be pointed at this node directly
+# to bypass the blockbuilder entirely and measure native-txpool perf.
+#
+# Use with:
+#   docker compose -f docker/docker-compose-reth-ext-dev.yaml up -d
+#
+# Ports (host):
+#   28545: HTTP RPC
+#   28546: WS RPC
+#   28551: Engine API (not used in --dev, but exposed for parity)
+
+networks:
+  default:
+    name: gasstorm
+    external: true
+
+services:
+  l2-reth-dev:
+    image: gatewayfm/reth-ext:dev
+    container_name: gasstorm-l2-dev
+    command:
+      [
+        "node",
+        "--chain",
+        "/config/genesis-ext.json",
+        "--datadir",
+        "/data",
+        # Auto-mine on tx arrival (no external CL required)
+        "--dev",
+        "--dev.block-time",
+        "${DEV_BLOCK_TIME:-200ms}",
+        # Native txpool tuning for burst loads
+        "--txpool.pending-max-count",
+        "100000",
+        "--txpool.basefee-max-count",
+        "100000",
+        "--txpool.queued-max-count",
+        "100000",
+        "--txpool.max-account-slots",
+        "10000",
+        # RPC
+        "--http",
+        "--http.addr",
+        "0.0.0.0",
+        "--http.port",
+        "8545",
+        "--http.api",
+        "eth,net,web3,debug,txpool,miner",
+        "--http.corsdomain",
+        "*",
+        # WebSocket
+        "--ws",
+        "--ws.addr",
+        "0.0.0.0",
+        "--ws.port",
+        "8546",
+        "--ws.api",
+        "eth,net,web3,txpool",
+        # RPC capacity
+        "--rpc.max-connections",
+        "1000",
+        "--rpc.max-request-size",
+        "100",
+        "--rpc.max-response-size",
+        "200",
+        "--ipcdisable",
+        "--disable-discovery",
+        "--no-persist-peers",
+        "--port",
+        "0",
+        "--log.stdout.format",
+        "terminal",
+        "-vvv",
+      ]
+    volumes:
+      - ../genesis:/config:ro
+      - l2-data-dev:/data
+    ports:
+      - "28545:8545"
+      - "28546:8546"
+      - "28551:8551"
+    deploy:
+      resources:
+        limits:
+          cpus: "8"
+          memory: 16G
+        reservations:
+          cpus: "4"
+          memory: 8G
+    restart: unless-stopped
+
+volumes:
+  l2-data-dev:

@@ -1,0 +1,109 @@
+# Regenesis profile: serve a cdk-erigon-imported chain via reth-ext.
+#
+# Boots reth-ext on a pre-populated MDBX datadir produced by
+# `reth-ext genesis-import-cdk` (see scripts/regenesis-bootstrap.sh
+# for the import step). State root and block hash match the source
+# cdk-erigon chain's head block byte-for-byte.
+#
+# Compose flow (composed onto the base reth-ext profile):
+#
+#   docker compose \
+#     -f docker/docker-compose.yml \
+#     -f docker/docker-compose-reth-ext.yaml \
+#     -f docker/docker-compose-regenesis.yaml \
+#     --profile reth-ext --profile regenesis \
+#     up -d
+#
+# Required env (set in .env or shell):
+#   REGENESIS_DATADIR_HOST    path on the host to a pre-imported reth-ext datadir
+#                             (produced by scripts/regenesis-bootstrap.sh)
+#   REGENESIS_CHAINSPEC_HOST  path on the host to the sanitized chainspec.json
+#                             (produced by scripts/regenesis-bootstrap.sh)
+#   REGENESIS_HEAD_BLOCK_NUM  block number of the regenesis head (decimal)
+#   REGENESIS_HEAD_BLOCK_HASH 0x-prefixed hash of the regenesis head
+#
+# Optional:
+#   RETH_EXT_VERSION  docker tag for `gatewayfm/reth-ext` (default: `dev`)
+#                     IMPORTANT: must be a build of gateway-fm/reth-ext that
+#                     includes the `genesis-import-cdk` subcommand (commit
+#                     "gateway.fm reth-ext fork: OP-style ... + genesis-import-cdk"
+#                     or later). Older `:dev` tags lack the subcommand.
+
+services:
+  # Override l2-reth from docker-compose-reth-ext.yaml. Same image (so the
+  # genesis-import-cdk subcommand is available) but mount a pre-populated
+  # datadir + the regenesis chainspec.
+  l2-reth:
+    image: gatewayfm/reth-ext:${RETH_EXT_VERSION:-dev}
+    profiles: [ "regenesis" ]
+    # No `init` container — the host runs `scripts/regenesis-bootstrap.sh`
+    # which performs the import OUTSIDE Docker (it needs ~20 GB peak working
+    # memory, easier to size against the host than a container).
+    volumes:
+      - ${REGENESIS_DATADIR_HOST:?REGENESIS_DATADIR_HOST is required — run scripts/regenesis-bootstrap.sh first}:/data
+      - ${REGENESIS_CHAINSPEC_HOST:?REGENESIS_CHAINSPEC_HOST is required}:/config/chainspec.json:ro
+    command:
+      [
+        "node",
+        "--chain", "/config/chainspec.json",
+        "--datadir", "/data",
+        "--http", "--http.addr", "0.0.0.0", "--http.port", "8545",
+        "--http.api", "eth,net,web3,debug",
+        "--http.corsdomain", "*",
+        "--ws", "--ws.addr", "0.0.0.0", "--ws.port", "8546",
+        "--ws.api", "eth,net,web3",
+        "--authrpc.addr", "0.0.0.0",
+        "--authrpc.port", "8551",
+        "--authrpc.jwtsecret", "/data/jwt.hex",
+        # Regenesis chain is L1-vanilla; reduce mempool to the minimum since
+        # there's no sequencer driving block production here.
+        "--txpool.pending-max-count", "1",
+        "--txpool.basefee-max-count", "1",
+        "--txpool.queued-max-count", "1",
+        "--txpool.max-account-slots", "1",
+      ]
+
+  # One-shot FCU sender. After l2-reth boots, the canonical chain pointer
+  # may not be set (reth treats chains with non-zero TTD as merged and
+  # expects a CL to send engine_forkchoiceUpdatedV3). Without an FCU, block
+  # API methods return null. This one-shot fixes it.
+  regenesis-fcu:
+    image: python:3.12-alpine
+    profiles: [ "regenesis" ]
+    container_name: gasstorm-regenesis-fcu
+    depends_on:
+      - l2-reth
+    environment:
+      - JWT_PATH=/data/jwt.hex
+      - AUTH_RPC=http://l2-reth:8551
+      - HTTP_RPC=http://l2-reth:8545
+      - HEAD_HASH=${REGENESIS_HEAD_BLOCK_HASH:?REGENESIS_HEAD_BLOCK_HASH is required}
+    volumes:
+      - ${REGENESIS_DATADIR_HOST}:/data:ro
+      - ../scripts/regenesis-fcu.py:/work/fcu.py:ro
+    entrypoint: ["sh", "-c"]
+    command: |
+      set -e
+      echo "[fcu] waiting for reth-ext RPC ($${HTTP_RPC}) to come up..."
+      until python3 -c "import urllib.request,json;urllib.request.urlopen(urllib.request.Request('$${HTTP_RPC}',data=b'{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}',headers={'Content-Type':'application/json'}),timeout=2)" 2>/dev/null; do
+        sleep 1
+      done
+      echo "[fcu] reth-ext up; sending engine_forkchoiceUpdatedV3"
+      python3 /work/fcu.py
+      echo "[fcu] done"
+    restart: "no"
+
+  # Chain-indexer override: start at the regenesis block, not 0. Without
+  # this the indexer would walk 17M+ dummy stub headers from block 0 to N.
+  chain-indexer:
+    profiles: [ "explorer" ]
+    environment:
+      - START_BLOCK=${REGENESIS_HEAD_BLOCK_NUM:?REGENESIS_HEAD_BLOCK_NUM is required (decimal)}
+      # Override to point at l2-reth (which IS the regenesis chain) rather
+      # than the block-builder (no builder in this profile).
+      - RPC_URL=${L2_RPC_URL:-http://l2-reth:8545}
+
+  explorer-api:
+    profiles: [ "explorer" ]
+    environment:
+      - RPC_URL=${L2_BUILDER_RPC_URL:-http://l2-reth:8545}
