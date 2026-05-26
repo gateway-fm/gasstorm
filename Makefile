@@ -1,4 +1,4 @@
-.PHONY: up down _up run run-build run-reth run-cdk-erigon run-metal stop-metal restart-metal run-attached stop restart logs status resource-report clean clean-metal build test test-load-generator test-dashboard test-tx bench-load-generator dev dev-infra dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-with-blob run-with-explorer run-with-privacy run-with-explorer-privacy pull-explorer pull-privacy run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks pull-blockbuilder pull-loadgenerator mcp-server mcp-build site-dev site-build tunnel-url _print-tunnel-url loadtest-privacy loadtest-direct run-high-throughput run-fast-confirm run-with-preconf run-conservative run-flashblocks run-gravity-reth run-with-bridge run-agglayer stop-agglayer test-contract test-e2e test-integration test-integration-quick test-smoke balance
+.PHONY: up down _up run run-build run-reth run-cdk-erigon run-metal stop-metal restart-metal run-attached stop restart logs status resource-report clean clean-metal build test test-load-generator test-dashboard test-tx bench-load-generator dev dev-infra dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-with-blob run-with-explorer run-with-privacy run-with-explorer-privacy pull-explorer pull-privacy run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks pull-blockbuilder pull-loadgenerator mcp-server mcp-build site-dev site-build tunnel-url _print-tunnel-url loadtest-privacy loadtest-direct run-high-throughput run-fast-confirm run-with-preconf run-conservative run-flashblocks run-gravity-reth run-with-bridge run-agglayer stop-agglayer test-contract test-e2e test-integration test-integration-quick test-smoke test-address-stats-rebuild balance
 
 # =============================================================================
 # Configuration: Source .env file if it exists
@@ -507,6 +507,10 @@ test-integration-quick:
 test-smoke:
 	@echo "Running smoke test..."
 	./scripts/integration-test.sh smoke --skip-startup
+
+test-address-stats-rebuild:
+	@echo "Running address_stats rebuild-loop e2e (stack must be running)..."
+	./scripts/e2e-address-stats-rebuild.sh
 
 # Send a test transaction (integration test)
 test-tx:
