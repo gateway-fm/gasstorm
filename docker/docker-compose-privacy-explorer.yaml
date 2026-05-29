@@ -50,7 +50,7 @@ services:
       # the gasstorm dashboard (which iframes this explorer) instead of
       # the standalone explorer origin — gives them the dashboard nav
       # back for switching between apps.
-      - POST_LOGIN_REDIRECT_URL=http://localhost:18000/explorer-l2
+      - POST_LOGIN_REDIRECT_URL=http://localhost:18000/explorer
     depends_on:
       privacy-proxy:
         condition: service_started

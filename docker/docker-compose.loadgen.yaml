@@ -113,6 +113,11 @@ services:
     image: gatewayfm/loadgenerator:local
     container_name: gasstorm-loadgen
     profiles: [ "reth", "reth-ext" ]
+    # Run as root so the process can write loadgen.db into the loadgen-data
+    # named volume: the image runs as non-root appuser (uid 1000) and a fresh
+    # named volume mounts root-owned 755, so appuser can't create the DB file.
+    # (The cdk variant below uses a world-writable tmpfs instead.)
+    user: "0:0"
     environment:
       - EXECUTION_LAYER=${EXECUTION_LAYER:-reth}
       - BUILDER_RPC_URL=${BUILDER_RPC_URL:-http://block-builder:3000}
