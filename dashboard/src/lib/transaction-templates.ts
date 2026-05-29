@@ -9,6 +9,8 @@ const SELECTORS = {
   // ERC20
   transfer: keccak256(toUtf8Bytes("transfer(address,uint256)")).slice(0, 10),
   approve: keccak256(toUtf8Bytes("approve(address,uint256)")).slice(0, 10),
+  // ERC721
+  transferFrom: keccak256(toUtf8Bytes("transferFrom(address,address,uint256)")).slice(0, 10),
   // SimpleSwap
   swap: keccak256(toUtf8Bytes("swap(uint256)")).slice(0, 10),
   // StorageWriter
@@ -22,6 +24,7 @@ export const GAS_LIMITS: Record<TransactionType, number> = {
   "eth-transfer": 21000,
   "erc20-transfer": 80000,
   "erc20-approve": 60000,
+  "erc721-transfer": 110000,
   "uniswap-swap": 200000,
   "storage-write": 50000,
   "heavy-compute": 500000,
@@ -44,6 +47,12 @@ function buildErc20Transfer(tokenAddress: string, recipient: string, amount: big
 function buildErc20Approve(tokenAddress: string, spender: string, amount: bigint): string {
   const params = abiCoder.encode(["address", "uint256"], [spender, amount]);
   return SELECTORS.approve + params.slice(2);
+}
+
+// Build ERC721 transferFrom calldata
+function buildErc721Transfer(from: string, to: string, tokenId: bigint): string {
+  const params = abiCoder.encode(["address", "address", "uint256"], [from, to, tokenId]);
+  return SELECTORS.transferFrom + params.slice(2);
 }
 
 // Build swap calldata (simplified - just takes amount to swap)
@@ -96,6 +105,16 @@ export function buildTransactionTemplate(
         gasLimit: GAS_LIMITS["erc20-approve"],
       };
 
+    case "erc721-transfer":
+      if (!contracts.nft) throw new Error("NFT contract not deployed");
+      // tokenId cycles via nonce; sender must own token (loadgen pre-mints in setup).
+      return {
+        to: contracts.nft,
+        data: buildErc721Transfer(RECIPIENT_ADDRESS, RECIPIENT_ADDRESS, BigInt(nonce)),
+        value: 0n,
+        gasLimit: GAS_LIMITS["erc721-transfer"],
+      };
+
     case "uniswap-swap":
       if (!contracts.simpleSwap) throw new Error("SimpleSwap contract not deployed");
       return {
@@ -138,6 +157,8 @@ export function getRequiredContracts(type: TransactionType): (keyof DeployedCont
     case "erc20-transfer":
     case "erc20-approve":
       return ["erc20"];
+    case "erc721-transfer":
+      return ["nft"];
     case "uniswap-swap":
       return ["simpleSwap", "erc20"];
     case "storage-write":

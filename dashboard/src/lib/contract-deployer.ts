@@ -174,6 +174,8 @@ export function needsDeployment(
     case "erc20-transfer":
     case "erc20-approve":
       return !contracts.erc20;
+    case "erc721-transfer":
+      return !contracts.nft;
     case "uniswap-swap":
       return !contracts.simpleSwap || !contracts.erc20;
     case "storage-write":

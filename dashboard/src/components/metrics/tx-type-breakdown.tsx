@@ -16,6 +16,7 @@ const TX_TYPE_LABELS: Record<TransactionType, string> = {
   "eth-transfer": "ETH Transfer",
   "erc20-transfer": "ERC20 Transfer",
   "erc20-approve": "ERC20 Approve",
+  "erc721-transfer": "ERC721 Transfer",
   "uniswap-swap": "Uniswap Swap",
   "storage-write": "Storage Write",
   "heavy-compute": "Heavy Compute",
@@ -27,8 +28,9 @@ const TX_TYPE_GAS_ORDER: Record<TransactionType, number> = {
   "erc20-approve": 2,    // ~46,000 gas
   "storage-write": 3,    // ~50,000 gas
   "erc20-transfer": 4,   // ~65,000 gas
-  "heavy-compute": 5,    // ~100,000 gas
-  "uniswap-swap": 6,     // ~150,000 gas
+  "erc721-transfer": 5,  // ~90,000 gas
+  "heavy-compute": 6,    // ~100,000 gas
+  "uniswap-swap": 7,     // ~150,000 gas
 };
 
 export function TxTypeBreakdown() {

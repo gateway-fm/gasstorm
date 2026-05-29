@@ -254,6 +254,35 @@ export function LoadTestPanel() {
                     Requires contract deployment (auto-deployed on first test)
                   </p>
                 )}
+                {config?.transactionType === "erc721-transfer" && (
+                  <div className="mt-2 space-y-1.5">
+                    <Label className="text-xs font-mono text-muted-foreground">
+                      Pre-mint NFTs
+                    </Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100000}
+                      step={100}
+                      className="h-9"
+                      key={`erc721premint-${config?.erc721PreMint}`}
+                      defaultValue={config?.erc721PreMint ?? 1000}
+                      onBlur={(e) =>
+                        setConfig({
+                          erc721PreMint: Number.isFinite(e.target.valueAsNumber)
+                            ? Math.max(0, Math.min(100000, e.target.valueAsNumber))
+                            : 1000,
+                        })
+                      }
+                      disabled={isDisabled}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Tokens minted to the deployer during setup before the test starts. Each load-test
+                      TX transfers one of these tokens. 0 = skip pre-mint (transfers will revert).
+                      Max 100,000.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

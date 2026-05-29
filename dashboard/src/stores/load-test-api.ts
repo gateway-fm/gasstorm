@@ -146,6 +146,8 @@ export interface StartTestRequest {
   privacyMode?: boolean;
   // Nonce gap healing
   fixNonceGaps?: boolean;
+  // ERC-721 pre-mint count (only valid when transactionType === "erc721-transfer")
+  erc721PreMint?: number;
 }
 
 // Types for historical data hydration

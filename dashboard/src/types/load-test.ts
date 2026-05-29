@@ -38,6 +38,7 @@ export type TransactionType =
   | "eth-transfer"
   | "erc20-transfer"
   | "erc20-approve"
+  | "erc721-transfer"
   | "uniswap-swap"
   | "storage-write"
   | "heavy-compute";
@@ -73,6 +74,13 @@ export const TRANSACTION_TYPES: TransactionTypeInfo[] = [
     description: "Token approval (ERC20)",
   },
   {
+    id: "erc721-transfer",
+    label: "ERC721 Transfer",
+    gasEstimate: 90000,
+    requiresContract: true,
+    description: "NFT transfer (ERC721). Pre-mint tokens during setup, then transfer them under load.",
+  },
+  {
     id: "uniswap-swap",
     label: "Uniswap Swap",
     gasEstimate: 150000,
@@ -99,6 +107,7 @@ export interface DeployedContracts {
   erc20?: string;
   simpleSwap?: string;
   gasConsumer?: string;
+  nft?: string;
   deployedAt?: number;
 }
 
@@ -141,6 +150,11 @@ export interface LoadTestConfig {
 
   // Nonce gap healing (sends no-op self-transfers to fill gaps during test)
   fixNonceGaps?: boolean;
+
+  // ERC-721 pre-mint count (only used when transactionType === "erc721-transfer").
+  // Mints this many NFTs from the deployer during setup before the transfer load
+  // test begins. Token IDs are sequential starting from 0. 0 = no pre-mint.
+  erc721PreMint?: number;
 }
 
 export type TransactionStatus = "pending" | "confirmed" | "failed";
@@ -331,6 +345,7 @@ export const DEFAULT_LOAD_TEST_CONFIG: LoadTestConfig = {
   gasLimit: 21000,
   privacyMode: false,
   fixNonceGaps: false,
+  erc721PreMint: 1000,
 };
 
 // Time-series point from persistent storage

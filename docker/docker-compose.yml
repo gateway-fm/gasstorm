@@ -1255,6 +1255,14 @@ volumes:
   chain-indexer-l1-db-data:
   privacy-db-data:
   privacy-loadtest-config:
+    # Explicit name pins this volume to `gasstorm_privacy-loadtest-config`
+    # regardless of which directory `docker compose` was invoked from. Without
+    # this, Compose derives the project name from the working dir — running
+    # from `docker/` produced `docker_privacy-loadtest-config` while the
+    # sibling docker-compose.loadgen.yaml hard-codes `gasstorm_*` as
+    # `external: true`. The setup container then wrote the loadtest JWT into
+    # the wrong volume and loadgen read an empty file.
+    name: gasstorm_privacy-loadtest-config
 
 
 networks:

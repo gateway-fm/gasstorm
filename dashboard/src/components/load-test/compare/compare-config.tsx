@@ -31,6 +31,7 @@ function getTxTypeLabel(type: string): string {
     "eth-transfer": "ETH Transfer",
     "erc20-transfer": "ERC20 Transfer",
     "erc20-approve": "ERC20 Approve",
+    "erc721-transfer": "ERC721 Transfer",
     "uniswap-swap": "Uniswap Swap",
     "storage-write": "Storage Write",
     "heavy-compute": "Heavy Compute",

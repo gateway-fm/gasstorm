@@ -49,6 +49,10 @@ function buildStartRequest(cfg: LoadTestConfig): StartTestRequest {
     request.fixNonceGaps = true;
   }
 
+  if (cfg.transactionType === "erc721-transfer" && cfg.erc721PreMint && cfg.erc721PreMint > 0) {
+    request.erc721PreMint = cfg.erc721PreMint;
+  }
+
   switch (pattern) {
     case "constant":
       request.constantRate = cfg.constantRate ?? DEFAULT_LOAD_TEST_CONFIG.constantRate;
