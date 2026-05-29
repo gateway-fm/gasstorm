@@ -40,6 +40,14 @@ services:
 
   l2-reth:
     image: gatewayfm/reth-ext:${RETH_EXT_VERSION:-dev}
+    # Built from the reth-free overlay repo gateway-fm/reth-ext-light (the old
+    # gateway-fm/reth-ext fork is retired). `docker compose build` builds the
+    # image from that repo's Dockerfile.ext and tags it as the image above.
+    # Override the checkout location with RETH_EXT_LIGHT_DIR if it isn't the
+    # sibling default.
+    build:
+      context: ${RETH_EXT_LIGHT_DIR:-../../reth-ext-light}
+      dockerfile: Dockerfile.ext
     command:
       [
         "node",

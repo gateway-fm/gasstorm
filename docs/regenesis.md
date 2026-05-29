@@ -9,7 +9,7 @@ The implementation is in companion repositories — this page is the gasstorm-si
 This profile depends on two private gateway-fm repos:
 
 - **`gateway-fm/regenesis-toolkit`** — the standalone tools (state-export, sanitize-chainspec.py, docs).
-- **`gateway-fm/reth-ext`** — the reth fork that provides the `genesis-import-cdk` subcommand. The published `gatewayfm/reth-ext` docker image must be built from a commit that includes that subcommand (see the repo's commit "gateway.fm reth-ext fork: OP-style ... + genesis-import-cdk"). Old `:dev` tags won't work.
+- **`gateway-fm/reth-ext-light`** — the reth-free overlay repo that builds the `reth-ext` binary (with the `genesis-import-cdk` subcommand) against an upstream reth pinned by commit SHA. Replaces the retired `gateway-fm/reth-ext` fork. The `gatewayfm/reth-ext` docker image is built from this repo's `Dockerfile.ext`.
 
 Clone both alongside gasstorm:
 
@@ -17,7 +17,7 @@ Clone both alongside gasstorm:
 mkdir -p ~/github/gateway/
 cd ~/github/gateway
 git clone git@github.com:gateway-fm/regenesis-toolkit.git
-git clone --recurse-submodules git@github.com:gateway-fm/reth-ext.git
+git clone git@github.com:gateway-fm/reth-ext-light.git
 ```
 
 Build the binaries:
@@ -30,11 +30,20 @@ GOROOT=/usr/local/go PATH=/usr/local/go/bin:$PATH \
   /usr/local/go/bin/go build -o ./build/bin/state-export ./cmd/state-export/
 
 # reth-ext (genesis-import-cdk lives here)
-cd ~/github/gateway/reth-ext
+cd ~/github/gateway/reth-ext-light
 cargo build --release --bin reth-ext
 ```
 
-Or use a pre-built `gatewayfm/reth-ext:<tag>` image where `<tag>` corresponds to the regenesis-enabled commit.
+Or build the docker image from the same repo:
+
+```sh
+cd ~/github/gateway/reth-ext-light
+docker build -f Dockerfile.ext -t gatewayfm/reth-ext:dev .
+```
+
+The compose files in `docker/` also carry a `build:` section pointing at
+`../../reth-ext-light` (override with `RETH_EXT_LIGHT_DIR`), so
+`docker compose ... build` produces the image directly from the repo.
 
 ## End-to-end run
 
@@ -107,7 +116,7 @@ curl -s http://localhost:18200/api/blocks?limit=5 | jq
    ```
 3. **No block production beyond N.** The regenesis chain is a static snapshot of the source at block N. Producing block N+1 onwards would require either (a) a separate sequencer feeding reth via Engine API, or (b) running reth in `--dev` mode (auto-mine; chain ID changes; head hash diverges from source on the next block). The current overlay does neither.
 4. **No CDK runtime semantics.** No GERManager precompile, no datastream consumption, no zk-proof submission, no sequencer auth. The regenesis chain runs as vanilla L1. State queries match the source byte-for-byte; transaction execution rules diverge from the CDK chain.
-5. **Old `gatewayfm/reth-ext:dev` images won't work.** The image MUST be built from a `gateway-fm/reth-ext` commit that has the `genesis-import-cdk` subcommand. Use `RETH_EXT_VERSION` env var to pin a specific tag.
+5. **Old `gatewayfm/reth-ext:dev` images won't work.** The image MUST be built from `gateway-fm/reth-ext-light` (which carries the `genesis-import-cdk` subcommand). Build it via `docker compose ... build` or `docker build -f Dockerfile.ext` in that repo. Use `RETH_EXT_VERSION` env var to pin a specific tag.
 
 ## Architecture diagram
 

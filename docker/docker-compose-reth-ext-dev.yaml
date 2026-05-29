@@ -17,7 +17,12 @@ networks:
 
 services:
   l2-reth-dev:
-    image: gatewayfm/reth-ext:dev
+    image: gatewayfm/reth-ext:${RETH_EXT_VERSION:-dev}
+    # Built from gateway-fm/reth-ext-light (old reth-ext fork retired). See
+    # docker-compose-reth-ext.yaml. Override path via RETH_EXT_LIGHT_DIR.
+    build:
+      context: ${RETH_EXT_LIGHT_DIR:-../../reth-ext-light}
+      dockerfile: Dockerfile.ext
     container_name: gasstorm-l2-dev
     command:
       [

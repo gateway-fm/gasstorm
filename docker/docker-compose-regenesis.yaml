@@ -24,10 +24,11 @@
 #
 # Optional:
 #   RETH_EXT_VERSION  docker tag for `gatewayfm/reth-ext` (default: `dev`)
-#                     IMPORTANT: must be a build of gateway-fm/reth-ext that
-#                     includes the `genesis-import-cdk` subcommand (commit
-#                     "gateway.fm reth-ext fork: OP-style ... + genesis-import-cdk"
-#                     or later). Older `:dev` tags lack the subcommand.
+#                     IMPORTANT: must be a build of gateway-fm/reth-ext-light
+#                     (the reth-free overlay repo; the old gateway-fm/reth-ext
+#                     fork is retired). Its `reth-ext` binary includes the
+#                     `genesis-import-cdk` subcommand. `docker compose build`
+#                     builds it from that repo (see docker-compose-reth-ext.yaml).
 
 services:
   # Override l2-reth from docker-compose-reth-ext.yaml. Same image (so the

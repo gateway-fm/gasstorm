@@ -28,7 +28,7 @@ set -euo pipefail
 SRC_DATADIR=""
 WORKDIR=""
 STATE_EXPORT_BIN="${STATE_EXPORT_BIN:-${HOME}/github/gateway/cdk-erigon/build/bin/state-export}"
-RETH_EXT_BIN="${RETH_EXT_BIN:-${HOME}/github/gateway/reth-experiment/reth/target/release/reth-ext}"
+RETH_EXT_BIN="${RETH_EXT_BIN:-${HOME}/github/gateway/reth-ext-light/target/release/reth-ext}"
 SANITIZER="${SANITIZER:-${HOME}/github/gateway/regenesis-toolkit/tools/sanitize-chainspec.py}"
 ENV_OUT=".env.regenesis"
 SKIP_EXPORT=0
@@ -53,7 +53,7 @@ Options:
 
 Required env (override via env if installed elsewhere):
   STATE_EXPORT_BIN         default: ~/github/gateway/cdk-erigon/build/bin/state-export
-  RETH_EXT_BIN             default: ~/github/gateway/reth-experiment/reth/target/release/reth-ext
+  RETH_EXT_BIN             default: ~/github/gateway/reth-ext-light/target/release/reth-ext
   SANITIZER                default: ~/github/gateway/regenesis-toolkit/tools/sanitize-chainspec.py
 EOF
 }
