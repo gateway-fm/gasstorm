@@ -127,6 +127,10 @@ services:
       - LISTEN_ADDR=:3001
       - DATABASE_PATH=/data/loadgen.db
       - BLOCK_TIME_MS=${BLOCK_TIME_MS:-150}
+      # Local devnet runs at ~0 base fee; match the chain's tip (~0.001 gwei) so the
+      # auto fee cap (2x gas price) stays >= tip. The default 1 gwei tip would exceed
+      # the auto fee cap on a quiet chain and get every tx rejected. Overridable.
+      - GAS_TIP_CAP=${GAS_TIP_CAP:-1000000}
       - PRIVACY_RPC_URL=${PRIVACY_RPC_URL:-http://privacy-proxy:8080}
       - PRIVACY_AUTH_TOKEN_FILE=${PRIVACY_AUTH_TOKEN_FILE:-/shared/loadtest-jwt.txt}
       - PRIVACY_ORG_ID_FILE=${PRIVACY_ORG_ID_FILE:-/shared/loadtest-org-id.txt}
