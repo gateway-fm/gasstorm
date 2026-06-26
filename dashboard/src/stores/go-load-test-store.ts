@@ -6,6 +6,7 @@
 import { create } from "zustand";
 import type { LoadTestConfig } from "@/types/load-test";
 import { DEFAULT_LOAD_TEST_CONFIG, DEFAULT_REALISTIC_CONFIG } from "@/types/load-test";
+import { checkPrivacyToken } from "@/lib/jwt";
 import { useMetricsStore } from "./metrics-store";
 import { useChainStore } from "./chain-store";
 import {
@@ -175,6 +176,36 @@ export const useGoLoadTestStore = create<GoLoadTestStore>()((set, get) => {
       if (isActive || state.isStarting) {
         console.log("[LoadTest] Already running or starting");
         return;
+      }
+
+      // Privacy paste flow (PROD): if a JWT was pasted, validate its expiry vs the
+      // test duration and deliver it to the privacy-token-receiver (which writes
+      // the shared token file the load generator reads) before starting. An empty
+      // token falls back to the existing/auto-refreshed token file.
+      const cfg = state.config;
+      if (cfg.privacyMode && (cfg.privacyAuthToken ?? "").trim()) {
+        const durationSec = cfg.duration ?? 60;
+        const tokenStatus = checkPrivacyToken(cfg.privacyAuthToken, durationSec);
+        if (!tokenStatus.ok) {
+          set({ status: "error", error: `Privacy token: ${tokenStatus.reason}` });
+          return;
+        }
+        try {
+          const r = await fetch("/api/privacy-token/token", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: (cfg.privacyAuthToken ?? "").trim() }),
+          });
+          if (!r.ok) {
+            throw new Error(await r.text());
+          }
+        } catch (e) {
+          set({
+            status: "error",
+            error: `Failed to deliver privacy token: ${e instanceof Error ? e.message : String(e)}`,
+          });
+          return;
+        }
       }
 
       // Full reset BEFORE the POST.  Setting status to "initializing" here

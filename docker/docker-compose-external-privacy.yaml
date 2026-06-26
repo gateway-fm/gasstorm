@@ -1,0 +1,40 @@
+# External privacy proxy mode (PROD).
+#
+# Routes ALL load-generator RPC through a third party's already-configured
+# privacy proxy (PRIVACY_ROUTE_ALL=true). The proxy is the only RPC endpoint;
+# no bundled proxy / DB / local chain is needed.
+#
+# Token delivery: a prod proxy can't be authenticated programmatically (real
+# DID/wallet or IdP login is a human action). The user logs into the proxy,
+# copies the short-lived JWT, and pastes it in the dashboard. The dashboard POSTs
+# it to the privacy-token-receiver, which writes it to the shared token file the
+# load generator reads. The load generator stays a pure token consumer.
+#
+# Driven by `make loadtest-external-privacy PRIVACY=<name>`, which sources
+# config/privacy/<name>.env (PRIVACY_RPC_URL, PRIVACY_ORG_ID) and brings up
+# load-generator + dashboard + privacy-token-receiver.
+services:
+  load-generator:
+    environment:
+      - PRIVACY_RPC_URL=${PRIVACY_RPC_URL}
+      - PRIVACY_ORG_ID=${PRIVACY_ORG_ID:-}
+      - PRIVACY_ROUTE_ALL=true
+      # Token file lives on the shared volume, written by the receiver (paste).
+      - PRIVACY_AUTH_TOKEN_FILE=/shared/loadtest-jwt.txt
+      # No preconf WebSocket against an external proxy; confirmation uses polling.
+      - PRECONF_WS_URL=
+
+  # Receives the pasted JWT from the dashboard and writes it to the shared token
+  # file. Keeps token handling out of the load generator and the (static) browser.
+  privacy-token-receiver:
+    image: python:3.12-alpine
+    container_name: gasstorm-privacy-token-receiver
+    profiles: [ "reth", "reth-ext" ]
+    volumes:
+      - ../scripts/privacy-token-receiver.py:/receiver.py:ro
+      - privacy-loadtest-config:/shared
+    environment:
+      - PRIVACY_AUTH_TOKEN_FILE=/shared/loadtest-jwt.txt
+      - PRIVACY_ORG_ID_FILE=/shared/loadtest-org-id.txt
+    entrypoint: ["python3", "/receiver.py"]
+    restart: unless-stopped

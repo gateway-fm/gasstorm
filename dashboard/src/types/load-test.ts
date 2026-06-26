@@ -148,6 +148,11 @@ export interface LoadTestConfig {
   // Privacy mode (routes TXs through privacy proxy)
   privacyMode?: boolean;
 
+  // Privacy proxy JWT pasted in the UI (PROD: copied from the proxy after login).
+  // Delivered to the privacy-token-receiver before Start; optional (empty = use
+  // the existing/auto-refreshed token file).
+  privacyAuthToken?: string;
+
   // Nonce gap healing (sends no-op self-transfers to fill gaps during test)
   fixNonceGaps?: boolean;
 
@@ -344,6 +349,7 @@ export const DEFAULT_LOAD_TEST_CONFIG: LoadTestConfig = {
   txValue: 1000000000000000000n, // 1 ETH
   gasLimit: 21000,
   privacyMode: false,
+  privacyAuthToken: "",
   fixNonceGaps: false,
   erc721PreMint: 1000,
 };

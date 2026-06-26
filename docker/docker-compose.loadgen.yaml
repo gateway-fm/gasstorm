@@ -129,6 +129,7 @@ services:
       - BLOCK_TIME_MS=${BLOCK_TIME_MS:-150}
       - PRIVACY_RPC_URL=${PRIVACY_RPC_URL:-http://privacy-proxy:8080}
       - PRIVACY_AUTH_TOKEN_FILE=${PRIVACY_AUTH_TOKEN_FILE:-/shared/loadtest-jwt.txt}
+      - PRIVACY_ORG_ID_FILE=${PRIVACY_ORG_ID_FILE:-/shared/loadtest-org-id.txt}
     volumes:
       - privacy-loadtest-config:/shared:ro
       - loadgen-data:/data
@@ -158,6 +159,7 @@ services:
       - DATABASE_PATH=/data/loadgen.db
       - PRIVACY_RPC_URL=${PRIVACY_RPC_URL:-}
       - PRIVACY_AUTH_TOKEN_FILE=${PRIVACY_AUTH_TOKEN_FILE:-}
+      - PRIVACY_ORG_ID_FILE=${PRIVACY_ORG_ID_FILE:-}
     tmpfs:
       - /data:mode=1777
     ports:

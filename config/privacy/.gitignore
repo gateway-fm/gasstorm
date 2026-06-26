@@ -1,0 +1,5 @@
+# External-privacy configs and JWT token files may contain secrets — never commit
+# them. Only the example template is tracked.
+*.env
+*.token
+!example.env

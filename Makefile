@@ -1,4 +1,4 @@
-.PHONY: up down _up run run-build run-reth run-cdk-erigon run-metal stop-metal restart-metal run-attached stop restart logs status resource-report clean clean-metal build test test-load-generator test-dashboard test-tx bench-load-generator dev dev-infra dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-with-blob run-with-explorer run-with-privacy run-with-explorer-privacy pull-explorer pull-privacy run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks pull-blockbuilder pull-loadgenerator mcp-server mcp-build site-dev site-build tunnel-url _print-tunnel-url loadtest-privacy loadtest-direct run-high-throughput run-fast-confirm run-with-preconf run-conservative run-flashblocks run-gravity-reth run-with-bridge run-agglayer stop-agglayer test-contract test-e2e test-integration test-integration-quick test-smoke test-address-stats-rebuild balance
+.PHONY: up down _up run run-build run-reth run-cdk-erigon run-metal stop-metal restart-metal run-attached stop restart logs status resource-report clean clean-metal build test test-load-generator test-dashboard test-tx bench-load-generator dev dev-infra dev-loadgen dev-dashboard dev-stop dev-cdk-erigon bridge-deploy bridge-relayer bridge-relayer-stop bridge-logs bridge-deposit bridge-withdraw bridge-balances bridge-setup bridge-help run-with-blob run-with-explorer run-with-privacy run-with-explorer-privacy pull-explorer pull-privacy run-zisk test-zisk prover-status prover-prove prover-proofs prover-help setup-hooks pull-blockbuilder pull-loadgenerator mcp-server mcp-build site-dev site-build tunnel-url _print-tunnel-url loadtest-privacy loadtest-direct loadtest-external-privacy run-high-throughput run-fast-confirm run-with-preconf run-conservative run-flashblocks run-gravity-reth run-with-bridge run-agglayer stop-agglayer test-contract test-e2e test-integration test-integration-quick test-smoke test-address-stats-rebuild balance
 
 # =============================================================================
 # Configuration: Source .env file if it exists
@@ -836,6 +836,29 @@ loadtest-privacy: ## Start stack with privacy proxy for load testing
 
 loadtest-direct: ## Start stack without privacy for baseline comparison
 	$(MAKE) _up PROFILE=reth WITH=explorer
+
+loadtest-external-privacy: ## Load-test a THIRD PARTY's privacy proxy (PRIVACY=<name>, see config/privacy/example.env)
+	@if [ -z "$(PRIVACY)" ]; then \
+		echo "Usage: make loadtest-external-privacy PRIVACY=<name>   (reads config/privacy/<name>.env)"; \
+		echo "Create it from the template: cp config/privacy/example.env config/privacy/<name>.env"; \
+		exit 1; \
+	fi
+	@privacy_config="config/privacy/$(PRIVACY).env"; \
+	if [ ! -f "$$privacy_config" ]; then \
+		echo "Error: $$privacy_config not found. Create it from config/privacy/example.env:"; \
+		echo "  cp config/privacy/example.env $$privacy_config"; \
+		exit 1; \
+	fi; \
+	set -a; . ./$$privacy_config; set +a; \
+	if [ -z "$${PRIVACY_RPC_URL:-}" ]; then echo "Error: PRIVACY_RPC_URL not set in $$privacy_config"; exit 1; fi; \
+	export PRIVACY_RPC_URL PRIVACY_ORG_ID; \
+	docker network create gasstorm >/dev/null 2>&1 || true; \
+	docker compose -f $(COMPOSE_DIR)/docker-compose.loadgen.yaml -f $(COMPOSE_DIR)/docker-compose-external-privacy.yaml --profile reth up --build -d load-generator dashboard privacy-token-receiver; \
+	echo ""; \
+	echo "External-privacy load test ready (no bundled proxy/chain):"; \
+	echo "  Dashboard:  http://localhost:$${DASHBOARD_PORT:-18000}"; \
+	echo "  Proxy:      $$PRIVACY_RPC_URL$${PRIVACY_ORG_ID:+/rpc/$$PRIVACY_ORG_ID}"; \
+	echo "  Next: open the dashboard, choose 'Through Privacy Proxy', paste a fresh JWT, then Start."
 
 # #############################################################################
 # Documentation Site

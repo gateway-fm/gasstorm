@@ -7,6 +7,11 @@ set -e
 
 PROXY_URL="${PROXY_URL:-http://privacy-proxy:8080}"
 OUTPUT_FILE="/shared/loadtest-jwt.txt"
+ORG_ID_FILE="/shared/loadtest-org-id.txt"
+DID="did:test:loadtest"
+# Re-mint the proxy-issued JWT (~30 min TTL) on this interval so the token file
+# the load generator reads never goes stale. Configurable via env (seconds).
+REFRESH_INTERVAL="${TOKEN_REFRESH_INTERVAL:-1200}"
 MAX_RETRIES=60
 RETRY_INTERVAL=2
 
@@ -27,6 +32,20 @@ api_call() {
         curl -sf -X "$method" "${PROXY_URL}${path}" \
             -H "Content-Type: application/json"
     fi
+}
+
+# mint_and_write authenticates the loadtest DID via mock login and writes a fresh
+# JWT (+ org id) to the shared volume. Used for the initial token and the refresh
+# loop. Returns non-zero on failure (logged; retried next cycle).
+mint_and_write() {
+    _sid=$(api_call POST "/api/v1/auth/request" "" | jq -r '.session_id')
+    if [ -z "$_sid" ] || [ "$_sid" = "null" ]; then log "WARN: auth/request failed"; return 1; fi
+    _body=$(printf '{"session_id":"%s","jwz_token":"mock.%s"}' "$_sid" "$DID")
+    _tok=$(api_call POST "/api/v1/auth/verify" "$_body" | jq -r '.access_token')
+    if [ -z "$_tok" ] || [ "$_tok" = "null" ]; then log "WARN: auth/verify failed"; return 1; fi
+    echo "$_tok" > "$OUTPUT_FILE"
+    echo "$ORG_ID" > "$ORG_ID_FILE"
+    return 0
 }
 
 # ---- Step 1: Wait for privacy-proxy health ----------------------------------
@@ -85,6 +104,12 @@ fi
 
 # ---- Step 4: Set group access ------------------------------------------------
 
+# NOTE: claims MUST be empty for an org-admin group. Step 4b below promotes this
+# group to org-admin, and the proxy (v0.11.x) rejects a non-empty claims list on
+# org-admin groups with HTTP 400 ("claims do not apply to org-admin groups —
+# members receive all claims automatically"). A non-empty list breaks re-runs
+# (the first run works only because the group isn't admin yet). Empty claims keeps
+# this script idempotent so it can be re-run to refresh the (30-min TTL) JWT.
 log "Setting group access permissions..."
 ACCESS_BODY=$(cat <<'ENDJSON'
 {
@@ -105,7 +130,7 @@ ACCESS_BODY=$(cat <<'ENDJSON'
         "eth_getBlockByHash",
         "net_version"
     ],
-    "claims": ["read", "write", "deploy", "admin"]
+    "claims": []
 }
 ENDJSON
 )
@@ -122,7 +147,6 @@ log "Group promoted to org admin."
 
 # ---- Step 5: Authenticate via mock login -------------------------------------
 
-DID="did:test:loadtest"
 log "Authenticating mock user (DID: ${DID})..."
 
 # Step 5a: Request auth session
@@ -178,22 +202,6 @@ log "Adding user to group..."
 MEMBERSHIP_BODY=$(printf '{"org_id":"%s","group_id":"%s"}' "$ORG_ID" "$GROUP_ID")
 api_call POST "/api/v1/admin/users/${USER_ID}/memberships" "$MEMBERSHIP_BODY" > /dev/null 2>&1 || true
 log "User added to group."
-
-# ---- Step 7: Refresh JWT with updated memberships ----------------------------
-
-log "Refreshing JWT with updated memberships..."
-
-AUTH_REQ_RESP2=$(api_call POST "/api/v1/auth/request" "")
-SESSION_ID2=$(echo "$AUTH_REQ_RESP2" | jq -r '.session_id')
-
-VERIFY_BODY2=$(printf '{"session_id":"%s","jwz_token":"mock.%s"}' "$SESSION_ID2" "$DID")
-VERIFY_RESP2=$(api_call POST "/api/v1/auth/verify" "$VERIFY_BODY2")
-FINAL_TOKEN=$(echo "$VERIFY_RESP2" | jq -r '.access_token')
-
-if [ -z "$FINAL_TOKEN" ] || [ "$FINAL_TOKEN" = "null" ]; then
-    log "ERROR: Failed to refresh JWT. Response: $VERIFY_RESP2"
-    exit 1
-fi
 
 # ---- Step 8: Link load generator ETH addresses to the loadtest user ----------
 
@@ -267,15 +275,32 @@ do
 done
 log "Registered ${REGISTERED} loadtest contract slots under org ${ORG_ID}."
 
-# ---- Step 10: Write JWT to shared volume -------------------------------------
+# ---- Step 10: Write the initial JWT + org id, then refresh on a loop ---------
 
-log "Writing JWT to ${OUTPUT_FILE}..."
+# org id is exposed so the load generator (PRIVACY_ORG_ID_FILE) routes RPC to
+# /rpc/{org_id} (the loadtest user is in multiple orgs; a bare /rpc is ambiguous).
 mkdir -p "$(dirname "$OUTPUT_FILE")"
-echo "$FINAL_TOKEN" > "$OUTPUT_FILE"
+if ! mint_and_write; then
+    log "ERROR: failed to mint initial JWT"
+    exit 1
+fi
 
 log "Setup complete."
 log "  Org ID:    ${ORG_ID}"
 log "  Group ID:  ${GROUP_ID}"
 log "  User ID:   ${USER_ID}"
-log "  JWT file:  ${OUTPUT_FILE}"
+log "  JWT file:  ${OUTPUT_FILE}  (org id: ${ORG_ID_FILE})"
 log "  ETH addrs: ${LINKED} linked"
+log "  Refreshing JWT every ${REFRESH_INTERVAL}s to avoid expiry."
+
+# Keep the JWT fresh: the proxy issues short-lived (~30 min) access tokens, so
+# re-mint well within the TTL and rewrite the file the load generator reads.
+# This container stays running as the token refresher.
+while true; do
+    sleep "$REFRESH_INTERVAL"
+    if mint_and_write; then
+        log "refreshed JWT (next in ${REFRESH_INTERVAL}s)"
+    else
+        log "WARN: JWT refresh failed; retrying in ${REFRESH_INTERVAL}s"
+    fi
+done

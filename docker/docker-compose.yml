@@ -1105,6 +1105,10 @@ services:
       - TUNNEL_URL_FILE=/shared/tunnel-url.txt
       - ENABLE_RUNTIME_TRACING=true
       - FRONTEND_URL=http://localhost:18301
+      # Per-user in-flight request cap. Load tests run as ONE user, so the default
+      # (50) throttles high TPS with HTTP 429 "too many concurrent requests".
+      # Raised for load testing on this local devnet. Overridable.
+      - MAX_CONCURRENT_REQUESTS=${MAX_CONCURRENT_REQUESTS:-5000}
     volumes:
       - ../data/tunnel:/shared:ro
     ports:
@@ -1149,11 +1153,16 @@ services:
     depends_on:
       privacy-proxy:
         condition: service_started
+    environment:
+      # Re-mint the loadtest JWT on this interval (seconds) so it never expires
+      # mid-session — proxy access tokens are ~30 min. Default 20 min. Overridable.
+      - TOKEN_REFRESH_INTERVAL=${TOKEN_REFRESH_INTERVAL:-1200}
     volumes:
       - ../scripts/privacy-loadtest-setup.sh:/setup.sh:ro
       - privacy-loadtest-config:/shared
     entrypoint: ["sh", "-c", "apk add --no-cache curl jq > /dev/null 2>&1 && sh /setup.sh"]
-    restart: "no"
+    # Long-running: the script loops to refresh the JWT, so keep it alive.
+    restart: unless-stopped
 
   # --- Privacy CDK-Erigon variants ---
 
@@ -1206,6 +1215,10 @@ services:
       - TUNNEL_URL_FILE=/shared/tunnel-url.txt
       - ENABLE_RUNTIME_TRACING=true
       - FRONTEND_URL=http://localhost:18301
+      # Per-user in-flight request cap. Load tests run as ONE user, so the default
+      # (50) throttles high TPS with HTTP 429 "too many concurrent requests".
+      # Raised for load testing on this local devnet. Overridable.
+      - MAX_CONCURRENT_REQUESTS=${MAX_CONCURRENT_REQUESTS:-5000}
     volumes:
       - ../data/tunnel:/shared:ro
     ports:

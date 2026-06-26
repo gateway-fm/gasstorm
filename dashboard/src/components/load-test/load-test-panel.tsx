@@ -23,6 +23,7 @@ import {
 import { getPatternDescription, getDefaultConfigForPattern } from "@/lib/load-patterns";
 import { needsDeployment, loadDeployedContracts } from "@/lib/contract-deployer";
 import { formatDuration } from "@/lib/statistics";
+import { checkPrivacyToken } from "@/lib/jwt";
 import { cn } from "@/lib/utils";
 import { RealisticTestConfigPanel } from "./realistic-test-config";
 
@@ -100,6 +101,12 @@ export function LoadTestPanel() {
   // Duration & progress
   const duration = durationSec > 0 ? durationSec : config?.duration ?? 60;
   const progressPct = duration > 0 ? Math.min((elapsedTime / duration) * 100, 100) : 0;
+
+  // Privacy JWT (paste) validation: when privacy mode is on and a token is
+  // pasted, it must outlive the test. Blocks Start if expired/too short.
+  const privacyTokenStatus = checkPrivacyToken(config?.privacyAuthToken, duration);
+  const hasPrivacyToken = !!(config?.privacyAuthToken ?? "").trim();
+  const privacyBlocked = !!config?.privacyMode && !privacyTokenStatus.ok;
 
   // Init / verify sub-progress (0..1)
   const initSubPct = (() => {
@@ -182,6 +189,34 @@ export function LoadTestPanel() {
             </Button>
           </div>
         </div>
+
+        {/* Privacy JWT paste (prod: copy from the proxy after login) */}
+        {config?.privacyMode && (
+          <div className="grid grid-cols-[80px_1fr] items-start gap-3">
+            <Label className="text-xs font-mono text-muted-foreground mt-2">JWT</Label>
+            <div className="space-y-1">
+              <Input
+                type="password"
+                placeholder="Paste privacy-proxy JWT"
+                value={config?.privacyAuthToken ?? ""}
+                onChange={(e) => setConfig({ privacyAuthToken: e.target.value })}
+                disabled={isDisabled}
+                className="font-mono text-xs"
+              />
+              {!hasPrivacyToken ? (
+                <p className="text-xs text-muted-foreground font-mono">
+                  Optional locally (token auto-refreshes). For an external/prod proxy, log in there and paste a fresh JWT.
+                </p>
+              ) : privacyTokenStatus.ok ? (
+                <p className="text-xs text-success font-mono">
+                  Token valid — expires in {privacyTokenStatus.secondsLeft}s
+                </p>
+              ) : (
+                <p className="text-xs text-destructive font-mono">{privacyTokenStatus.reason}</p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Pattern tabs */}
         <div className="grid grid-cols-[80px_1fr] items-start gap-3 pt-1">
@@ -641,6 +676,7 @@ export function LoadTestPanel() {
             start={start}
             stop={stop}
             reset={reset}
+            startDisabled={privacyBlocked}
           />
         </div>
       </div>
@@ -860,16 +896,23 @@ function TransportAction({
   start,
   stop,
   reset,
+  startDisabled,
 }: {
   status: string;
   isStarting: boolean;
   start: () => void;
   stop: () => void;
   reset: () => void;
+  startDisabled?: boolean;
 }) {
   if (status === "idle") {
     return (
-      <Button onClick={start} disabled={isStarting} className="shrink-0 min-w-[140px]">
+      <Button
+        onClick={start}
+        disabled={isStarting || startDisabled}
+        title={startDisabled ? "Privacy JWT is expired or expires before the test ends" : undefined}
+        className="shrink-0 min-w-[140px]"
+      >
         {isStarting ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
