@@ -17,6 +17,8 @@ open http://localhost:18000/load-test/
 
 This builds all services from local sibling repos with 1s block times, and includes the privacy proxy and block explorer. See [Configuration](./docs/configuration.md) for advanced options.
 
+> **Component availability.** The full `make up` stack orchestrates several Gateway.fm components — **block-builder**, **privacy-proxy**, **block-explorer**, **chain-indexer** — some of which are **currently distributed from private sources/registries**. **`privacy-proxy`, `block-explorer`, and `chain-indexer` are planned to be open-sourced in 2026.** Until then, if you don't have access to those, you can still run GasStorm's **load generator + dashboard** (built from public source) against an **existing/external chain and privacy proxy** — see [External / standalone load testing](./docs/external-privacy.md).
+
 ## Architecture
 
 ```
@@ -290,3 +292,11 @@ Then open the dashboard, choose **Through Privacy Proxy**, paste a JWT, and **St
 - Key bottleneck: ECDSA sig verification (~40% builder CPU at high TPS)
 
 See [docs/TROUBLESHOOTING.md](./docs/TROUBLESHOOTING.md) for common issues including pipeline stuck, invalid JWT, low throughput, and Engine API SYNCING recovery.
+
+## License
+
+Licensed under the [Apache License 2.0](./LICENSE) — see [LICENSE](./LICENSE) and [NOTICE](./NOTICE).
+
+GasStorm orchestrates several external components (block builder, load generator, op-reth, agglayer, Hyperlane, etc.) that are distributed under their own licenses by their respective projects; see the [Components](#components) table.
+
+> **Note:** The bundled accounts and secrets are well-known **public test values** for local development only (the standard Anvil/Foundry keys and local dev JWTs). Never use them on a public network or with real funds.

@@ -1,0 +1,21 @@
+GasStorm
+Copyright 2026 Gateway.fm
+
+This product includes software developed at Gateway.fm (https://gateway.fm).
+
+Licensed under the Apache License, Version 2.0 (the "License"); see the LICENSE
+file for the full text.
+
+---
+
+GasStorm orchestrates several external components, each distributed under its own
+license by its respective project (pulled as Docker images or built from source;
+see README.md):
+
+  - block-builder, load-generator, privacy-proxy, block-explorer, chain-indexer
+    (gateway-fm)
+  - op-reth (Paradigm), cdk-erigon, agglayer / zkevm-bridge (Polygon),
+    Hyperlane agent (Abacus/Hyperlane), Foundry/Anvil (Foundry), Besu (Hyperledger)
+
+This NOTICE file does not modify the License. Third-party components are subject
+to their own licenses and notices.

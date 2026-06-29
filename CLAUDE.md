@@ -4,8 +4,6 @@
 
 Local devnet and stress-testing toolkit for EVM sequencers — spins up an L1/L2 stack, block builder, and load generator with a real-time dashboard to measure throughput, latency, and gas metrics.
 
-**Task Tracking:** See [todo.md](./todo.md) for current tasks and priorities.
-
 ## External Dependencies
 
 Both the block-builder and load-generator are maintained in separate repositories and pulled as Docker images:
