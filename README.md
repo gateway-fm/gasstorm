@@ -243,6 +243,18 @@ make loadtest-direct     # Start stack without privacy (baseline)
 
 After running tests in both modes, open the **History** tab in the dashboard to compare results side-by-side. Each run is badged as "Privacy" or "Direct".
 
+### Standalone load testing (external proxy / chain)
+
+To load-test a **third party's** already-deployed privacy proxy and chain — running **only** the load generator, dashboard, and token receiver, with **none** of the bundled services (no chain, explorer, indexer, or bundled privacy proxy):
+
+```bash
+git clone https://github.com/gateway-fm/loadgenerator ../loadgenerator   # sibling repo, built from source
+cp config/privacy/example.env config/privacy/<name>.env                  # set PRIVACY_RPC_URL (+ PRIVACY_ORG_ID, GASLESS)
+make loadtest-standalone PRIVACY=<name>
+```
+
+Then open the dashboard, choose **Through Privacy Proxy**, paste a JWT, and **Start**. See [External privacy / standalone load testing](./docs/external-privacy.md) for the full guide (build prerequisites, JWT delivery, gasless chains, reading results).
+
 ## Components
 
 | Component | Repository | Description |
@@ -260,6 +272,7 @@ After running tests in both modes, open the **History** tab in the dashboard to 
 |----------|-------------|
 | [Remote Deployment](./deploy/README.md) | Single-server and 3-way split deploy guide |
 | [Configuration](./docs/configuration.md) | Env vars, Makefile targets, Docker Compose profiles |
+| [Standalone load testing](./docs/external-privacy.md) | Load-test a third party's privacy proxy/chain with no bundled services (`make loadtest-standalone`) |
 | [System Architecture](./docs/system-architecture.md) | Service map, critical paths, design patterns, nonce management |
 | [Execution Layers](./docs/execution-layers.md) | reth / cdk-erigon / gravity-reth comparison |
 | [MCP Server](./docs/mcp.md) | AI tool integration (24 tools: stack management, builder, load generator) |

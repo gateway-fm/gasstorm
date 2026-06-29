@@ -148,6 +148,11 @@ export interface LoadTestConfig {
   // Privacy mode (routes TXs through privacy proxy)
   privacyMode?: boolean;
 
+  // Gasless network: skip account funding and send 0-value transactions.
+  // For chains with zero gas fees (eth-transfer only — contract types need a
+  // funded deployer).
+  gasless?: boolean;
+
   // Privacy proxy JWT pasted in the UI (PROD: copied from the proxy after login).
   // Delivered to the privacy-token-receiver before Start; optional (empty = use
   // the existing/auto-refreshed token file).
@@ -350,6 +355,7 @@ export const DEFAULT_LOAD_TEST_CONFIG: LoadTestConfig = {
   gasLimit: 21000,
   privacyMode: false,
   privacyAuthToken: "",
+  gasless: false,
   fixNonceGaps: false,
   erc721PreMint: 1000,
 };

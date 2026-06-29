@@ -28,6 +28,27 @@ and **paste it into the dashboard**. The dashboard POSTs it to a small
 `privacy-token-receiver` service, which writes it to the shared token file the
 load generator reads. The load generator stays a pure token consumer.
 
+## Build prerequisites
+
+The standalone stack **builds from source** — the dashboard from this repo's
+`dashboard/`, and the load generator from the
+[`loadgenerator`](https://github.com/gateway-fm/loadgenerator) repo, which must
+be cloned **as a sibling of this repo**:
+
+```
+parent/
+├── gasstorm/        # this repo
+└── loadgenerator/   # git clone https://github.com/gateway-fm/loadgenerator
+```
+
+```bash
+git clone https://github.com/gateway-fm/loadgenerator ../loadgenerator
+```
+
+(`make loadtest-standalone` checks for `../loadgenerator` and errors with this
+hint if it's missing.) The only image pulled is `postgres:15-alpine` for the
+token receiver — no private/bundled images.
+
 ## Setup
 
 ```bash
@@ -42,11 +63,17 @@ stored — you paste it per session. `config/privacy/*.env` is git-ignored (only
 ## Run
 
 ```bash
-make loadtest-external-privacy PRIVACY=<name>
+make loadtest-standalone PRIVACY=<name>
 ```
 
-This brings up only the **load generator + dashboard + privacy-token-receiver**,
-pointed at your proxy. Then:
+(`make loadtest-external-privacy` is kept as an alias.)
+
+This brings up **only** the **load generator + dashboard + privacy-token-receiver**
+(from `docker/docker-compose-standalone.yaml`), pointed at your proxy. It pulls in
+**none** of the bundled services — no privacy proxy, block explorer, chain
+indexer, L1/L2, bridge, etc. — and needs no pre-existing volumes or network, so
+it runs on a fresh checkout. The load generator builds from the sibling
+`../loadgenerator` repo and the dashboard from this repo's `dashboard/`. Then:
 
 1. Open the dashboard at <http://localhost:18000>.
 2. Log into your privacy proxy separately and copy a fresh JWT.
@@ -59,10 +86,26 @@ duration shorter than the token's remaining lifetime, or paste a fresher token.
 
 `privacyMode`/route-all means all traffic goes through the proxy regardless.
 
+## Gasless networks (no faucet keys needed)
+
+If the target chain has **zero gas fees** and self-authorizes senders by
+signature (`eth_sendRawTransaction`), you don't need funded or pre-authorized
+keys at all. Set `GASLESS=true` in `config/privacy/<name>.env` (or flip the
+dashboard **Gasless network** toggle per test). The load generator then:
+
+- **skips account funding** — random accounts send immediately, no faucet,
+- sends **0-value** ETH transfers (nothing to move, so no balance required),
+- uses **zero** gas tip and fee caps.
+
+Only the `eth-transfer` transaction type is supported in gasless mode (contract
+types need a funded deployer). On a chain whose base fee is **0**, a
+`maxFeePerGas=0` transaction is accepted; on a chain with any non-zero base fee
+these transactions are rejected as underpriced, so leave `GASLESS` off there.
+
 ## How it works
 
-`make loadtest-external-privacy` sources `config/privacy/<name>.env` and applies
-`docker/docker-compose-external-privacy.yaml`, which sets on the load generator:
+`make loadtest-standalone` sources `config/privacy/<name>.env` and runs only
+`docker/docker-compose-standalone.yaml`, which sets on the load generator:
 
 | Variable | Effect |
 |----------|--------|
@@ -71,6 +114,7 @@ duration shorter than the token's remaining lifetime, or paste a fresher token.
 | `PRIVACY_ROUTE_ALL=true` | Routes **all** RPC (not just sends) through the proxy with the token |
 | `PRIVACY_AUTH_TOKEN_FILE` | `/shared/loadtest-jwt.txt` — written by the receiver from the pasted JWT, re-read each test |
 | `PRECONF_WS_URL` (empty) | No preconfirmation WebSocket against an external proxy |
+| `GASLESS` | `true` on zero-fee chains: skip funding, send 0-value transfers, zero gas (see above) |
 
 Token delivery: dashboard paste → `POST /api/privacy-token/token` (nginx →
 `privacy-token-receiver:8080`) → writes `/shared/loadtest-jwt.txt` → the load

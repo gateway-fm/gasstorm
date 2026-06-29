@@ -144,6 +144,8 @@ export interface StartTestRequest {
   realisticConfig?: RealisticTestConfig;
   // Privacy mode (route through privacy proxy)
   privacyMode?: boolean;
+  // Gasless network: skip funding + send 0-value txs (zero-fee chains)
+  gasless?: boolean;
   // Nonce gap healing
   fixNonceGaps?: boolean;
   // ERC-721 pre-mint count (only valid when transactionType === "erc721-transfer")

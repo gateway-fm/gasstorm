@@ -1,0 +1,114 @@
+# Standalone external-privacy stack (publishable).
+#
+# Runs ONLY the parts needed to load-test a THIRD PARTY's already-deployed
+# privacy proxy + chain: the load generator, the dashboard, and the token
+# receiver. It pulls in NONE of the bundled/private services (privacy-proxy,
+# block-explorer, chain-indexer, L1/L2, bridge, agglayer, …) and needs no
+# pre-existing external volumes or network — so it works on a fresh checkout of
+# the published repo.
+#
+# Build inputs (both public repos, cloned as siblings):
+#   - load-generator  <- ../../loadgenerator
+#   - dashboard       <- ../dashboard   (in this repo)
+#   - privacy-token-receiver: postgres:15-alpine + ../scripts/privacy-token-receiver.py
+#
+# Driven by `make loadtest-standalone PRIVACY=<name>`, which sources
+# config/privacy/<name>.env (PRIVACY_RPC_URL, PRIVACY_ORG_ID, optional GASLESS)
+# and brings these three up. ALL RPC is routed through the proxy with a JWT you
+# paste in the dashboard; the receiver writes it to the shared token file the
+# load generator reads. See docs/external-privacy.md.
+services:
+  load-generator:
+    build:
+      context: ../../loadgenerator
+      dockerfile: Dockerfile
+    image: gatewayfm/loadgenerator:local
+    container_name: gasstorm-loadgen
+    # Root so the process can write loadgen.db into the loadgen-data volume
+    # (image runs as uid 1000; a fresh named volume mounts root-owned 755).
+    user: "0:0"
+    environment:
+      - EXECUTION_LAYER=${EXECUTION_LAYER:-reth}
+      # Builder/L2 endpoints are placeholders: in route-all mode every RPC is
+      # rebuilt to point at the proxy at test start, so these are never used for
+      # real calls (the block-metrics WS just warns; the chart uses the poller).
+      - BUILDER_RPC_URL=${BUILDER_RPC_URL:-http://unused:3000}
+      - L2_RPC_URL=${L2_RPC_URL:-http://unused:3000}
+      - L2_WS_URL=${L2_WS_URL:-}
+      # No preconf WebSocket against an external proxy; confirmation uses polling.
+      - PRECONF_WS_URL=
+      - LISTEN_ADDR=:3001
+      - DATABASE_PATH=/data/loadgen.db
+      - BLOCK_TIME_MS=${BLOCK_TIME_MS:-1000}
+      # Route ALL RPC through the third party's proxy, authed with the pasted JWT.
+      - PRIVACY_RPC_URL=${PRIVACY_RPC_URL}
+      - PRIVACY_ORG_ID=${PRIVACY_ORG_ID:-}
+      - PRIVACY_ROUTE_ALL=true
+      - PRIVACY_AUTH_TOKEN_FILE=/shared/loadtest-jwt.txt
+      - PRIVACY_ORG_ID_FILE=/shared/loadtest-org-id.txt
+      # Zero-fee chain: skip funding, send 0-value txs, zero gas (or use the
+      # dashboard "Gasless network" toggle per test). Leave empty for gas chains.
+      - GASLESS=${GASLESS:-}
+    volumes:
+      - privacy-loadtest-config:/shared:ro
+      - loadgen-data:/data
+    ports:
+      - "${LOADGEN_PORT:-13001}:3001"
+      - "16061:6061"
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: ../dashboard
+      dockerfile: Dockerfile
+    container_name: gasstorm-dashboard
+    environment:
+      # load-generator is the only real upstream. The explorer/chain hosts don't
+      # exist standalone, so they point at a dead local address: a literal IP
+      # (not a name) so nginx starts without a startup DNS lookup — some routes
+      # (the iframe /proxy/<port>/ ones) resolve their upstream at startup, and an
+      # unresolvable *name* there is fatal. Those routes just 502 if visited; the
+      # load-test page (-> load-generator) works. Override any of these to wire up
+      # an explorer/chain UI if you have one.
+      - LOADGEN_HOST=${LOADGEN_HOST:-load-generator:3001}
+      - CHAIN_HOST_RPC=${CHAIN_HOST_RPC:-127.0.0.1:1}
+      - CHAIN_HOST_BUILDER_WS=${CHAIN_HOST_BUILDER_WS:-127.0.0.1:1}
+      - CHAIN_HOST_L2_RPC=${CHAIN_HOST_L2_RPC:-127.0.0.1:1}
+      - CHAIN_HOST_L2_WS=${CHAIN_HOST_L2_WS:-127.0.0.1:1}
+      - CHAIN_HOST_L1=${CHAIN_HOST_L1:-127.0.0.1:1}
+      - EXPLORER_HOST_API=${EXPLORER_HOST_API:-127.0.0.1:1}
+      - EXPLORER_HOST_L1_API=${EXPLORER_HOST_L1_API:-127.0.0.1:1}
+      - EXPLORER_HOST_UI=${EXPLORER_HOST_UI:-127.0.0.1:1}
+      - EXPLORER_HOST_L1_UI=${EXPLORER_HOST_L1_UI:-127.0.0.1:1}
+      - PRIVACY_HOST_API=${PRIVACY_HOST_API:-127.0.0.1:1}
+      - PRIVACY_HOST_UI=${PRIVACY_HOST_UI:-127.0.0.1:1}
+    ports:
+      - "${DASHBOARD_PORT:-18000}:80"
+    healthcheck:
+      test: [ "CMD", "curl", "-sf", "http://localhost/" ]
+      interval: 10s
+      timeout: 5s
+      start_period: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # Receives the JWT pasted in the dashboard and writes it to the shared token
+  # file the load generator reads. Same postgres:15-alpine + python pattern as
+  # the bundled privacy-loadtest-setup, so no extra image to pull.
+  privacy-token-receiver:
+    image: postgres:15-alpine
+    container_name: gasstorm-privacy-token-receiver
+    volumes:
+      - ../scripts/privacy-token-receiver.py:/receiver.py:ro
+      - privacy-loadtest-config:/shared
+    environment:
+      - PRIVACY_AUTH_TOKEN_FILE=/shared/loadtest-jwt.txt
+      - PRIVACY_ORG_ID_FILE=/shared/loadtest-org-id.txt
+    entrypoint: ["sh", "-c", "apk add --no-cache python3 > /dev/null 2>&1 && python3 /receiver.py"]
+    restart: unless-stopped
+
+# Local volumes — auto-created by compose; no pre-existing external volumes
+# needed (unlike the bundled stack).
+volumes:
+  privacy-loadtest-config: {}
+  loadgen-data: {}

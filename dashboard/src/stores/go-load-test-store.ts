@@ -46,6 +46,10 @@ function buildStartRequest(cfg: LoadTestConfig): StartTestRequest {
     request.privacyMode = true;
   }
 
+  if (cfg.gasless) {
+    request.gasless = true;
+  }
+
   if (cfg.fixNonceGaps) {
     request.fixNonceGaps = true;
   }

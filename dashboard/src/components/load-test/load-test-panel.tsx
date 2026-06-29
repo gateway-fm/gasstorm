@@ -218,6 +218,36 @@ export function LoadTestPanel() {
           </div>
         )}
 
+        {/* Gasless network: skip funding + send 0-value txs (zero-fee chains) */}
+        <div className="grid grid-cols-[80px_1fr] items-start gap-3">
+          <Label className="text-xs font-mono text-muted-foreground mt-2">Gasless</Label>
+          <div className="space-y-1">
+            <div className="flex gap-2">
+              <Button
+                variant={!config?.gasless ? "default" : "outline"}
+                size="sm"
+                onClick={() => setConfig({ gasless: false })}
+                disabled={isDisabled}
+                className="flex-1"
+              >
+                Off
+              </Button>
+              <Button
+                variant={config?.gasless ? "default" : "outline"}
+                size="sm"
+                onClick={() => setConfig({ gasless: true, transactionType: "eth-transfer" })}
+                disabled={isDisabled}
+                className="flex-1"
+              >
+                Gasless network
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground font-mono">
+              Skips funding and sends 0-value transactions — for chains with zero gas fees.
+            </p>
+          </div>
+        </div>
+
         {/* Pattern tabs */}
         <div className="grid grid-cols-[80px_1fr] items-start gap-3 pt-1">
           <Label className="text-xs font-mono text-muted-foreground mt-2">Pattern</Label>
@@ -263,7 +293,7 @@ export function LoadTestPanel() {
                 <Select
                   value={config?.transactionType ?? "eth-transfer"}
                   onValueChange={(v) => setConfig({ transactionType: v as TransactionType })}
-                  disabled={isDisabled}
+                  disabled={isDisabled || !!config?.gasless}
                 >
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="Select transaction type" />
@@ -281,8 +311,14 @@ export function LoadTestPanel() {
                     ))}
                   </SelectContent>
                 </Select>
-                {selectedType && (
-                  <p className="text-xs text-muted-foreground">{selectedType.description}</p>
+                {config?.gasless ? (
+                  <p className="text-xs text-muted-foreground">
+                    Gasless mode sends 0-value ETH transfers only.
+                  </p>
+                ) : (
+                  selectedType && (
+                    <p className="text-xs text-muted-foreground">{selectedType.description}</p>
+                  )
                 )}
                 {needsDeploy && (
                   <p className="text-xs text-warning">
