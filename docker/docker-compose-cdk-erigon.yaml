@@ -65,6 +65,10 @@ services:
       - PRECONF_WS_URL=  # No preconfirmations in cdk-erigon mode
       - LISTEN_ADDR=:3001
       - DATABASE_PATH=/data/loadgen.db
+      # ERC-20 recipient pool (loadgenerator PRST-4669). Empty means unset: the
+      # historical all-random workload. Recorded in each run's environment snapshot.
+      - ERC20_RECIPIENT_POOL=${ERC20_RECIPIENT_POOL:-}
+      - ERC20_RECIPIENT_POOL_SEED=${ERC20_RECIPIENT_POOL_SEED:-}
       - PRIVACY_RPC_URL=${PRIVACY_RPC_URL:-}
       - PRIVACY_AUTH_TOKEN_FILE=${PRIVACY_AUTH_TOKEN_FILE:-}
     user: "0:0"

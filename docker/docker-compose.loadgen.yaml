@@ -134,6 +134,10 @@ services:
       - PRIVACY_RPC_URL=${PRIVACY_RPC_URL:-http://privacy-proxy:8080}
       - PRIVACY_AUTH_TOKEN_FILE=${PRIVACY_AUTH_TOKEN_FILE:-/shared/loadtest-jwt.txt}
       - PRIVACY_ORG_ID_FILE=${PRIVACY_ORG_ID_FILE:-/shared/loadtest-org-id.txt}
+      # ERC-20 recipient pool (loadgenerator PRST-4669). Empty means unset: the
+      # historical all-random workload. Recorded in each run's environment snapshot.
+      - ERC20_RECIPIENT_POOL=${ERC20_RECIPIENT_POOL:-}
+      - ERC20_RECIPIENT_POOL_SEED=${ERC20_RECIPIENT_POOL_SEED:-}
     volumes:
       - privacy-loadtest-config:/shared:ro
       - loadgen-data:/data
@@ -164,6 +168,10 @@ services:
       - PRIVACY_RPC_URL=${PRIVACY_RPC_URL:-}
       - PRIVACY_AUTH_TOKEN_FILE=${PRIVACY_AUTH_TOKEN_FILE:-}
       - PRIVACY_ORG_ID_FILE=${PRIVACY_ORG_ID_FILE:-}
+      # ERC-20 recipient pool (loadgenerator PRST-4669). Empty means unset: the
+      # historical all-random workload. Recorded in each run's environment snapshot.
+      - ERC20_RECIPIENT_POOL=${ERC20_RECIPIENT_POOL:-}
+      - ERC20_RECIPIENT_POOL_SEED=${ERC20_RECIPIENT_POOL_SEED:-}
     tmpfs:
       - /data:mode=1777
     ports:
