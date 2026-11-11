@@ -1,7 +1,7 @@
 # Hyperlane Init Container
 # Deploys Hyperlane core contracts via CLI, warp routes via ethers.js
 
-FROM node:20-slim
+FROM node:24.22.3-slim
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \

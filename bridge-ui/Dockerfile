@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Hyperlane Warp UI v2.0.0 Dockerfile
 
-FROM node:20-alpine AS base
+FROM node:24.22.3-alpine AS base
 RUN corepack enable && corepack prepare pnpm@10.25.0 --activate
 WORKDIR /app
 

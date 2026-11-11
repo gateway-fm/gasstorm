@@ -105,7 +105,7 @@
     "yaml-loader": "^0.8.1"
   },
   "engines": {
-    "node": ">=24"
+    "node": "^24.22.3 || >=26.13.1"
   },
   "homepage": "https://www.hyperlane.xyz",
   "license": "Apache-2.0",
