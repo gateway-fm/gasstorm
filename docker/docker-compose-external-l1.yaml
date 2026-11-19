@@ -21,7 +21,7 @@
 services:
   # Replace L1 with an nginx proxy forwarding to the external RPC
   l1:
-    image: nginx:alpine
+    image: nginx:1.30.7-alpine
     container_name: gasstorm-l1
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
     command: []

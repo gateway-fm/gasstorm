@@ -79,7 +79,7 @@ services:
 
   # Nginx proxy that forwards to the external Besu RPC (hides credentials from browser)
   external-l1-proxy:
-    image: nginx:alpine
+    image: nginx:1.30.7-alpine
     container_name: gasstorm-external-l1-proxy
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
     command: []
