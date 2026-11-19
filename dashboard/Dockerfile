@@ -34,7 +34,7 @@ RUN --mount=type=cache,target=/app/.next/cache \
     npm run build
 
 # Stage 2: Production
-FROM nginx:alpine
+FROM nginx:1.30.7-alpine
 
 # Install curl for healthcheck
 RUN apk add --no-cache curl
